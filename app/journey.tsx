@@ -1,14 +1,10 @@
-import { View, Text, StyleSheet } from "react-native";
+import React from "react";
+import { View, Text } from "react-native";
 
-export default function JourneyScreen() {
+export default function Journey() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>Journey Page</Text>
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <Text>Journey Page</Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center" },
-  text: { fontSize: 24 }
-});
