@@ -1,0 +1,130 @@
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+
+import { useAuth0 } from "@auth0/auth0-react";
+import { useUser } from "./UserContext";
+import { getModuleProgress, getLevelProgress } from "../api/mentorship";
+
+const ProgressContext = createContext(null);
+
+export const ProgressProvider = ({ children }) => {
+  const { getAccessTokenSilently } = useAuth0();
+  const { role, mentorId, menteeId, mentorshipIds, isContextLoading: isUserCtxLoading } =
+    useUser();
+
+  const [isContextLoading, setIsContextLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Cache progress states by mentorshipId
+  const [progressByMentorship, setProgressByMentorship] = useState({});
+
+  // Token helper
+  const getAuthHeaders = useCallback(async () => {
+    const token = await getAccessTokenSilently({
+      authorizationParams: { audience: import.meta.env.VITE_APP_AUTH0_AUDIENCE },
+    });
+    return { Authorization: `Bearer ${token}` };
+  }, [getAccessTokenSilently]);
+
+  // Set cached progress
+  const setProgress = useCallback((mentorshipId, updater) => {
+    setProgressByMentorship((prev) => {
+      const current = prev[mentorshipId] || {};
+      const next =
+        typeof updater === "function" ? updater(current) : { ...current, ...updater };
+      return { ...prev, [mentorshipId]: next };
+    });
+  }, []);
+
+  // ---- FETCH: Module progress ----
+  const fetchModuleProgress = useCallback(
+    async (mentorshipId) => {
+      if (!mentorshipId || !role) return null;
+      try {
+        const headers = await getAuthHeaders();
+        const data = await getModuleProgress(mentorshipId, role, headers.Authorization);
+        setProgress(mentorshipId, (curr) => ({ ...curr, moduleProgress: data || {} }));
+        return data;
+      } catch (e) {
+        console.error("ProgressContext: fetchModuleProgress failed", e);
+        setError(e);
+        return null;
+      }
+    },
+    [getAuthHeaders, role, setProgress]
+  );
+
+  // ---- FETCH: Level progress ----
+  const fetchLevelProgress = useCallback(
+    async (mentorshipId, moduleId) => {
+        if (!mentorshipId || !moduleId) return null;
+        try {
+        const headers = await getAuthHeaders();
+        const data = await getLevelProgress(
+            mentorshipId,
+            moduleId,
+            headers.Authorization
+        );
+
+        setProgress(mentorshipId, (curr) => ({
+            ...curr,
+            levelProgress: {
+            ...(curr.levelProgress || {}),
+            [moduleId]: data || {}
+            }
+        }));
+
+        return data;
+        } catch (e) {
+        console.error("ProgressContext: fetchLevelProgress failed", e);
+        setError(e);
+        return null;
+        }
+    },
+    [getAuthHeaders, setProgress]
+    );
+
+  // Bootstrap fetching once UserContext is ready
+  useEffect(() => {
+    const ready =
+      !isUserCtxLoading &&
+      role &&
+      ((role === "mentor" && mentorId) || (role === "mentee" && menteeId)) &&
+      Array.isArray(mentorshipIds) &&
+      mentorshipIds.filter(Boolean).length > 0;
+
+    if (ready) {
+      setIsContextLoading(true);
+      Promise.all(
+        mentorshipIds.filter(Boolean).map((mId) => fetchModuleProgress(mId))
+      )
+        .catch((e) => console.error("ProgressContext bootstrap failed", e))
+        .finally(() => setIsContextLoading(false));
+    }
+  }, [isUserCtxLoading, role, mentorId, menteeId, mentorshipIds, fetchModuleProgress]);
+
+  return (
+    <ProgressContext.Provider
+      value={{
+        isContextLoading,
+        error,
+        progressByMentorship,
+        fetchModuleProgress,
+        fetchLevelProgress,
+      }}
+    >
+      {children}
+    </ProgressContext.Provider>
+  );
+};
+
+export const useProgressContext = () => {
+  const ctx = useContext(ProgressContext);
+  if (!ctx) throw new Error("useProgressContext must be used within a ProgressProvider");
+  return ctx;
+};

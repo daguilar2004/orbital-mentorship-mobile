@@ -1,0 +1,73 @@
+import React, { createContext, useCallback, useContext, useState, useEffect } from "react";
+import { useAuth0 } from "@auth0/auth0-react";
+import { useUser } from "./UserContext";
+
+const Module0Context = createContext(null);
+
+export const Module0Provider = ({ children }) => {
+  const { isAuthenticated, getAccessTokenSilently, isLoading: isAuthLoading } = useAuth0();
+  const { userId } = useUser();
+
+  const ORB_SERVER_API_URL = import.meta.env.VITE_APP_SERVER_URL;
+
+  const [currentStep, setCurrentStep] = useState(null);
+  const [completedSteps, setCompletedSteps] = useState([]);
+  const [error, setError] = useState(null);
+  const [isLoadingSetup, setIsLoadingSetup] = useState(true);
+
+  const fetchSetupSteps = useCallback(async () => {
+    if (!isAuthenticated || !userId || isAuthLoading) return;
+
+    try {
+      setIsLoadingSetup(true);
+      const token = await getAccessTokenSilently({
+        authorizationParams: { audience: import.meta.env.VITE_APP_AUTH0_AUDIENCE },
+      });
+
+      const response = await fetch(`${ORB_SERVER_API_URL}/api/users/${userId}/status`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch setup steps.");
+      }
+
+      const data = await response.json();
+      setCurrentStep(data.currentStep);
+      setCompletedSteps(data.completedSteps);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoadingSetup(false);
+    }
+  }, [getAccessTokenSilently, isAuthenticated, userId, isAuthLoading, ORB_SERVER_API_URL]);
+
+  // Fetch once on mount
+  useEffect(() => {
+    fetchSetupSteps();
+  }, [fetchSetupSteps]);
+
+  return (
+    <Module0Context.Provider
+      value={{
+        currentStep,
+        completedSteps,
+        error,
+        isLoadingSetup,
+        refreshSteps: fetchSetupSteps,
+      }}
+    >
+      {children}
+    </Module0Context.Provider>
+  );
+};
+
+export const useModule0 = () => {
+  const ctx = useContext(Module0Context);
+  if (!ctx) throw new Error("useModule0 must be used within Module0Provider");
+  return ctx;
+};

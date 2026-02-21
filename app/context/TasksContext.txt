@@ -1,0 +1,226 @@
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import axios from "axios";
+import { useAuth0 } from "@auth0/auth0-react";
+import {useUser } from "../contexts/UserContext"; // to read role/ids/mentorshipIds
+
+const TasksContext = createContext(null);
+const ORB_SERVER_API_URL = import.meta.env.VITE_APP_SERVER_URL;
+
+export const TasksProvider = ({ children }) => {
+
+  const { getAccessTokenSilently } = useAuth0();
+  const { role, mentorId, menteeId, mentorshipIds, isContextLoading: isUserCtxLoading } = useUser();
+
+
+  const [isContextLoading, setIsContextLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Cache tasks per mentorship (so mentors w/ multiple mentorships don't re-fetch)
+  // Shape: { [mentorshipId]: Array<Task> }
+  const [tasksByMentorship, setTasksByMentorship] = useState({});
+
+  // Gets the auth0 token for calls
+  const getAuthHeaders = useCallback(async () => {
+    const token = await getAccessTokenSilently({
+      authorizationParams: { audience: import.meta.env.VITE_APP_AUTH0_AUDIENCE },
+    });
+
+    return { Authorization: `Bearer ${token}` };
+  }, [getAccessTokenSilently]);
+
+
+  const setTasks = useCallback((mentorshipId, updater) => {
+    setTasksByMentorship((prev) => {
+      const current = prev[mentorshipId] || [];
+      const next = typeof updater === "function" ? updater(current) : updater;
+      return { ...prev, [mentorshipId]: next };
+    });
+  }, []);
+
+  // ---- READ ----
+/**
+ * Fetches tasks for a specific mentorship.
+ *
+ * @param {string} mentorshipId The ID of the mentorship to fetch tasks for.
+ * @returns {Promise<Array<Object>|null>} A promise that resolves to an array of tasks if successful, or null if an error occurs.
+ * Sets the context loading state and error state accordingly.
+ */
+  const fetchTasks = useCallback(async (mentorshipId) => {
+    if (!mentorshipId) return null;
+    setIsContextLoading(true);
+    setError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const { data } = await axios.get(
+        `${ORB_SERVER_API_URL}/api/mentorships/${mentorshipId}/tasks`,
+        { headers }
+      );
+      setTasks(mentorshipId, Array.isArray(data) ? data : []);
+      return data;
+    } catch (e) {
+      setError(e);
+      console.error("TasksContext: fetchTasks failed", e);
+      return null;
+    } finally {
+      setIsContextLoading(false);
+    }
+  }, [getAuthHeaders, setTasks]);
+
+  // ---- CREATE ----
+  const createTask = useCallback(async (mentorshipId, payload) => {
+    if (!mentorshipId) return null;
+    const tempId = `temp-${Date.now()}`;
+    const optimistic = { ...payload, _id: tempId, status: payload.status || "To Do" };
+
+    // optimistic insert at top
+    setTasks(mentorshipId, (items) => [optimistic, ...items]);
+
+    try {
+      const headers = await getAuthHeaders();
+      const { data } = await axios.post(
+        `${ORB_SERVER_API_URL}/api/mentorships/${mentorshipId}/tasks`,
+        payload,
+        { headers }
+      );
+      setTasks(mentorshipId, (items) => items.map((t) => (t._id === tempId ? data : t)));
+      return data;
+    } catch (e) {
+      // rollback
+      setTasks(mentorshipId, (items) => items.filter((t) => t._id !== tempId));
+      throw e;
+    }
+  }, [getAuthHeaders, setTasks]);
+
+  // ---- UPDATE ----
+  const updateTask = useCallback(async (mentorshipId, taskId, patch) => {
+    if (!mentorshipId || !taskId) return null;
+
+    let snapshot;
+    setTasks(mentorshipId, (items) => {
+      snapshot = items;
+      return items.map((t) => (t._id === taskId ? { ...t, ...patch } : t));
+    });
+
+    try {
+      const headers = await getAuthHeaders();
+      
+      const { data } = await axios.patch(
+        `${ORB_SERVER_API_URL}/api/mentorships/tasks/${taskId}`,
+       { ...patch},
+        { headers }
+      );
+      setTasks(mentorshipId, (items) => items.map((t) => (t._id === taskId ? data : t)));
+      return data;
+    } catch (e) {
+      setTasks(mentorshipId, snapshot); // rollback
+      throw e;
+    }
+  }, [getAuthHeaders, setTasks]);
+
+  // ---- DELETE ----
+  const deleteTask = useCallback(async (mentorshipId, taskId) => {
+    if (!mentorshipId || !taskId) return false;
+
+    let snapshot;
+    setTasks(mentorshipId, (items) => {
+      snapshot = items;
+      return items.filter((t) => t._id !== taskId);
+    });
+
+    try {
+      const headers = await getAuthHeaders();
+      await axios.delete(
+        `${ORB_SERVER_API_URL}/api/mentorships/tasks/${taskId}`,
+        { headers }
+      );
+      return true;
+    } catch (e) {
+      setTasks(mentorshipId, snapshot); // rollback
+      throw e;
+    }
+  }, [getAuthHeaders, setTasks]);
+
+  // Push updates from other flows (e.g., S3 submission/PATCH done elsewhere or sockets)
+  const pushTaskUpdate = useCallback((mentorshipId, nextTask) => {
+    if (!mentorshipId || !nextTask?._id) return;
+    setTasks(mentorshipId, (items) => {
+      const exists = items.some((t) => t._id === nextTask._id);
+      return exists
+        ? items.map((t) => (t._id === nextTask._id ? nextTask : t))
+        : [nextTask, ...items];
+    });
+  }, [setTasks]);
+
+  // Mirror your UserContext helpers
+  const clearTasksContext = useCallback(() => {
+    setTasksByMentorship({});
+    setError(null);
+    setIsContextLoading(false);
+  }, []);
+
+  const refreshTasksContext = useCallback(async () => {
+    // re-fetch for all known mentorships 
+    if (!Array.isArray(mentorshipIds) || mentorshipIds.length === 0) return true;
+    setIsContextLoading(true);
+    setError(null);
+    try {
+      await Promise.all(mentorshipIds.filter(Boolean).map((mId) => fetchTasks(mId)));
+      return true;
+    } catch (e) {
+      setError(e);
+      return false;
+    } finally {
+      setIsContextLoading(false);
+    }
+  }, [mentorshipIds, fetchTasks]);
+
+  // Bootstrap: once user context finishes and we have IDs, fetch tasks for each mentorship
+  useEffect(() => {
+    const ready =
+      !isUserCtxLoading &&
+      role &&
+      ((role === "mentor" && mentorId) || (role === "mentee" && menteeId)) &&
+      Array.isArray(mentorshipIds) &&
+      mentorshipIds.filter(Boolean).length > 0;
+
+    if (ready) {
+      mentorshipIds.filter(Boolean).forEach((mId) => {
+        // only fetch if not already cached
+        if (!tasksByMentorship[mId]) fetchTasks(mId);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUserCtxLoading, role, mentorId, menteeId, mentorshipIds, fetchTasks]);
+
+  return (
+    <TasksContext.Provider
+      value={{
+        // state (parallel naming)
+        isContextLoading,
+        error,
+        tasksByMentorship,
+
+        // read helpers
+        fetchTasks,
+
+        // write ops (axios under the hood)
+        createTask,
+        updateTask,
+        deleteTask,
+
+        // misc
+        pushTaskUpdate,
+        refreshTasksContext,
+        clearTasksContext,
+      }}
+    >
+      {children}
+    </TasksContext.Provider>
+  );
+};
+
+export const useTasksContext = () => {
+  const ctx = useContext(TasksContext);
+  if (!ctx) throw new Error("useTasksContext must be used within a TasksProvider");
+  return ctx;
+};

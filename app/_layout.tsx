@@ -72,26 +72,6 @@ export default function Layout() {
             ),
           }}
         />
-
-        {/* Optional routes if you want them in the drawer too */}
-        <Drawer.Screen
-          name="phases"
-          options={{
-            title: "Phases",
-            drawerIcon: ({ color, size }) => (
-              <Ionicons name="layers" size={size} color={color} />
-            ),
-          }}
-        />
-        <Drawer.Screen
-          name="timeline"
-          options={{
-            title: "Timeline",
-            drawerIcon: ({ color, size }) => (
-              <Ionicons name="time" size={size} color={color} />
-            ),
-          }}
-        />
       </Drawer>
     </AppProvider>
   );
