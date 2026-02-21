@@ -1,0 +1,163 @@
+import React ,{ createContext, useContext, useState, useEffect, useCallback, useRef} from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
+import { useUser } from './UserContext';
+import axios from 'axios';
+
+const ResourceContext = createContext(null);
+const ORB_SERVER_API_URL = import.meta.env.VITE_APP_SERVER_URL;
+
+/*
+provider function, Heart of the context 
+holds the functions to:
+fetch data from api call 
+store info in cache
+sets TTL 
+update data from the network 
+cache update internally
+
+*/
+export const ResoureProvider = ({children}) => {
+    const {getAccessTokenSilently } = useAuth0();
+    const {role, mentorId, menteeId, mentorshipIds, isContextLoading: isUserCtxLoading } = useUser();
+
+    // States to track when data is loading 
+    const [isContextLoading, setIsContextLoading] = useState(false);
+    const [ error,setError] = useState(null);
+
+    // staate to cache the resource for that mentorship 
+    const [ resourcesByMentorship, setResourcesByMentorship] = useState({});
+
+    const tokenRef = useRef({ token: null , expMs: 0});
+    
+    const getAuthHeaders = useCallback(async () => {
+        const now = Date.now();
+        const cur =tokenRef.current || { token: null, expMs: 0};
+    
+    
+        if(!cur.token || now > cur.expMs) {
+            const token = await getAccessTokenSilently({
+            authorizationParams:{
+                    audience: import.meta.env.VITE_APP_AUTH0_AUDIENCE
+                }
+            })
+            let expMs = now + 5*60*1000;
+            try {
+                const { exp } = JSON.parse(atob(token.split('.')[1])); expMs = exp*1000 - 60000;
+                 } catch {}
+                tokenRef.current = { token, expMs };
+            }
+            
+            return  {
+                        Authorization: `Bearer ${tokenRef.current.token}`,
+                        'Content-Type': 'application/json',
+                    };
+   
+   
+    }, [getAccessTokenSilently]);
+
+
+    const setResources = useCallback((mentorshipId, updater) => {
+        setResourcesByMentorship((prev) => {
+            const current = prev[mentorshipId] || [];
+            const next = typeof updater === "function" ? updater(current) : updater;
+            return { ...prev, [mentorshipId]: next };
+         });
+    })
+
+    const fetchResources = useCallback(async (mentorshipId) => {
+        if(!mentorshipId) return null;
+        setIsContextLoading(true);
+        setError(null);
+
+        try{
+            const headers = await getAuthHeaders();
+            
+            const { data }= await axios.get( 
+                `${ORB_SERVER_API_URL}/api/mentorships/${mentorshipId}/resources`,
+                {
+                    headers
+                }
+            );
+
+   
+            setResources(mentorshipId, Array.isArray(data) ? data : []);
+            return data;
+        
+        }catch(err) {
+            console.error("ResourceContext: fetching resource failed");
+            return null;
+        }finally {
+            setIsContextLoading(false);
+        }
+    }, [getAuthHeaders, setResources]);
+
+    const createResource = useCallback( async (mentorshipId, payload) => {
+        if(!mentorshipId) return null;
+        setIsContextLoading(true);
+
+        try{
+            const headers = await getAuthHeaders();
+            const { data } = await axios.post(
+                    `${ORB_SERVER_API_URL}/api/mentorships/${mentorshipId}/resources`,
+                    payload,
+                    {headers}
+                )
+
+            const resource = await data.json();
+            console.log("responce from createResource", resource);
+            //setResources();
+            return resource;
+
+        
+        }catch(err) {
+            return null;
+        }finally{
+            setIsContextLoading(false);
+        }
+        
+    }, [getAuthHeaders, setResources])
+
+    // BootStrap: 
+    useEffect( () => {
+        
+        // checks that all the right resources are loaded to start apis
+         const ready = !isUserCtxLoading && role && 
+        ((role === "mentor" && mentorId) || (role === "mentee" && menteeId)) &&
+        Array.isArray(mentorshipIds) &&
+        mentorshipIds.filter(Boolean).length > 0;
+
+        if(ready) {
+            mentorshipIds.filter(Boolean).forEach((mId) => {
+                // checks that resource for that id is not in cache
+                if(!resourcesByMentorship[mId]) fetchResources(mId);
+            });
+        }
+    }, [isUserCtxLoading, role, menteeId, mentorId,mentorshipIds, fetchResources]);
+       
+    
+
+    return (
+        <ResourceContext.Provider
+          value={{
+            isContextLoading,
+            error,
+            resourcesByMentorship,
+
+            fetchResources,
+            createResource
+
+          }}
+        >
+            {children}
+        </ResourceContext.Provider>
+    );
+};
+
+// gives all the funcions in ResourcesContext to a use function so that parent Components can refrense the right actions
+export const useResourceContext = () => {
+    const ctx = useContext(ResourceContext);
+    if(!ctx) throw new Error("useResourceContext must be used within taskProvider")
+        return ctx;
+}
+
+

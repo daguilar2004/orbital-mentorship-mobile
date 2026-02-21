@@ -1,0 +1,793 @@
+import React, { createContext, useContext, useState, useMemo, useEffect, useCallback, useRef} from 'react'
+import { useAuth0 } from '@auth0/auth0-react'
+import { TbLockSquareRoundedFilled } from 'react-icons/tb'
+
+
+
+/**
+ * Context for storing and accessing user information across the application
+ * @type {React.Context<Object>}
+ */
+const UserContext = createContext(null)
+
+/**
+ * UserProvider Component
+ * 
+ * Centralized state management for user identity and role information.
+ * This provider serves as a single source of truth for user data across the application.
+ * 
+ * Key responsibilities:
+ * 1. Connects Auth0 authentication with application user data
+ * 2. Fetches and maintains user IDs and role information
+ * 3. Manages relationships between user, mentor, and mentee data
+ * 4. Provides loading states to coordinate data-dependent UI rendering
+ * 5. Offers methods to refresh or clear user context data
+ * 
+ * @param {Object} props - Component props
+ * @param {React.ReactNode} props.children - Child components that will have access to this context
+ * @returns {JSX.Element} UserContext.Provider wrapping the provided children
+ */
+export const UserProvider = ({ children }) => {
+    const { isAuthenticated, user, getAccessTokenSilently, isLoading } = useAuth0()
+    const ORB_SERVER_API_URL = import.meta.env.VITE_APP_SERVER_URL
+
+    /**
+     * Primary states tracking user identity and role information
+     * These values are used throughout the application to determine access and UI display
+     */
+    const [userId, setUserId] = useState('')
+    const [role, setRole] = useState('')
+    const [mentorId, setMentorId] = useState('')
+    const [menteeId, setMenteeId] = useState('')
+    const [mentorshipIds, setMentorshipIds] = useState([])
+    const [isContextLoading, setIsContextLoading] = useState(true)
+    const [setupProgress, setProgress] = useState('')
+
+    // States for caching data used across platform
+    const [usersByUserId, setUsersByUserId]       = useState({});
+    const [menteesById, setMenteesById]           = useState({});
+    const [mentorsById, setMentorsById]           = useState({});
+    const [mentorshipsById, setMentorshipsById]   = useState({});
+    const [displayByUserId, setDisplayByUserId]   = useState({});
+    const [menteeNames , setMenteeNames ]         = useState([]);
+    const [menteeNamesLoaded, setMenteeNamesLoaded ] = useState(false);
+    const PROFILE_TTL_MS = 5 * 60 * 1000;
+    let cachedToken = null;
+    let tokenExpiry = null;
+
+
+    function shouldUseCache(entry, ttl = PROFILE_TTL_MS) {
+        
+        if(!entry) return false;
+        if(entry.loading) return  false;
+        if(!entry.lastFetched) return false;
+        return Date.now() - entry.lastFetched < ttl;
+
+    }
+
+
+
+    const tokenRef = useRef({ token: null , expMs: 0});
+
+    const getAuthHeaders = useCallback(async () => {
+        const now = Date.now();
+        const cur =tokenRef.current || { token: null, expMs: 0};
+
+
+        if(!cur.token || now > cur.expMs) {
+            const token = await getAccessTokenSilently({
+                authorizationParams:{
+                    audience: import.meta.env.VITE_APP_AUTH0_AUDIENCE
+                }
+            })
+           let expMs = now + 5*60*1000;
+           try {
+             const { exp } = JSON.parse(atob(token.split('.')[1])); expMs = exp*1000 - 60000;
+             } catch {}
+            tokenRef.current = { token, expMs };
+        }
+        
+        return  {
+                    Authorization: `Bearer ${tokenRef.current.token}`,
+                    'Content-Type': 'application/json',
+                };
+
+
+        }, [getAccessTokenSilently]);
+       
+    
+    const fetchUserIfNeeded = useCallback(async (userId, {force= false }= {}) => {
+        if(!userId) return null;
+        const entry = usersByUserId[userId];
+        if(!force && shouldUseCache(entry) ) return entry?.data ?? null;
+
+        setUsersByUserId(s => ({ ...s, [userId]: { ...(s[userId] || {}), loading: true, error: null } }));
+
+        // Calls api to fetch new user data
+        try{
+            const headers = await getAuthHeaders();
+            const res = await fetch(`${ORB_SERVER_API_URL}/api/users/other-users/${userId}`,{
+                method: "GET",
+                headers: headers
+            }
+            )
+            if(!res) throw new Error("Failed to fetch user data")
+            const data = await res.json();
+            // sets new data to  exisitng UsersByUserId
+            setUsersByUserId(s => ({ ...s, [userId]: { data, loading: false, error: null, lastFetched: Date.now() } }));
+            return data;
+            
+        } catch(err) {
+        
+             setUsersByUserId(s => ({ ...s, [userId]: { ...(s[userId] || {}), loading: false, error: err } }))
+        }
+        
+
+    }, [usersByUserId, getAuthHeaders]);
+
+    // FUTURE: fetchMentorIfNeeded
+    const fetchMentorIfNeeded = useCallback(async (mentorId, { force = false } = {}) => {
+        if (!mentorId) return null;
+        const entry = mentorsById[mentorId];
+        if (!force && shouldUseCache(entry)) return entry?.data ?? null;
+
+        setMentorsById(s => ({ ...s, [mentorId]: { ...(s[mentorId]||{}), loading: true, error: null } }));
+        try {
+            const headers = await getAuthHeaders();
+            const res = await fetch(`${ORB_SERVER_API_URL}/api/mentors/${mentorId}`, { method: 'GET', headers });
+            const data = await res.json();
+            setMentorsById(s => ({ ...s, [mentorId]: { data, loading: false, error: null, lastFetched: Date.now() } }));
+            return data;
+        } catch (e) {
+            setMentorsById(s => ({ ...s, [mentorId]: { ...(s[mentorId]||{}), loading: false, error: e } }));
+            throw e;
+        }
+    }, [mentorsById, getAuthHeaders, ORB_SERVER_API_URL]);
+
+
+    async function fetchMyMenteeIfNeeded(opts = {}) {return menteeId ? fetchMenteeIfNeeded(menteeId, opts) : null;}
+    async function fetchMyMentorIfNeeded(opts = {}) {return mentorId ? fetchMentorIfNeeded(mentorId, opts) : null;}
+    
+    const fetchMenteeIfNeeded = useCallback(async (menteeId, { force = false } = {}) => {
+        if (!menteeId) return null;
+        const entry = menteesById[menteeId];
+        if (!force && (shouldUseCache(entry) || entry?.loading)) return entry?.data ?? null;
+
+        if (menteeInflight.current.has(menteeId)) {
+        return menteeInflight.current.get(menteeId);
+        }
+
+        const p = (async () => {
+             setMenteesById(s => (
+            { ...s, [menteeId]: { ...(s[menteeId]||{}), loading: true, error: null } }
+            ));
+
+        // calls api to fetch new mentor data
+        try {
+
+            const headers = await getAuthHeaders();
+            const res = await fetch(`${ORB_SERVER_API_URL}/api/mentees/${menteeId}`, {
+                 method: "GET",
+                 headers: headers  });
+
+            const data = await res.json();
+            setMenteesById(s => ({ ...s, [menteeId]: { data, loading: false, error: null, lastFetched: Date.now() } }));
+            return data;
+
+        } catch (e) {
+            setMenteesById(s => ({ ...s, [menteeId]: { ...(s[menteeId]||{}), loading: false, error: e } }));
+            throw e;
+        } finally {
+            menteeInflight.current.delete(menteeId);
+        }
+        })();
+
+        menteeInflight.current.set(menteeId, p);
+        return p;
+
+       
+    }, [menteesById, getAuthHeaders, ORB_SERVER_API_URL]);
+
+    
+    const mentorshipInflight = useRef(new Map());
+    const menteeInflight = useRef(new Map());
+    /**
+     * Fetches mentorship data by ID, using cached data if available and valid.
+     * If not valid, calls api to return and store data in cache
+     *
+     * @param {string} mId - The ID of the mentorship to fetch. If null, the function returns null.
+     * @param {object} [options={}] - Optional parameters.
+     * @param {boolean} [options.force=false] - If true, forces a refetch and bypasses the cache.
+     * @returns {Promise<object|null>} A promise that resolves to the mentorship data if successful, or null if mId is null.
+     * @throws {Error} If the fetch request fails.
+     */
+    const fetchMentorshipIfNeeded = useCallback(async (mId, { force = false } = {}) => {
+        if (!mId) return null;
+        const entry = mentorshipsById[mId];
+        if (!force && shouldUseCache(entry)) return entry?.data ?? null;
+
+        if ( !force && (shouldUseCache(entry)) || entry?.loading) return entry?.data ?? null;
+        
+        if(mentorshipInflight.current.has(mId)){
+            return mentorshipInflight.current.get(mId);
+        }
+
+        const p = (async () => {
+            setMentorshipsById(s => ({ ...s, [mId]: { ...(s[mId]||{}), loading: true, error: null } }));
+            try {
+                const headers = await getAuthHeaders();
+                const res = await fetch(`${ORB_SERVER_API_URL}/api/mentorships/${mId}`, {
+                    method: 'GET',
+                    headers:  headers }
+                    );
+
+                if(!res) throw new Error('failed to get mentorshipData');
+                const data = await res.json();
+                setMentorshipsById(s => ({ ...s, [mId]: { data, loading: false, error: null, lastFetched: Date.now() } }));
+                return data;
+
+            } catch (e) {
+                setMentorshipsById(s => ({ ...s, [mId]: { ...(s[mId]||{}), loading: false, error: e } }));
+                throw e;
+            } finally {
+                mentorshipInflight.current.delete(mId);
+            }
+
+        })();
+
+        menteeInflight.current.set(mId, p);
+        return p;
+    }, [mentorshipsById, getAuthHeaders, ORB_SERVER_API_URL]);
+
+    
+     const getMenteeNameByMentorshipId = useCallback( async (mentorshipId, {force = false } = {}) => {
+         const ms = await fetchMentorshipIfNeeded(mentorshipId, { force }).catch(() => null);
+        const menteeId = ms?.data?.menteeId ?? ms?.menteeId;
+        if (!menteeId) return 'Unknown';
+        const mentee = await fetchMenteeIfNeeded(menteeId, { force }).catch(() => null);
+        return mentee?.name ?? 'Unknown';
+     }, [fetchMenteeIfNeeded, fetchMenteeIfNeeded]);
+       
+    
+const fetchMenteeNameList = useCallback( async (mentorshipIds = []) => {
+    try{
+        console.log(mentorshipIds);
+        const ids = [...new Set((mentorshipIds || []).filter(Boolean))];
+        // No list in the id's given
+        console.log("ids: ", ids);
+        if(!ids.length) return [];
+
+        if( role !== "mentor") return [];
+
+        // Checks if list is already cached
+       if(menteeNamesLoaded) return menteeNames;
+
+        console.log("connecting ");
+
+        const headers = await getAuthHeaders();
+        const body = {
+            "mentorshipIds" : ids
+        }
+        console.log("conneting with the network");
+        const res = await fetch(
+            `${ORB_SERVER_API_URL}/api/mentorships/mentee-names`, {
+                method: "POST",
+                body: JSON.stringify({ mentorshipIds: ids }),
+                headers: headers
+            }
+        )
+        if (!res.ok) {
+          const txt = await res.text().catch(() => '');
+          throw new Error(`HTTP ${res.status} ${res.statusText} ${txt}`);
+        }
+        const list = await res.json();
+
+        console.log("Mentee name respones: ", list );
+        setMenteeNames(list);
+        setMenteeNamesLoaded(true);
+        return list;
+
+    }catch(error){
+        console.error("[UserContext] fetchMenteeNameList failed:", error);
+        throw error;
+    }
+
+
+}, [menteeNamesLoaded, role, getAuthHeaders, ORB_SERVER_API_URL, menteeNames] );
+
+    // One-shot, no-cache, no-context-writes version.
+// Returns: [{ mentorshipId, menteeId, name }]
+const loadMenteeNamesForMentorshipsOnce = useCallback(async (mentorshipIds) => {
+  const ids = [...new Set((mentorshipIds || []).filter(Boolean))];
+  if (!ids.length) return [];
+
+  // one token for the whole batch
+  const headers = await getAuthHeaders();
+
+  // small concurrency to avoid connection exhaustion
+  const fetchJson = async (url) => {
+    const res = await fetch(url, { method: 'GET', headers });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.json();
+  };
+
+  // 1) mentorships → menteeIds (limit parallelism)
+  const msResults = [];
+  const MS_CHUNK = 5;
+  for (let i = 0; i < ids.length; i += MS_CHUNK) {
+    const chunk = ids.slice(i, i + MS_CHUNK);
+    const part = await Promise.all(
+      chunk.map(id => fetchJson(`${ORB_SERVER_API_URL}/api/mentorships/${id}`).catch(() => null))
+    );
+    msResults.push(...part);
+  }
+  const pairs = ids.map((id, i) => ({ mentorshipId: id, menteeId: msResults[i]?.data?.menteeId ?? msResults[i]?.menteeId ?? null }))
+                  .filter(p => p.menteeId);
+
+  if (!pairs.length) return [];
+
+  // 2) mentees → names (limit parallelism)
+  const namesMap = new Map();
+  const M_CHUNK = 5;
+  for (let i = 0; i < pairs.length; i += M_CHUNK) {
+    const chunk = pairs.slice(i, i + M_CHUNK);
+    const part = await Promise.all(
+      chunk.map(p => fetchJson(`${ORB_SERVER_API_URL}/api/mentees/${p.menteeId}`).catch(() => null))
+    );
+    part.forEach((mentee, idx) => {
+      const mId = chunk[idx].menteeId;
+      if (mentee) namesMap.set(mId, mentee.name ?? 'Unknown');
+    });
+  }
+
+  return pairs.map(p => ({
+    mentorshipId: p.mentorshipId,
+    menteeId: p.menteeId,
+    name: namesMap.get(p.menteeId) ?? 'Unknown'
+  }));
+}, [getAuthHeaders, ORB_SERVER_API_URL]);
+
+
+
+    // this process could be done by the server its self.
+    // Rn its needs all mentorship data for each mentee to get the menteeId.
+    // then it has to fetch each mentee document to for the name
+    // we could make a call that takes a list of id's and extracts the mentee names form them.
+    // No api chains in the client, faster response time, less bloaded client. 
+// in UserContext
+/**
+ * 
+ * const warmMenteeProfilesForMentorships = useCallback(async (ids, { force = false } = {}) => {
+
+        if (!Array.isArray(ids) || ids.length === 0) return;
+
+        const mentorships = await Promise.all(
+            ids.map(id => fetchMentorshipIfNeeded(id, { force }).catch(() => null))
+        );
+
+        const menteeIds = mentorships
+            .map(m => m?.data?.menteeId ?? m?.menteeId)
+            .filter(Boolean);
+
+        const mentees = await Promise.all(
+            menteeIds.map(mid => fetchMenteeIfNeeded(mid, { force }).catch(() => null))
+        );
+
+        const userIds = mentees.map(mt => mt?.userId).filter(Boolean);
+
+        await Promise.all(
+            userIds.map(uid => fetchUserIfNeeded(uid, { force }).catch(() => null))
+        );
+    }, [fetchMentorshipIfNeeded, fetchMenteeIfNeeded, fetchUserIfNeeded]);
+
+
+ const warmMenteeNamesForMentorships = useCallback(async (mentorshipIds, { force = false } = {}) => {
+  const ids = (mentorshipIds || []).filter(Boolean);
+  if (ids.length === 0) return;
+
+  // 1. Figure out which mentorships are missing
+  const needMentorship = ids.filter(id => {
+    const entry = mentorshipsById[id];
+    return !(entry?.data?.menteeId && shouldUseCache(entry) && !force);
+  });
+
+  if (needMentorship.length > 0) {
+    await Promise.all(
+      needMentorship.map(id => fetchMentorshipIfNeeded(id, { force }).catch(() => null))
+    );
+  }
+
+  // 2. Now get menteeIds
+  const menteeIds = ids.map(id => mentorshipsById[id]?.data?.menteeId).filter(Boolean);
+
+  // 3. Only fetch missing names
+  const needMentees = menteeIds.filter(mId => {
+    const entry = menteesById[mId];
+    return !(entry?.data?.name && shouldUseCache(entry) && !force);
+  });
+
+  if (needMentees.length > 0) {
+    await Promise.all(
+      needMentees.map(mId => fetchMenteeIfNeeded(mId, { force }).catch(() => null))
+    );
+  }
+
+}, [fetchMentorshipIfNeeded, fetchMenteeIfNeeded]); 
+ */
+
+
+
+
+
+    
+    // read
+    // Functions that would be used by other sections of the app to select the data they need to display
+    // Grabbed from cache. DOES NOT CALL API 
+ 
+    function selectMyMentee()    { return menteesById[menteeId]?.data   || null; }
+    function selectMyMentor()    { return mentorsById[mentorId]?.data   || null; }
+
+    function selectUser(userId)        { return usersByUserId[userId]?.data || null; }
+    function selectMentee(menteeId)    { return menteesById[menteeId]?.data   || null; }
+    function selectMentorship(mId)     { return mentorshipsById[mId]?.data    || null; }
+
+    // in UserContext
+    const selectMenteeIdByMentorshipId = useCallback(
+    (mentorshipId) => mentorshipsById[mentorshipId]?.data?.menteeId ?? null,
+    [mentorshipsById]
+    );
+
+    const selectMenteeNameByMentorshipId = useCallback(
+    (mentorshipId) => {
+        const mId = selectMenteeIdByMentorshipId(mentorshipId);
+        return mId ? (menteesById[mId]?.data?.name ?? null) : null;
+    },
+    [selectMenteeIdByMentorshipId, menteesById]
+    );
+
+    function displayNameFromUser(u) {
+    if (!u) return "Unknown";
+    const full = [u.firstName, u.lastName].filter(Boolean).join(" ");
+    return full || u.username || "Unknown";
+    }
+
+    // write-through after external updates (PATCH)
+    function pushUserBasic(user) {
+    const id = user?.id || user?._id;
+    if (!id) return;
+    setUsersByUserId(s => ({ ...s, [id]: { data: user, loading: false, error: null, lastFetched: Date.now() } }));
+    }
+
+    function computeDisplayFromUser(user) {
+        if (!user) return { name: 'Unknown', avatarUrl: '' };
+        const name = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'Unknown';
+        const avatarUrl = user.picture || user.profilePictureUrl || '';
+        return { name, avatarUrl };
+    }
+
+    function pushDisplayForUser(userId, userObj){
+        const display = computeDisplayFromUser(userObj);
+        setDisplayByUserId(s => ({...s,[userId]: {...display, lastComputed: Date.now() }}))
+    }
+
+    async function getDisplayByUserId(userId, { force = false } = {}) {
+        // if we already computed and user cache is fresh, return it
+        const disp = displayByUserId[userId];
+        const userEntry = usersByUserId[userId];
+
+        const freshUser = userEntry && shouldUseCache(userEntry);
+        const freshDisp  = disp && freshUser && !force; // if user is fresh, display is implicitly fresh
+
+        if (freshDisp) return disp;
+
+        // ensure user is cached
+        const user = await fetchUserIfNeeded(userId, { force });
+        const nextDisplay = computeDisplayFromUser(user);
+        setDisplayByUserId(s => ({ ...s, [userId]: { ...nextDisplay, lastComputed: Date.now() } }));
+        return nextDisplay;
+
+    }
+
+    // pure selector (no fetch)
+    function selectDisplayByUserId(userId) {
+    return displayByUserId[userId] || null; // { name, avatarUrl } or null
+    }
+    
+
+    // Logs updated menteeId after re-render
+    useEffect(() => {
+        console.log("UserProvider: menteeId updated to ", menteeId);
+    }, [menteeId]);
+    
+    /**
+     * Fetches user identity information from the server
+     * This includes userId, role, mentorId, and menteeId
+     * 
+     * Key features:
+     * - Retrieves data using Auth0 token for authentication
+     * - Handles 404 gracefully for new users
+     * - Updates all relevant state values with retrieved data
+     * - Returns the raw data for potential direct use by the caller
+     * 
+     * @returns {Promise<Object|null>} The user data object or null if not available/error
+     */
+    const fetchUserIds = useCallback(async () => {
+        try {
+            if (!isAuthenticated || !user) {
+                setIsContextLoading(false)
+                return null
+            }
+            
+            setIsContextLoading(true);
+            
+            const auth0Token = await getAccessTokenSilently({
+                authorizationParams: {
+                    audience: import.meta.env.VITE_APP_AUTH0_AUDIENCE,
+                },
+            });
+
+            const response = await fetch(`${ORB_SERVER_API_URL}/api/users/my-user`, {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${auth0Token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                if (response.status === 404) {
+                    // User document not found, which is normal for new users
+                    console.log('User document not found - this is normal for new users')
+                    setIsContextLoading(false)
+                    return null
+                }
+                throw new Error(`HTTP error! Status: ${response.status}`)
+            }
+
+            const data = await response.json();
+            setUserId(data._id || '');
+            setRole(data.role || '');
+           
+            
+            // Ensure proper parsing of the IDs, which might be MongoDB ObjectIDs
+            const parsedMenteeId = (
+                data.menteeId && typeof data.menteeId.toString === 'function'
+                )
+                ? data.menteeId.toString()
+                : '';
+            const parsedMentorId = data.mentorId ? data.mentorId.toString() : '';
+            
+            console.log('UserContext: Fetched user data:', {
+                _id: data._id,
+                role: data.role,
+                menteeId: parsedMenteeId,
+                mentorId: parsedMentorId,
+                setupProgress: data.setupProgress
+            });
+            
+            setMenteeId(parsedMenteeId);
+            setMentorId(parsedMentorId);
+            setIsContextLoading(false);
+            setProgress(data.setupProgress || 1); // adds the setUpProgrss number to the user context
+            
+            return data  // Return the data so caller can use it directly
+        }
+        catch (error) {
+            console.error('Error fetching user data:', error)
+            setUserId('')
+            setRole('')
+            setMentorId('')
+            setMenteeId('')
+            setIsContextLoading(false)
+            return null
+        }
+    }, [isAuthenticated, user, getAccessTokenSilently, ORB_SERVER_API_URL])
+
+    /**
+     * Fetches active mentorship IDs based on the user's role
+     * For mentors: retrieves all current mentorships (potentially multiple)
+     * For mentees: retrieves the current mentorship (single)
+     * 
+     * @param {string} currentRole - The user's role ('mentor' or 'mentee')
+     * @param {string} currentMentorId - The user's mentor ID (if they are a mentor)
+     * @param {string} currentMenteeId - The user's mentee ID (if they are a mentee)
+     * @returns {Promise<void>}
+     */
+    const fetchMentorshipIds = useCallback(async (currentRole, currentMentorId, currentMenteeId) => {
+        try {
+            if (!isAuthenticated || !user || !currentRole) {
+                return
+            }
+            
+            // Guard against invalid IDs
+            if (currentRole === 'mentor' && !currentMentorId) {
+                console.log('Cannot fetch mentorships: No mentor ID available')
+                return
+            }
+            
+            if (currentRole === 'mentee' && !currentMenteeId) {
+                console.log('Cannot fetch mentorships: No mentee ID available')
+                return
+            }
+            
+            const auth0Token = await getAccessTokenSilently({
+                authorizationParams: {
+                    audience: import.meta.env.VITE_APP_AUTH0_AUDIENCE,
+                },
+            })
+
+            const idToUse = currentRole === 'mentee' ? currentMenteeId : currentMentorId
+            
+            const response = await fetch(`${ORB_SERVER_API_URL}/api/${currentRole}s/${idToUse}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${auth0Token}`,
+                    'Content-Type': 'application/json',
+                },
+            })
+
+            if (!response.ok) {
+                throw new Error(`HTTP eror! Status: ${response.status}`)
+            }
+
+            const data = await response.json()
+
+            if (currentRole === "mentor") {
+                setMentorshipIds(data.currentMentorships || [])
+            }
+            else if (currentRole === "mentee") {
+                setMentorshipIds(data.currentMentorship ? [data.currentMentorship] : [])
+            }
+        }
+        catch (error) {
+            console.error('Error fetching mentorship data:', error)
+            setMentorshipIds([''])
+        }
+    }, [isAuthenticated, user, getAccessTokenSilently, ORB_SERVER_API_URL])
+
+    /**
+     * Resets and refreshes all user context data
+     * Used when user data may have changed and needs to be re-fetched
+     * 
+     * The process:
+     * 1. Clear all state variables
+     * 2. Fetch basic user information
+     * 3. Fetch mentorship information based on updated user data
+     * 
+     * @returns {Promise<boolean>} Success status of the refresh operation
+     */
+    const refreshUserContext = useCallback(async () => {
+        try {
+            console.log("Refreshing user context...")
+            
+            setIsContextLoading(true)
+            setUserId('')
+            setRole('')
+            setMentorId('')
+            setMenteeId('')
+            setMentorshipIds([''])
+            
+            // Fetch basic user info
+            await fetchUserIds()
+            
+            // Short delay to ensure state updates have propagated
+            await new Promise(resolve => setTimeout(resolve, 200))
+            
+            // Get the latest values after state updates
+            const latestRole = role
+            const latestMentorId = mentorId
+            const latestMenteeId = menteeId
+            
+            if (latestRole && (latestMentorId || latestMenteeId)) {
+                await fetchMentorshipIds(latestRole, latestMentorId, latestMenteeId)
+            }
+            
+            console.log("User context refreshed successfully")
+            setIsContextLoading(false)
+            return true
+        }
+        catch (error) {
+            console.error('Error refreshing user context:', error)
+            setIsContextLoading(false)
+            return false
+        }
+    }, [fetchUserIds, fetchMentorshipIds, role, mentorId, menteeId])
+
+    useEffect(() => {
+        if( !isLoading && isAuthenticated){
+            if(menteeId) { fetchMyMenteeIfNeeded().catch(() => {} );}
+            if(mentorId) { fetchMyMentorIfNeeded().catch(() => {} );}
+        }
+    }, [isLoading, isAuthenticated, menteeId, mentorId])
+
+    /**
+     * Effect to initialize user context when authentication state changes
+     * Fetches user IDs on app startup or when auth state changes
+     * Clears user data when not authenticated
+     */
+    useEffect(() => {
+        if (!isLoading && isAuthenticated) {
+            fetchUserIds()
+        } else if (!isAuthenticated) {
+            // Clear user data when not authenticated
+            setUserId('')
+            setRole('')
+            setMentorId('')
+            setMenteeId('')
+            setMentorshipIds([''])
+            setIsContextLoading(false)
+        }
+    }, [isLoading, isAuthenticated, fetchUserIds])
+
+    /**
+     * Effect to fetch mentorship IDs once user identity and role are established
+     * Only executes when we have the required IDs based on the user's role
+     */
+    useEffect(() => {
+        const hasRequiredId = (role === 'mentor' && mentorId) || (role === 'mentee' && menteeId)
+        
+        if (!isLoading && isAuthenticated && role && hasRequiredId) {
+            fetchMentorshipIds(role, mentorId, menteeId)
+        }
+    }, [isLoading, isAuthenticated, role, mentorId, menteeId, fetchMentorshipIds])
+
+    /**
+     * Clears all user context state
+     * Used during logout or when needing to reset user state
+     */
+    const clearUserContext = useCallback(() => {
+        setUserId('')
+        setRole('')
+        setMentorId('')
+        setMenteeId('')
+        setMentorshipIds([''])
+    }, [])
+
+   const value = useMemo(() => ({
+    // existing ids & flags
+    userId, role, mentorId, menteeId, mentorshipIds, isContextLoading, setupProgress,
+    clearUserContext, refreshUserContext,
+    selectMyMentee,selectMyMentor,
+    // caches + helpers
+    usersByUserId, menteesById, mentorshipsById,
+    fetchUserIfNeeded, fetchMenteeIfNeeded, fetchMentorshipIfNeeded,
+    fetchMyMenteeIfNeeded, fetchMyMentorIfNeeded,
+    getMenteeNameByMentorshipId,
+
+    fetchMenteeNameList,
+
+    loadMenteeNamesForMentorshipsOnce,
+
+    
+    selectUser, selectMentee, selectMentorship, 
+    displayNameFromUser, selectDisplayByUserId,selectMenteeNameByMentorshipId,
+    getDisplayByUserId,
+    pushUserBasic, pushDisplayForUser
+
+    }), [
+    userId, role, mentorId, menteeId, mentorshipIds, isContextLoading, setupProgress,
+    usersByUserId, menteesById, mentorshipsById,
+    fetchUserIfNeeded, fetchMenteeIfNeeded, fetchMentorshipIfNeeded,fetchMyMentorIfNeeded,fetchMenteeNameList
+    ]);
+
+    return (
+        <UserContext.Provider value={value}>
+            {children}
+        </UserContext.Provider>
+    )
+}
+
+/**
+ * Custom hook to use the UserContext
+ * Validates that the hook is used within a UserProvider
+ * 
+ * @returns {Object} The user context object containing all user state and methods
+ * @throws {Error} If used outside of a UserProvider
+ */
+export const useUser = () => {
+    const context = useContext(UserContext)
+    if (context === undefined) {
+        throw new Error('useUser must be used within a UserProvider')
+    }
+    return context
+}

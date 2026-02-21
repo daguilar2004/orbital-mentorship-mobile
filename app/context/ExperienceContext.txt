@@ -1,0 +1,50 @@
+import React, { createContext, useState, useContext, useEffect } from "react";
+import { useAuth0 } from "@auth0/auth0-react";
+import { getMentorData, getMenteeData } from "../api/mentorship";
+import { useUser } from "./UserContext";
+
+const ExperienceContext = createContext();
+
+export const ExperienceProvider = ({ children }) => {
+  const { getAccessTokenSilently } = useAuth0();
+  const { role, mentorId, menteeId, mentorshipIds } = useUser();
+  const mentorshipId = mentorshipIds?.[0] || null;
+  
+  const [userXP, setUserXP] = useState(0);
+
+  // Fetch XP once when role/id changes
+  useEffect(() => {
+    const fetchXP = async () => {
+      try {
+        const token = await getAccessTokenSilently({
+          authorizationParams: {
+            audience: import.meta.env.VITE_APP_AUTH0_AUDIENCE,
+          },
+        });
+
+        let roleData;
+        if (role === "mentor" && mentorId) {
+          roleData = await getMentorData(mentorId, token);
+          setUserXP(roleData?.profile?.xp ?? 0);
+        } else if (role === "mentee" && menteeId) {
+          roleData = await getMenteeData(menteeId, token);
+          setUserXP(roleData?.profile?.xp ?? 0);
+        }
+      } catch (err) {
+        console.error("Failed to fetch XP:", err);
+      }
+    };
+
+    if (role && (mentorId || menteeId)) {
+      fetchXP();
+    }
+  }, [role, mentorId, menteeId, getAccessTokenSilently, mentorshipId]);
+
+  return (
+    <ExperienceContext.Provider value={{ userXP, setUserXP }}>
+      {children}
+    </ExperienceContext.Provider>
+  );
+};
+
+export const useExperience = () => useContext(ExperienceContext);
