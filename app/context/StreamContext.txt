@@ -1,0 +1,357 @@
+/**
+ * StreamContext.jsx
+ * 
+ * This file provides a central context for Stream.io integration,
+ * handling both Stream Chat and Stream Video services.
+ */
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { StreamChat } from 'stream-chat'; // Stream Chat SDK
+import { StreamVideoClient } from '@stream-io/video-react-sdk'; // Stream Video SDK
+import { useAuth0 } from '@auth0/auth0-react'; // Auth0 authentication
+import axios from 'axios'; // HTTP client for API requests
+
+// Create a context to share Stream state across components
+const StreamContext = createContext(null);
+
+/**
+ * StreamProvider - Provider component for Stream Chat and Video functionality
+ * 
+ * This component:
+ * 1. Integrates with Auth0 for authentication
+ * 2. Manages StreamChat and StreamVideo clients
+ * 3. Handles token acquisition and management
+ * 4. Exposes Stream functionality to child components
+ */
+export const StreamProvider = ({ children }) => {
+    // Access Auth0 authentication context
+    const { isAuthenticated, user, getAccessTokenSilently, isLoading } = useAuth0();
+
+    // Environment variables for configuration
+    const STREAM_API_KEY = import.meta.env.VITE_APP_STREAM_API_KEY || '';
+    const ORB_SERVER_API_URL = import.meta.env.VITE_APP_SERVER_URL || '';
+    
+    // Log API key for debugging
+    console.log('ENV:', import.meta.env.VITE_APP_STREAM_API_KEY);
+
+    // Log warning if Stream API key is missing
+    useEffect(() => {
+        if (!STREAM_API_KEY) {
+            console.error('Stream API key is missing. Please check your environment variables.');
+            console.log('Make sure you have VITE_APP_STREAM_API_KEY in your .env file');
+        }
+    }, [STREAM_API_KEY]);
+
+    // Store Stream user information and tokens
+    const [streamUser, setStreamUser] = useState({
+        id: '',
+        name: '',
+        streamChatToken: '',
+        streamVideoToken: '',
+        isAuthenticated: false
+    });
+
+    // Stream client instances
+    const [videoClient, setVideoClient] = useState(null);
+    const [chatClient, setChatClient] = useState(null);
+
+    /**
+     * Effect to initialize Stream user when Auth0 authentication changes
+     * This handles token acquisition and user setup
+     */
+    useEffect(() => {
+        const setupStreamUser = async () => {
+            if (isAuthenticated && user) {
+                try {
+                    // Format user ID to be compatible with Stream
+                    const userId = user.sub.replace('|', '-');
+
+                    // Get Stream tokens from backend
+                    const tokens = await getStreamTokens();
+                    
+                    // Validate tokens
+                    if (!tokens || !tokens.streamChatToken || !tokens.streamVideoToken) {
+                        console.error('Failed to get valid Stream tokens');
+                        return; // Exit early to avoid setting invalid user state
+                    }
+
+                    // console.log("Stream user state to be set: \n",
+                    //     {
+                    //         id: userId,
+                    //         name: user.name || user.email,
+                    //         streamChatToken: tokens.streamChatToken,
+                    //         streamVideoToken: tokens.streamVideoToken,
+                    //         isAuthenticated: true
+                    //     }
+                    // )
+
+                    // Update Stream user state with tokens and user info
+                    setStreamUser({
+                        id: userId,
+                        name: user.name || user.email,
+                        streamChatToken: tokens.streamChatToken,
+                        streamVideoToken: tokens.streamVideoToken,
+                        isAuthenticated: true
+                    });
+
+                    // console.log(streamUser)
+                } catch (error) {
+                    console.error('Error setting up Stream user:', error);
+                }
+            } else if (!isLoading && !isAuthenticated) {
+                // Reset Stream user state when not authenticated
+                setStreamUser({
+                    id: '',
+                    name: '',
+                    streamChatToken: '',
+                    streamVideoToken: '',
+                    isAuthenticated: false
+                });
+            }
+        };
+
+        setupStreamUser();
+    }, [isAuthenticated, user, getAccessTokenSilently, isLoading]);
+
+    /**
+     * Effect to initialize Stream Chat client when user authentication changes
+     * Creates and configures the chat client with user credentials
+     */
+    useEffect(() => {
+        let newChatClient;
+        
+        // Initialize the Stream Chat client
+        const createChatClient = async () => {
+            if (streamUser.isAuthenticated && streamUser.id && streamUser.streamChatToken) {
+                // Get a new instance of the StreamChat client
+                newChatClient = StreamChat.getInstance(STREAM_API_KEY);
+
+                try {
+                    // Connect the user to Stream Chat
+                    await newChatClient.connectUser(
+                        {
+                            id: streamUser.id,
+                            name: streamUser.name,
+                        },
+                        streamUser.streamChatToken
+                    );
+                    
+                    console.log('Chat client connected successfully');
+                    // Set the chat client in state
+                    setChatClient(newChatClient);
+                } catch (error) {
+                    console.error('Error connecting chat client:', error);
+                    // Attempt to disconnect if connection failed partially
+                    if (newChatClient?.disconnectUser) {
+                      await newChatClient.disconnectUser();
+                    }
+                    setChatClient(null); // Ensure client state is null on error
+                }
+            }
+        };
+
+        createChatClient();
+        
+        // Cleanup function: Disconnect the user when dependencies change or component unmounts
+        return () => {
+            if (newChatClient) {
+                console.log('Disconnecting chat client');
+                newChatClient.disconnectUser().catch(err => {
+                    console.error('Error disconnecting chat client:', err);
+                });
+            }
+            setChatClient(null); // Reset client state on cleanup
+        };
+
+    }, [streamUser.isAuthenticated, streamUser.id, streamUser.streamChatToken, streamUser.name, STREAM_API_KEY]);
+
+    /**
+     * Effect to initialize Stream Video client when user authentication changes
+     * Creates and configures the video client with user credentials
+     */
+    useEffect(() => {
+        const createVideoClient = async () => {
+            if (streamUser.isAuthenticated && streamUser.id && streamUser.streamVideoToken) {
+                try {
+                    console.log('Initializing video client with:', {
+                        apiKey: STREAM_API_KEY,
+                        userId: streamUser.id,
+                        userName: streamUser.name
+                    });
+                    
+                    // Create a new instance of the StreamVideoClient
+                    const newVideoClient = new StreamVideoClient({
+                        apiKey: STREAM_API_KEY,
+                        user: {
+                            id: streamUser.id,
+                            name: streamUser.name,
+                        },
+                        token: streamUser.streamVideoToken,
+                    });
+                    
+                    console.log('Video client created successfully');
+                    setVideoClient(newVideoClient);
+                } catch (error) {
+                    console.error('Error creating video client:', error);
+                }
+            }
+        };
+
+        createVideoClient();
+
+        // Cleanup when component unmounts or dependencies change
+        return () => {
+            if (videoClient) {
+                console.log('Disconnecting video client');
+                try {
+                    videoClient.disconnectUser();
+                } catch (error) {
+                    console.error('Error disconnecting video client:', error);
+                }
+                setVideoClient(null);
+            }
+        };
+    }, [streamUser.isAuthenticated, streamUser.id, streamUser.streamVideoToken, streamUser.name, STREAM_API_KEY]);
+
+    /**
+     * Fetches Stream tokens from the backend API
+     * Uses Auth0 token for authentication with the server
+     * 
+     * @returns {Object} Object containing streamChatToken and streamVideoToken
+     */
+    const getStreamTokens = async () => {
+        try {
+            // Get Auth0 access token
+            const auth0Token = await getAccessTokenSilently({
+                authorizationParams: {
+                    audience: import.meta.env.VITE_APP_AUTH0_AUDIENCE,
+                },
+            });
+
+            console.log('Attempting to fetch Stream tokens from:', `${ORB_SERVER_API_URL}/api/auth/streamio/login`);
+            
+            // Request Stream tokens from backend
+            const response = await fetch(`${ORB_SERVER_API_URL}/api/auth/streamio/login`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${auth0Token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+            
+            // Check response status
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Server responded with error:', response.status, errorText);
+                throw new Error(`Server error: ${response.status}`);
+            }
+
+            // Parse response data
+            const data = await response.json();
+            
+            // Validate tokens in response
+            if (!data.streamChatToken || !data.streamVideoToken) {
+                console.error('Invalid token data received:', data);
+                throw new Error('Invalid token data from server');
+            }
+            
+            // Return tokens
+            return {
+                streamChatToken: data.streamChatToken,
+                streamVideoToken: data.streamVideoToken,
+            };
+        } catch (error) {
+            console.error('Error fetching tokens for Stream:', error);
+            // Return empty tokens to avoid undefined errors
+            return {
+                streamChatToken: '',
+                streamVideoToken: ''
+            };
+        }
+    };
+
+    /**
+     * Invalidates Stream tokens and disconnects clients
+     * Called during logout or token refresh
+     */
+    const invalidateStreamToken = async () => {
+        try {
+            // Disconnect from Stream services
+            chatClient.disconnectUser().then(() => {
+                setChatClient(null);
+            });
+            videoClient.disconnectUser().then(() => {
+                setVideoClient(null);
+            });
+
+            // Get Auth0 token for backend API call
+            const auth0Token = await getAccessTokenSilently({
+                authorizationParams: {
+                    audience: import.meta.env.VITE_APP_AUTH0_AUDIENCE,
+                },
+            });
+
+            // Call backend to invalidate tokens
+            axios.get(
+                `${ORB_SERVER_API_URL}/api/auth/streamio/logout`,
+                {},
+                {
+                    headers: {
+                        'Authorization': `Bearer ${auth0Token}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            )
+                .then(response => {
+                    console.error(response.data)
+                })
+                .catch(error => {
+                    console.error('Error fetching tokens for Stream:', error);
+                });
+                
+            // Reset Stream user state
+            setStreamUser({
+                id: '',
+                name: '',
+                streamChatToken: '',
+                streamVideoToken: '',
+                isAuthenticated: false
+            });
+        }
+        catch (error) {
+            console.error('Error logging out for Stream:', error);
+        }
+    };
+
+    // Context value with all Stream functionality and state
+    return (
+        <StreamContext.Provider
+            value={{
+                chatClient,
+                videoClient,
+                streamUser,
+                getStreamTokens, // Manual token acquisition method
+                invalidateStreamToken, // Method to invalidate tokens
+                streamAuthenticated: streamUser.isAuthenticated,
+                isLoading // Auth0 loading state
+            }}
+        >
+            {children}
+        </StreamContext.Provider>
+    );
+};
+
+/**
+ * useStream - Custom hook to access Stream context
+ * 
+ * Provides a convenient way for components to access Stream functionality
+ * Throws an error if used outside of a StreamProvider
+ * 
+ * @returns {Object} Stream context value
+ */
+export const useStream = () => {
+    const context = useContext(StreamContext);
+    if (!context) {
+        throw new Error('useStream must be used within a StreamProvider');
+    }
+    return context;
+};

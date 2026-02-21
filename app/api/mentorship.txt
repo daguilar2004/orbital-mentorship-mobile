@@ -1,0 +1,233 @@
+import axios from "axios";
+const API_URL = import.meta.env.VITE_APP_SERVER_URL;
+
+
+
+export const getModuleProgress = async (mentorshipId,role, token ) => {
+    try{
+       
+        const res = await fetch(`${API_URL}/api/mentorships/${mentorshipId}/modules/progress?role=${role}`, {
+            method: "GET",
+            headers: {
+                "Authorization": token,
+                "Content-Type": "application/json",
+            },
+        })
+        if (!res.ok) {
+            throw new Error("Failed to fetch module progress");
+        }
+        const data =  await res.json();
+        return data;
+
+    }catch(error){
+        console.error("Error fetching module progress:", error);
+        throw error;
+    }
+
+
+}
+
+export const getLevelProgress = async (mentorshipId,moduleId,token) => {
+    try{
+        
+        const res = await fetch(`${API_URL}/api/mentorships/${mentorshipId}/modules/${moduleId}/levels/progress`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": token,
+            },
+        })
+        if (!res.ok) {
+            throw new Error("Failed to fetch level progress");
+        }
+        const data =  await res.json();
+        return data;
+
+    }catch(error){
+        console.error("Error fetching level progress:", error);
+        throw error;
+    }
+}
+
+
+export const getMentorData = async (mentorId, token) => {
+    try {
+        const id = mentorId.userId || mentorId; // Check if mentorId is an object or a string
+        
+        const res = await fetch(`${API_URL}/api/mentors/${id}`, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+        })
+        if (!res.ok) {
+            throw new Error("Fetched bad response when fetching mentorship ID (from mentor's data).");
+        }
+        const data =  await res.json();
+        
+        
+        return data || null; // Return null if no mentorship is found
+    
+    } catch(error){
+        console.error("Error fetching mentorship ID (from mentor's data): ", error);
+        throw error;
+    }
+}
+
+
+export const getMenteeData = async (menteeId, token) => {
+    try{
+
+        const id = menteeId.userId || menteeId; // Check if menteeId is an object or a string
+        
+        
+        const res = await fetch(`${API_URL}/api/mentees/${id}`, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+        })
+        if (!res.ok) {
+            throw new Error("Fetched bad response when fetching mentorship ID (from mentee's data).");
+        }
+        const data =  await res.json();
+        
+        return data || null; // Return null if no mentorship is found
+
+    }
+    catch(error){
+        console.error("Error fetching mentorship ID (from mentee's data): ", error);
+       
+        throw error;
+    }
+}
+
+export const getUserXP = async (mentorshipId, role, token) => {
+    try{
+        const id = mentorshipId;
+        const res = await fetch(`${API_URL}/api/mentorships/${id}/${role}/xp`, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+        })
+        if (!res.ok) {
+            throw new Error("Fetched bad response when fetching user xp attribute.");
+        }
+        const resData =  await res.json();
+        const userXP = resData.xp;
+        return userXP || null; // Return null if no user xp attr was found
+
+    }
+    catch(error){
+        console.error("Error fetching user xp attribute: ", error);
+        throw error;
+    }
+}
+
+
+export const submitLevel = async (mentorshipId, moduleId, levelOrder, responses, token) => {
+  try {
+    const res = await fetch(`${API_URL}/api/mentorships/${mentorshipId}/modules/${moduleId}/levels/${levelOrder}`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,   // ✅ Fixed casing
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ responses }),
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to submit level progress");
+    }
+    return await res.json();
+  } catch (error) {
+    console.error("Error submitting level progress:", error);
+    throw error;
+  }
+};
+
+export const submitModule = async (mentorshipId, moduleId, token) => {
+  try {
+    const res = await fetch(`${API_URL}/api/mentorships/${mentorshipId}/modules/${moduleId}`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,   // ✅ Fixed casing
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to submit module progress");
+    }
+    return await res.json();
+  } catch (error) {
+    console.error("Error submitting module progress:", error);
+    throw error;
+  }
+};
+
+export const createMentorship = async (mentorId, menteeId, token ) => {
+    try{
+        const res = await fetch(`${API_URL}/api/mentorships`, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                mentorId,
+                menteeId,
+            }),
+        })
+        if (!res.ok) {
+            throw new Error("Failed to create mentorship");
+        }
+        const data =  await res.json();
+        return data;
+
+    }catch(error){
+        console.error("Error creating mentorship:", error);
+        throw error;
+    }
+}
+
+export const mentorshipRequest = async (mentorId, token) => {
+    
+    try {
+        if(mentorId === null ){
+            throw new Error("mentorId not given ")
+        }
+
+        const res = await fetch(`${API_URL}/api/mentorship-requests/`, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                mentorId: mentorId
+                }),
+        })
+     
+
+        if(!res.ok){
+            throw new Error("Mentorship requests call failed")
+        }
+
+       
+        const data = await res.json();
+        return data;
+    }
+    catch(error){
+        console.error("Error creating mentorship:", error);
+        throw error;
+    }
+
+}
+
+
+
