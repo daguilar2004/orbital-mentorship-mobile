@@ -14,6 +14,28 @@ export type Phase = {
   tasks: Task[];
 };
 
+export type ProfileData = {
+  firstName: string;
+  lastName: string;
+  profilePicture: string | null;
+  resume: string | null;
+  headline: string;
+  bio: string;
+  goals: string;
+  industries: string[];
+  skills: string[];
+  links: string[];
+};
+
+export interface QuestionnaireAnswers {
+  mentoringComfort: number;
+  industry: string;
+  mentorIndustry: string;
+  mentorSkillset: string;
+  developmentGoal: string;
+  holdingBack: string;
+}
+
 type AppContextValue = {
   userRole: UserRole;
   setUserRole: (role: UserRole) => void;
@@ -21,6 +43,12 @@ type AppContextValue = {
 
   totalXP: number;
   phases: Phase[];
+
+  profileData: ProfileData;
+  setProfileData: (data: ProfileData) => void;
+
+  questionnaireAnswers: QuestionnaireAnswers;
+  setQuestionnaireAnswers: (answers: QuestionnaireAnswers) => void;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -52,15 +80,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     },
   ]);
 
+  const [profileData, setProfileData] = useState<ProfileData>({
+    firstName: "",
+    lastName: "",
+    profilePicture: null,
+    resume: null,
+    headline: "",
+    bio: "",
+    goals: "",
+    industries: [],
+    skills: [],
+    links: [],
+  });
+
+  const [questionnaireAnswers, setQuestionnaireAnswers] =
+    useState<QuestionnaireAnswers>({
+      mentoringComfort: 5,
+      industry: "",
+      mentorIndustry: "",
+      mentorSkillset: "",
+      developmentGoal: "",
+      holdingBack: "",
+    });
+
   const value = useMemo<AppContextValue>(() => {
     return {
       userRole,
       setUserRole,
-      toggleRole: () => setUserRole((r) => (r === "mentee" ? "mentor" : "mentee")),
+      toggleRole: () =>
+        setUserRole((r) => (r === "mentee" ? "mentor" : "mentee")),
       totalXP,
       phases,
+      profileData,
+      setProfileData,
+      questionnaireAnswers,
+      setQuestionnaireAnswers,
     };
-  }, [userRole, totalXP, phases]);
+  }, [userRole, totalXP, phases, profileData, questionnaireAnswers]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

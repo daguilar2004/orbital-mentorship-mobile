@@ -26,10 +26,7 @@ function CustomDrawerContent(props: any) {
           </Text>
         </View>
 
-        <Switch
-          value={userRole === "mentor"}
-          onValueChange={toggleRole}
-        />
+        <Switch value={userRole === "mentor"} onValueChange={toggleRole} />
       </View>
     </DrawerContentScrollView>
   );
@@ -89,6 +86,36 @@ export default function Layout() {
             title: "Timeline",
             drawerIcon: ({ color, size }) => (
               <Ionicons name="time" size={size} color={color} />
+            ),
+          }}
+        />
+
+        <Drawer.Screen
+          name="onboarding"
+          options={{
+            title: "Onboarding",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="school" size={size} color={color} />
+            ),
+          }}
+        />
+
+        <Drawer.Screen
+          name="onboarding2"
+          options={{
+            title: "Onboarding 2",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="rocket" size={size} color={color} />
+            ),
+          }}
+        />
+
+        <Drawer.Screen
+          name="offboarding"
+          options={{
+            title: "Offboarding",
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="checkmark-done" size={size} color={color} />
             ),
           }}
         />

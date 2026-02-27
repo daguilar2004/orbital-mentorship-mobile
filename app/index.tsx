@@ -9,12 +9,12 @@ export default function Home() {
 
   const currentPhase = useMemo(
     () => phases.find((p) => p.status === "current"),
-    [phases]
+    [phases],
   );
 
   const completedPhases = useMemo(
     () => phases.filter((p) => p.status === "completed").length,
-    [phases]
+    [phases],
   );
 
   const totalPhases = phases.length;
@@ -127,6 +127,18 @@ export default function Home() {
           title="Update Journey"
           desc="Reflect on your habits, goals, and personal growth"
           onPress={() => router.push("/journey")}
+        />
+
+        <QuickCard
+          title="Onboarding"
+          desc="Complete your profile setup and mentorship preferences"
+          onPress={() => router.push("./onboarding")}
+        />
+
+        <QuickCard
+          title="Offboarding"
+          desc="Review your progress and complete your mentorship"
+          onPress={() => router.push("./offboarding")}
         />
       </View>
     </ScrollView>
