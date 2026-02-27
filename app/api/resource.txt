@@ -1,0 +1,105 @@
+const API_URL = import.meta.env.VITE_APP_SERVER_URL;
+
+export const getAllResources = async (mentorshipId, token) => {
+    try {
+        if (!mentorshipId || !token) {
+            throw new Error("Mentorship ID and token are required");
+        }
+
+        const response = await fetch(`${API_URL}/api/mentorships/${mentorshipId}/resources`, {
+            method: "GET",
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to fetch resources");
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error("Error fetching resources:", error);
+        throw error;
+    }
+};
+
+export const createResource = async (mentorshipId, token, body) => {
+    try {
+        if (!mentorshipId || !token || !body) {
+            throw new Error("Mentorship ID, token, and body are required");
+        }
+
+        const response = await fetch(`${API_URL}/api/mentorships/${mentorshipId}/resources`, {
+            method: "POST",
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to create resource");
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error("Error creating resource:", error);
+        throw error;
+    }
+};
+
+export const updateResource = async (resourceId, resourceData, token) => {
+    try {
+        if (!resourceId || !token || !resourceData) {
+            throw new Error("Resource ID, token, and resource data are required");
+        }
+
+        const response = await fetch(`${API_URL}/api/mentorships/resources/${resourceId}`, {
+            method: "PUT",
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(resourceData),
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to update resource");
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error("Error updating resource:", error);
+        throw error;
+    }
+};
+
+export const deleteResource = async (resourceId, token) => {
+    try {
+        if (!resourceId || !token) {
+            throw new Error("Resource ID and token are required");
+        }
+
+        const response = await fetch(`${API_URL}/api/mentorships/resources/${resourceId}`, {
+            method: "DELETE",
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        if (!response.ok) {
+            throw new Error("Failed to delete resource");
+        }
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error("Error deleting resource:", error);
+        throw error;
+    }
+}; 
