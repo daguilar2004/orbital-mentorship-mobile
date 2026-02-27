@@ -25,10 +25,7 @@ function CustomDrawerContent(props: any) {
           </Text>
         </View>
 
-        <Switch
-          value={userRole === "mentor"}
-          onValueChange={toggleRole}
-        />
+        <Switch value={userRole === "mentor"} onValueChange={toggleRole} />
       </View>
     </DrawerContentScrollView>
   );

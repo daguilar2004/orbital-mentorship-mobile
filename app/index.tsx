@@ -25,7 +25,7 @@ export default function Home() {
 
   const currentPhase = useMemo(
     () => phases.find((p) => p.status === "current"),
-    [phases]
+    [phases],
   );
 
   // accordion
