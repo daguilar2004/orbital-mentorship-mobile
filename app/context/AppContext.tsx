@@ -46,6 +46,28 @@ export type Phase = {
   tasks: Task[];
 };
 
+export type ProfileData = {
+  firstName: string;
+  lastName: string;
+  profilePicture: string | null;
+  resume: string | null;
+  headline: string;
+  bio: string;
+  goals: string;
+  industries: string[];
+  skills: string[];
+  links: string[];
+};
+
+export interface QuestionnaireAnswers {
+  mentoringComfort: number;
+  industry: string;
+  mentorIndustry: string;
+  mentorSkillset: string;
+  developmentGoal: string;
+  holdingBack: string;
+}
+
 type AppContextValue = {
   userRole: UserRole;
   toggleRole: () => void;
@@ -290,7 +312,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateTaskDescription,
       reviewTask,
     };
-  }, [userRole, totalXP, phases]);
+  }, [userRole, totalXP, phases, profileData, questionnaireAnswers]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

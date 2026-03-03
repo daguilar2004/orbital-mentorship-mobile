@@ -1,12 +1,11 @@
-import "react-native-gesture-handler";
-import React from "react";
-import { Drawer } from "expo-router/drawer";
 import { Ionicons } from "@expo/vector-icons";
 import {
   DrawerContentScrollView,
   DrawerItemList,
 } from "@react-navigation/drawer";
-import { View, Text, Switch, StyleSheet } from "react-native";
+import { Drawer } from "expo-router/drawer";
+import { StyleSheet, Switch, Text, View } from "react-native";
+import "react-native-gesture-handler";
 import { AppProvider, useApp } from "./context/AppContext";
 
 function CustomDrawerContent(props: any) {
@@ -26,10 +25,7 @@ function CustomDrawerContent(props: any) {
           </Text>
         </View>
 
-        <Switch
-          value={userRole === "mentor"}
-          onValueChange={toggleRole}
-        />
+        <Switch value={userRole === "mentor"} onValueChange={toggleRole} />
       </View>
     </DrawerContentScrollView>
   );
