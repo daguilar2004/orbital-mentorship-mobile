@@ -31,29 +31,6 @@ export default function Journey() {
     { id: "h2", title: "Daily coding practice" },
   ]);
 
-  // Goals
-  const [smartInput, setSmartInput] = useState("");
-  const [smartGoals, setSmartGoals] = useState<Item[]>([
-    { id: "sg1", title: "Complete certification by end of Q2" },
-  ]);
-
-  const [longInput, setLongInput] = useState("");
-  const [longGoals, setLongGoals] = useState<Item[]>([
-    { id: "lg1", title: "Become a senior developer" },
-  ]);
-
-  const [taskInput, setTaskInput] = useState("");
-  const [actionTasks, setActionTasks] = useState<Item[]>([
-    { id: "t1", title: "Build portfolio website" },
-    { id: "t2", title: "Contribute to open source" },
-  ]);
-
-  const [obstacleInput, setObstacleInput] = useState("");
-  const [obstacles, setObstacles] = useState<Item[]>([
-    { id: "o1", title: "Time management" },
-    { id: "o2", title: "Procrastination" },
-  ]);
-
   // Discipline
   const [character, setCharacter] = useState("Persistent and curious");
   const [personality, setPersonality] = useState("Analytical problem solver");
@@ -65,22 +42,8 @@ export default function Journey() {
     setHabitInput("");
   };
 
-  const removeFrom = (
-    id: string,
-    setList: React.Dispatch<React.SetStateAction<Item[]>>
-  ) => {
-    setList((prev) => prev.filter((x) => x.id !== id));
-  };
-
-  const addTo = (
-    input: string,
-    setInput: React.Dispatch<React.SetStateAction<string>>,
-    setList: React.Dispatch<React.SetStateAction<Item[]>>
-  ) => {
-    const title = input.trim();
-    if (!title) return;
-    setList((prev) => [{ id: String(Date.now()), title }, ...prev]);
-    setInput("");
+  const removeHabit = (id: string) => {
+    setHabits((prev) => prev.filter((x) => x.id !== id));
   };
 
   return (
@@ -101,28 +64,7 @@ export default function Journey() {
           setHabitInput={setHabitInput}
           habits={habits}
           addHabit={addHabit}
-          removeHabit={(id) => removeFrom(id, setHabits)}
-          // goals
-          smartInput={smartInput}
-          setSmartInput={setSmartInput}
-          smartGoals={smartGoals}
-          addSmart={() => addTo(smartInput, setSmartInput, setSmartGoals)}
-          removeSmart={(id) => removeFrom(id, setSmartGoals)}
-          longInput={longInput}
-          setLongInput={setLongInput}
-          longGoals={longGoals}
-          addLong={() => addTo(longInput, setLongInput, setLongGoals)}
-          removeLong={(id) => removeFrom(id, setLongGoals)}
-          taskInput={taskInput}
-          setTaskInput={setTaskInput}
-          actionTasks={actionTasks}
-          addTask={() => addTo(taskInput, setTaskInput, setActionTasks)}
-          removeTask={(id) => removeFrom(id, setActionTasks)}
-          obstacleInput={obstacleInput}
-          setObstacleInput={setObstacleInput}
-          obstacles={obstacles}
-          addObstacle={() => addTo(obstacleInput, setObstacleInput, setObstacles)}
-          removeObstacle={(id) => removeFrom(id, setObstacles)}
+          removeHabit={removeHabit}
           // discipline
           character={character}
           setCharacter={setCharacter}
@@ -191,30 +133,6 @@ function MyJourneyScreen(props: {
   addHabit: () => void;
   removeHabit: (id: string) => void;
 
-  smartInput: string;
-  setSmartInput: (v: string) => void;
-  smartGoals: Item[];
-  addSmart: () => void;
-  removeSmart: (id: string) => void;
-
-  longInput: string;
-  setLongInput: (v: string) => void;
-  longGoals: Item[];
-  addLong: () => void;
-  removeLong: (id: string) => void;
-
-  taskInput: string;
-  setTaskInput: (v: string) => void;
-  actionTasks: Item[];
-  addTask: () => void;
-  removeTask: (id: string) => void;
-
-  obstacleInput: string;
-  setObstacleInput: (v: string) => void;
-  obstacles: Item[];
-  addObstacle: () => void;
-  removeObstacle: (id: string) => void;
-
   character: string;
   setCharacter: (v: string) => void;
   personality: string;
@@ -229,30 +147,6 @@ function MyJourneyScreen(props: {
     habits,
     addHabit,
     removeHabit,
-
-    smartInput,
-    setSmartInput,
-    smartGoals,
-    addSmart,
-    removeSmart,
-
-    longInput,
-    setLongInput,
-    longGoals,
-    addLong,
-    removeLong,
-
-    taskInput,
-    setTaskInput,
-    actionTasks,
-    addTask,
-    removeTask,
-
-    obstacleInput,
-    setObstacleInput,
-    obstacles,
-    addObstacle,
-    removeObstacle,
 
     character,
     setCharacter,
@@ -322,129 +216,47 @@ function MyJourneyScreen(props: {
       ) : activeTab === "goals" ? (
         <View style={{ gap: 14 }}>
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>SMART Goals</Text>
-            <Text style={styles.sectionSub}>
-              Specific, Measurable, Achievable, Relevant, Time-bound
+            <Text style={styles.sectionTitle}>Weekly SMART Goal</Text>
+
+            <Text style={styles.sectionSub}>Why you’re setting a SMART goal:</Text>
+            <Text style={styles.goalInfoText}>
+              Setting a SMART goal helps turn intention into action by making your focus
+              clear, specific, and measurable. People are far more likely to follow through
+              when goals are concrete, time-bound, and tied to a specific action rather than
+              vague intentions.
             </Text>
 
-            <View style={styles.addRow}>
-              <TextInput
-                value={smartInput}
-                onChangeText={setSmartInput}
-                placeholder="Add a SMART goal..."
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                returnKeyType="done"
-                onSubmitEditing={addSmart}
-              />
-              <Pressable style={styles.addBtnPurple} onPress={addSmart}>
-                <Text style={styles.addBtnText}>＋</Text>
-              </Pressable>
-            </View>
+            <View style={{ height: 12 }} />
 
-            <View style={{ height: 10 }} />
+            <GoalQuestion
+              label="Specific"
+              question="What is one specific action you can take this week that moves you closer to the professional role or leadership style you described above?"
+              example='“I want to practice explaining technical ideas in plain language so they are easily understood by someone outside my discipline.”'
+            />
 
-            {smartGoals.map((g) => (
-              <View key={g.id} style={styles.rowPurple}>
-                <Text style={styles.rowText}>{g.title}</Text>
-                <Pressable onPress={() => removeSmart(g.id)} style={styles.rowXBtn}>
-                  <Text style={styles.rowXText}>×</Text>
-                </Pressable>
-              </View>
-            ))}
-          </View>
+            <GoalQuestion
+              label="Measurable"
+              question="How will you know that you made progress on this by the end of the week?"
+              example='“Someone outside my technical background can accurately summarize my explanation without needing additional clarification.”'
+            />
 
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Long-term Goals</Text>
-            <Text style={styles.sectionSub}>Major milestones over time</Text>
+            <GoalQuestion
+              label="Achievable"
+              question="Why is this goal realistic to complete within the next 7 days?"
+              example='“This is achievable because I will have at least one opportunity this week to explain a technical idea to a non-technical audience and reflect on how clearly I communicated.”'
+            />
 
-            <View style={styles.addRow}>
-              <TextInput
-                value={longInput}
-                onChangeText={setLongInput}
-                placeholder="Add a long-term goal..."
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                returnKeyType="done"
-                onSubmitEditing={addLong}
-              />
-              <Pressable style={styles.addBtnBlue} onPress={addLong}>
-                <Text style={styles.addBtnText}>＋</Text>
-              </Pressable>
-            </View>
+            <GoalQuestion
+              label="Relevant"
+              question="How does this goal support the type of professional you want to become?"
+              example='“This supports the kind of professional I want to be because effective collaboration and leadership require the ability to communicate ideas clearly across different backgrounds.”'
+            />
 
-            <View style={{ height: 10 }} />
-
-            {longGoals.map((g) => (
-              <View key={g.id} style={styles.rowBlue}>
-                <Text style={styles.rowText}>{g.title}</Text>
-                <Pressable onPress={() => removeLong(g.id)} style={styles.rowXBtn}>
-                  <Text style={styles.rowXText}>×</Text>
-                </Pressable>
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Action Tasks</Text>
-            <Text style={styles.sectionSub}>Concrete actions towards your goals</Text>
-
-            <View style={styles.addRow}>
-              <TextInput
-                value={taskInput}
-                onChangeText={setTaskInput}
-                placeholder="Add an action task..."
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                returnKeyType="done"
-                onSubmitEditing={addTask}
-              />
-              <Pressable style={styles.addBtnGreen} onPress={addTask}>
-                <Text style={styles.addBtnText}>＋</Text>
-              </Pressable>
-            </View>
-
-            <View style={{ height: 10 }} />
-
-            {actionTasks.map((t) => (
-              <View key={t.id} style={styles.rowGreen}>
-                <Text style={styles.rowText}>{t.title}</Text>
-                <Pressable onPress={() => removeTask(t.id)} style={styles.rowXBtn}>
-                  <Text style={styles.rowXText}>×</Text>
-                </Pressable>
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Obstacles to Avoid</Text>
-            <Text style={styles.sectionSub}>Challenges to overcome</Text>
-
-            <View style={styles.addRow}>
-              <TextInput
-                value={obstacleInput}
-                onChangeText={setObstacleInput}
-                placeholder="Add an obstacle..."
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                returnKeyType="done"
-                onSubmitEditing={addObstacle}
-              />
-              <Pressable style={styles.addBtnOrange} onPress={addObstacle}>
-                <Text style={styles.addBtnText}>＋</Text>
-              </Pressable>
-            </View>
-
-            <View style={{ height: 10 }} />
-
-            {obstacles.map((o) => (
-              <View key={o.id} style={styles.rowOrange}>
-                <Text style={styles.rowText}>{o.title}</Text>
-                <Pressable onPress={() => removeObstacle(o.id)} style={styles.rowXBtn}>
-                  <Text style={styles.rowXText}>×</Text>
-                </Pressable>
-              </View>
-            ))}
+            <GoalQuestion
+              label="Time-bound"
+              question="When will you work on or complete this goal within the next 7 days?"
+              example='“I will work on this during my mentorship session this week and refine it by the end of the week.”'
+            />
           </View>
         </View>
       ) : (
@@ -479,6 +291,37 @@ function MyJourneyScreen(props: {
         </View>
       )}
     </ScrollView>
+  );
+}
+
+function GoalQuestion(props: { label: string; question: string; example: string }) {
+  const { label, question, example } = props;
+  const [answer, setAnswer] = useState("");
+
+  return (
+    <View style={styles.goalBlock}>
+      {/* Mini “SMART” tab-style label */}
+      <View style={styles.goalLabelRow}>
+        <View style={styles.goalPill}>
+          <Text style={styles.goalPillText}>{label}</Text>
+        </View>
+      </View>
+
+      {/* Removed the word "Prompt:" — just show the question */}
+      <Text style={styles.goalQuestionText}>{question}</Text>
+
+      <Text style={[styles.goalMetaTitle, { marginTop: 10 }]}>Example:</Text>
+      <Text style={styles.goalMetaText}>{example}</Text>
+
+      <TextInput
+        value={answer}
+        onChangeText={setAnswer}
+        placeholder="Short answer text"
+        placeholderTextColor="#9CA3AF"
+        style={styles.goalAnswerInput}
+        returnKeyType="done"
+      />
+    </View>
   );
 }
 
@@ -631,7 +474,12 @@ const styles = StyleSheet.create({
   cardSub: { marginTop: 4, fontSize: 12, color: "#6B7280" },
   sectionTitle: { fontSize: 14, fontWeight: "900", color: "#111827" },
   sectionSub: { marginTop: 4, fontSize: 12, color: "#6B7280" },
-  subHeader: { marginTop: 14, fontSize: 13, fontWeight: "900", color: "#111827" },
+  subHeader: {
+    marginTop: 14,
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#111827",
+  },
 
   addRow: {
     marginTop: 12,
@@ -672,31 +520,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  addBtnBlue: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: "#2563EB",
-    alignItems: "center",
-    justifyContent: "center",
+  addBtnText: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: -1,
   },
-  addBtnGreen: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: "#16A34A",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addBtnOrange: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: "#F97316",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addBtnText: { color: "#FFFFFF", fontSize: 22, fontWeight: "900", marginTop: -1 },
 
   // rows
   rowText: {
@@ -713,7 +542,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  rowXText: { fontSize: 20, fontWeight: "900", color: "#9CA3AF", marginTop: -2 },
+  rowXText: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#9CA3AF",
+    marginTop: -2,
+  },
 
   rowPurple: {
     height: 46,
@@ -721,39 +555,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F3FF",
     borderWidth: 1,
     borderColor: "#E9D5FF",
-    paddingHorizontal: 12,
-    marginTop: 10,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  rowBlue: {
-    height: 46,
-    borderRadius: 12,
-    backgroundColor: "#EFF6FF",
-    borderWidth: 1,
-    borderColor: "#DBEAFE",
-    paddingHorizontal: 12,
-    marginTop: 10,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  rowGreen: {
-    height: 46,
-    borderRadius: 12,
-    backgroundColor: "#ECFDF5",
-    borderWidth: 1,
-    borderColor: "#D1FAE5",
-    paddingHorizontal: 12,
-    marginTop: 10,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  rowOrange: {
-    height: 46,
-    borderRadius: 12,
-    backgroundColor: "#FFF7ED",
-    borderWidth: 1,
-    borderColor: "#FFEDD5",
     paddingHorizontal: 12,
     marginTop: 10,
     flexDirection: "row",
@@ -769,5 +570,74 @@ const styles = StyleSheet.create({
     borderColor: "#E9D5FF",
     padding: 12,
   },
-  tipText: { color: "#7C3AED", fontSize: 12, fontWeight: "700", lineHeight: 16 },
+  tipText: {
+    color: "#7C3AED",
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 16,
+  },
+
+  // GOALS tab styles
+  goalInfoText: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 16,
+    color: "#374151",
+  },
+  goalBlock: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+    marginTop: 12,
+  },
+  goalLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+
+  // soft purple mini-tab/pill (matches your Habits purple vibe)
+  goalPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "#F5F3FF",
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+  },
+  goalPillText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#7C3AED",
+  },
+
+  goalQuestionText: {
+    fontSize: 12,
+    lineHeight: 16,
+    color: "#111827",
+    fontWeight: "600",
+  },
+  goalMetaTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#111827",
+    marginTop: 2,
+  },
+  goalMetaText: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 16,
+    color: "#374151",
+  },
+  goalAnswerInput: {
+    marginTop: 10,
+    height: 40,
+    borderBottomWidth: 1,
+    borderBottomColor: "#D1D5DB",
+    fontSize: 12,
+    color: "#111827",
+    paddingVertical: 6,
+  },
 });
