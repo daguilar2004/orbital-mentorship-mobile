@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
 import {
@@ -11,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useApp } from "./context/AppContext"; // App context with userRole
 
 /* STORAGE */
 const NOTES_KEY = "NOTES_STORAGE";
@@ -26,10 +26,21 @@ const categoryColors: Record<string, string> = {
 
 const options = ["Pre", "During", "Post", "Daily", "New"];
 
-/* LABELS (CHANGE HERE ONLY) */
+/* DEFAULT LABELS */
 const defaultLabels = {
-  Pre: "What is one specific thing I want clarity on?",
-  During: "During Note",
+  Pre: [
+    "What is one specific thing I want clarity on?",
+    "What have I tried since our last conversation?",
+    "Where am I feeling stuck, uncertain, or overwhelmed?",
+    "What decision, next step, or mindset shift would help me most right now?"
+  ],
+  During: [
+    "What would make this session valuable today? What are the one or two things we should focus on? What does success look like by the end of this session?",
+    "What has gone well since our last session? What challenges came up? What did you learn from those experiences?",
+    "What are some possible ways to move forward? What else could you try? If there were no constraints, what would you do?",
+    "Which option feels best right now? What specific action will you take? By when will you complete it? How will you measure progress?",
+    "What is your biggest takeaway from today? What are you committing to before next time? When should we check in again?"
+  ],
   Post: ["What did I learn or realize during this session?"],
   Daily: [
     "What did I do today that mattered?",
@@ -85,12 +96,14 @@ type Note = {
 };
 
 export default function Notes() {
+  const { userRole } = useApp(); // mentor or mentee
+
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteTitle, setNoteTitle] = useState("");
   const [text, setText] = useState("");
-  const [multiText, setMultiText] = useState(["", "", ""]);
+  const [multiText, setMultiText] = useState<string[]>([]);
   const [fmt, setFmt] = useState(defaultFormatting);
 
   const [search, setSearch] = useState("");
@@ -116,23 +129,42 @@ export default function Notes() {
     await AsyncStorage.setItem(NOTES_KEY, JSON.stringify(updated));
   };
 
-  /* FIXED handleSave to properly save multiText */
+  /* MODE-SENSITIVE LABELS */
+  const getLabels = (type: string | null) => {
+    if (!type) return [];
+    if (type === "Pre") {
+      return userRole === "mentor"
+        ? [
+          "What do I want to meaningfully practice or strengthen in myself as a mentor during this meeting?",
+          "What tendency of mine should I be mindful of in this conversation?",
+          "How can I guide this conversation in a way that builds the mentee’s independent thinking not reliance on me?",
+          "What would “showing up well” as a mentor look like in this meeting, regardless of the outcome?"
+          ]
+        : defaultLabels.Pre;
+    }
+    return (defaultLabels as any)[type];
+  };
+
+  /* SAVE NOTE */
   const handleSave = () => {
-    if (!noteTitle.trim()) return;
+    // If title is empty, use current date
+    const finalTitle = noteTitle.trim() || new Date().toLocaleDateString();
 
     let noteContent: string | string[] = text;
+    const labels = getLabels(selectedType);
 
-    if (selectedType === "Post" || selectedType === "Daily") {
+    if (Array.isArray(labels)) {
       if (multiText.every((t) => !t.trim())) return;
       noteContent = multiText;
     } else {
       if (!text.trim()) return;
+      noteContent = text;
     }
 
     const newNote: Note = {
       id: Date.now().toString(),
       type: selectedType!,
-      title: noteTitle,
+      title: finalTitle,
       text: noteContent,
       formatting: fmt,
     };
@@ -140,35 +172,30 @@ export default function Notes() {
     saveNotes([newNote, ...notes]);
 
     setText("");
-    setMultiText(["", "", ""]);
+    setMultiText([]);
     setNoteTitle("");
     setSelectedType(null);
     setFmt(defaultFormatting);
   };
 
-  /* Filter notes based on search and active filter */
+  /* FILTER NOTES */
   const filteredNotes = notes.filter((n) => {
-  const searchLower = search.toLowerCase();
+    const searchLower = search.toLowerCase();
+    const titleText = n.title ?? "";
+    const matchesTitle = titleText.toLowerCase().includes(searchLower);
 
-  // Safe title check
-  const titleText = n.title ?? "";
-  const matchesTitle = titleText.toLowerCase().includes(searchLower);
+    let matchesText = false;
+    if (Array.isArray(n.text)) {
+      matchesText = n.text.some((t) => (t ?? "").toLowerCase().includes(searchLower));
+    } else if (typeof n.text === "string") {
+      matchesText = n.text.toLowerCase().includes(searchLower);
+    }
 
-  // Safe text check
-  let matchesText = false;
-  if (Array.isArray(n.text)) {
-    matchesText = n.text.some(
-      (t) => (t ?? "").toLowerCase().includes(searchLower)
-    );
-  } else if (typeof n.text === "string") {
-    matchesText = n.text.toLowerCase().includes(searchLower);
-  }
+    const matchesSearch = matchesTitle || matchesText;
+    const matchesFilter = activeFilter ? n.type === activeFilter : true;
 
-  const matchesSearch = matchesTitle || matchesText;
-  const matchesFilter = activeFilter ? n.type === activeFilter : true;
-
-  return matchesSearch && matchesFilter;
-});
+    return matchesSearch && matchesFilter;
+  });
 
   const groupedNotes = options.reduce(
     (acc: Record<string, Note[]>, category) => {
@@ -192,19 +219,13 @@ export default function Notes() {
           {options.map((opt) => (
             <TouchableOpacity
               key={opt}
-              onPress={() =>
-                setActiveFilter(activeFilter === opt ? null : opt)
-              }
+              onPress={() => setActiveFilter(activeFilter === opt ? null : opt)}
               style={[
                 styles.filterBtn,
                 activeFilter === opt && { backgroundColor: categoryColors[opt] },
               ]}
             >
-              <Text
-                style={{
-                  color: activeFilter === opt ? "white" : "#333",
-                }}
-              >
+              <Text style={{ color: activeFilter === opt ? "white" : "#333" }}>
                 {opt}
               </Text>
             </TouchableOpacity>
@@ -213,7 +234,7 @@ export default function Notes() {
       </View>
 
       {/* NOTES LIST */}
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
         {options.map((category) =>
           groupedNotes[category]?.length ? (
             <View key={category} style={{ marginBottom: 25 }}>
@@ -230,17 +251,17 @@ export default function Notes() {
 
                   {Array.isArray(item.text)
                     ? item.text.map((section, index) => (
-                        <View key={index} style={{ marginBottom: 10 }}>
-                          <Text style={styles.sectionLabel}>
-                            {(defaultLabels as any)[category][index]}
-                          </Text>
-                          <Text style={noteTextStyle(item.formatting)}>{section}</Text>
-                        </View>
-                      ))
+                      <View key={index} style={{ marginBottom: 10 }}>
+                        <Text style={styles.sectionLabel}>
+                          {getLabels(category)[index]}
+                        </Text>
+                        <Text style={noteTextStyle(item.formatting)}>{section}</Text>
+                      </View>
+                    ))
                     : (
                       <>
                         <Text style={styles.sectionLabel}>
-                          {(defaultLabels as any)[category]}
+                          {getLabels(category)}
                         </Text>
                         <Text style={noteTextStyle(item.formatting)}>{item.text}</Text>
                       </>
@@ -257,9 +278,9 @@ export default function Notes() {
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
-      {/* MODAL */}
+      {/* BOTTOM SHEET */}
       <Modal transparent visible={modalVisible} animationType="slide">
-        <Pressable style={styles.overlay} onPress={() => setModalVisible(false)}>
+        <Pressable style={styles.overlay1} onPress={() => setModalVisible(false)}>
           <View style={styles.bottomSheet}>
             {options.map((option) => (
               <TouchableOpacity
@@ -268,6 +289,9 @@ export default function Notes() {
                 onPress={() => {
                   setSelectedType(option);
                   setModalVisible(false);
+                  const labels = getLabels(option);
+                  if (Array.isArray(labels)) setMultiText(new Array(labels.length).fill(""));
+                  else setMultiText([]);
                 }}
               >
                 <Text style={{ fontSize: 18, color: categoryColors[option] }}>
@@ -282,8 +306,7 @@ export default function Notes() {
       {/* FULL SCREEN EDITOR */}
       {selectedType && (
         <View style={styles.fullScreenEditor}>
-          <ScrollView>
-            {/* TITLE */}
+          <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
             <TextInput
               style={styles.titleInput}
               placeholder="Enter Title..."
@@ -351,16 +374,14 @@ export default function Notes() {
             </ScrollView>
 
             {/* TEXT INPUTS */}
-            {(selectedType === "Daily") ? (
-              multiText.map((value, index) => (
+            {Array.isArray(getLabels(selectedType)) ? (
+              getLabels(selectedType).map((label: string, index: number) => (
                 <View key={index}>
-                  <Text style={styles.sectionLabel}>
-                    {(defaultLabels as any)[selectedType][index]}
-                  </Text>
+                  <Text style={styles.sectionLabel}>{label}</Text>
                   <TextInput
                     style={[styles.input, noteTextStyle(fmt)]}
                     multiline
-                    value={value}
+                    value={multiText[index] || ""}
                     onChangeText={(textValue) => {
                       const updated = [...multiText];
                       updated[index] = textValue;
@@ -371,9 +392,7 @@ export default function Notes() {
               ))
             ) : (
               <>
-                <Text style={styles.sectionLabel}>
-                  {(defaultLabels as any)[selectedType]}
-                </Text>
+                <Text style={styles.sectionLabel}>{getLabels(selectedType)}</Text>
                 <TextInput
                   style={[styles.input, noteTextStyle(fmt)]}
                   multiline
@@ -403,6 +422,7 @@ export default function Notes() {
   );
 }
 
+// Styles remain unchanged
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 40, paddingHorizontal: 20 },
   topBar: { marginBottom: 20 },
@@ -434,8 +454,8 @@ const styles = StyleSheet.create({
   sectionLabel: { fontWeight: "bold", marginBottom: 4 },
   fab: {
     position: "absolute",
-    bottom: 30,
-    right: 30,
+    bottom: 20,
+    right: 20,
     backgroundColor: "#000",
     width: 65,
     height: 65,
@@ -444,16 +464,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   fabText: { color: "white", fontSize: 34 },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    justifyContent: "flex-end",
-  },
+  overlay1: { flex: 1, justifyContent: "flex-end" },
   bottomSheet: {
     backgroundColor: "white",
-    padding: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 30,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    minWidth: "100%",
+    maxWidth: 600,
+    elevation: 10,
   },
   option: { paddingVertical: 15 },
   fullScreenEditor: {
