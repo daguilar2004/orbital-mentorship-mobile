@@ -75,9 +75,9 @@ const fontColors = [
 function noteTextStyle(f?: Formatting) {
   const format = f ?? defaultFormatting;
   return {
-    fontWeight: format.bold ? "bold" : "normal",
-    fontStyle: format.italic ? "italic" : "normal",
-    textDecorationLine: format.underline ? "underline" : "none",
+    fontWeight: format.bold ? ("bold" as const) : ("normal" as const),
+    fontStyle: format.italic ? ("italic" as const) : ("normal" as const),
+    textDecorationLine: format.underline ? ("underline" as const) : ("none" as const),
     fontSize: format.fontSize,
     color: format.fontColor,
   };
@@ -103,6 +103,61 @@ export default function Notes() {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+
+  const handleDeleteOne = (id: string) => {
+    const updated = notes.filter((n) => n.id !== id);
+    saveNotes(updated);
+  };
+
+  const toggleSelectNote = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const handleDeleteSelected = () => {
+    const updated = notes.filter((n) => !selectedIds.has(n.id));
+    saveNotes(updated);
+    setSelectedIds(new Set());
+    setSelectMode(false);
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const openEditNote = (note: Note) => {
+    setEditingNote(note);
+    setSelectedType(note.type);
+    setNoteTitle(note.title);
+    setFmt(note.formatting ?? defaultFormatting);
+    if (Array.isArray(note.text)) {
+      const padded = [...note.text];
+      while (padded.length < 3) padded.push("");
+      setMultiText(padded);
+      setText("");
+    } else {
+      setText(note.text);
+      setMultiText(["", "", ""]);
+    }
+  };
+
+  const closeEditor = () => {
+    setSelectedType(null);
+    setEditingNote(null);
+    setText("");
+    setMultiText(["", "", ""]);
+    setNoteTitle("");
+    setFmt(defaultFormatting);
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -123,7 +178,6 @@ export default function Notes() {
     await AsyncStorage.setItem(NOTES_KEY, JSON.stringify(updated));
   };
 
-  /* FIXED handleSave to properly save multiText */
   const handleSave = () => {
     if (!noteTitle.trim()) return;
 
@@ -136,21 +190,25 @@ export default function Notes() {
       if (!text.trim()) return;
     }
 
-    const newNote: Note = {
-      id: Date.now().toString(),
-      type: selectedType!,
-      title: noteTitle,
-      text: noteContent,
-      formatting: fmt,
-    };
+    if (editingNote) {
+      const updated = notes.map((n) =>
+        n.id === editingNote.id
+          ? { ...n, title: noteTitle, text: noteContent, formatting: fmt }
+          : n
+      );
+      saveNotes(updated);
+    } else {
+      const newNote: Note = {
+        id: Date.now().toString(),
+        type: selectedType!,
+        title: noteTitle,
+        text: noteContent,
+        formatting: fmt,
+      };
+      saveNotes([newNote, ...notes]);
+    }
 
-    saveNotes([newNote, ...notes]);
-
-    setText("");
-    setMultiText(["", "", ""]);
-    setNoteTitle("");
-    setSelectedType(null);
-    setFmt(defaultFormatting);
+    closeEditor();
   };
 
   /* Filter notes based on search and active filter */
@@ -189,12 +247,25 @@ export default function Notes() {
     <View style={styles.container}>
       {/* SEARCH + FILTER BAR */}
       <View style={styles.topBar}>
-        <TextInput
-          placeholder="Search notes..."
-          value={search}
-          onChangeText={setSearch}
-          style={styles.searchInput}
-        />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <TextInput
+            placeholder="Search notes..."
+            value={search}
+            onChangeText={setSearch}
+            style={[styles.searchInput, { flex: 1, marginBottom: 0 }]}
+          />
+          <TouchableOpacity
+            onPress={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+            style={[
+              styles.selectBtn,
+              selectMode && { backgroundColor: "#E53935" },
+            ]}
+          >
+            <Text style={{ color: selectMode ? "white" : "#333", fontSize: 13 }}>
+              {selectMode ? "Cancel" : "Select"}
+            </Text>
+          </TouchableOpacity>
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {options.map((opt) => (
             <TouchableOpacity
@@ -228,41 +299,85 @@ export default function Notes() {
                 {displayLabels[category] ?? category}
               </Text>
 
-              {groupedNotes[category].map((item) => (
-                <View
-                  key={item.id}
-                  style={[styles.noteCard, { borderLeftColor: categoryColors[category] }]}
-                >
-                  <Text style={styles.noteTitle}>{item.title}</Text>
-
-                  {Array.isArray(item.text)
-                    ? item.text.map((section, index) => (
-                        <View key={index} style={{ marginBottom: 10 }}>
-                          <Text style={styles.sectionLabel}>
-                            {(defaultLabels as any)[category][index]}
-                          </Text>
-                          <Text style={noteTextStyle(item.formatting)}>{section}</Text>
+              {groupedNotes[category].map((item) => {
+                const isSelected = selectedIds.has(item.id);
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    activeOpacity={selectMode ? 0.7 : 1}
+                    onPress={() => selectMode && toggleSelectNote(item.id)}
+                    style={[
+                      styles.noteCard,
+                      { borderLeftColor: categoryColors[category] },
+                      isSelected && { backgroundColor: "#fde8e8", borderLeftColor: "#E53935" },
+                    ]}
+                  >
+                    {/* Card header: title + action button */}
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
+                      <Text style={[styles.noteTitle, { flex: 1 }]}>{item.title}</Text>
+                      {selectMode ? (
+                        <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+                          {isSelected && <Text style={{ color: "white", fontSize: 12, fontWeight: "bold" }}>✓</Text>}
                         </View>
-                      ))
-                    : (
-                      <>
-                        <Text style={styles.sectionLabel}>
-                          {(defaultLabels as any)[category]}
-                        </Text>
-                        <Text style={noteTextStyle(item.formatting)}>{item.text}</Text>
-                      </>
-                    )}
-                </View>
-              ))}
+                      ) : (
+                        <View style={{ flexDirection: "row", gap: 14 }}>
+                          <TouchableOpacity onPress={() => openEditNote(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <Ionicons name="pencil-outline" size={20} color="#999" />
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleDeleteOne(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <Ionicons name="trash-outline" size={20} color="#999" />
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+
+                    {Array.isArray(item.text)
+                      ? item.text.map((section, index) => (
+                          <View key={index} style={{ marginBottom: 10 }}>
+                            <Text style={styles.sectionLabel}>
+                              {(defaultLabels as any)[category][index]}
+                            </Text>
+                            <Text style={noteTextStyle(item.formatting)}>{section}</Text>
+                          </View>
+                        ))
+                      : (
+                        <>
+                          <Text style={styles.sectionLabel}>
+                            {(defaultLabels as any)[category]}
+                          </Text>
+                          <Text style={noteTextStyle(item.formatting)}>{item.text}</Text>
+                        </>
+                      )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           ) : null
         )}
       </ScrollView>
 
+      {/* BULK DELETE BAR */}
+      {selectMode && (
+        <View style={styles.bulkBar}>
+          <Text style={{ color: "white", fontSize: 14 }}>
+            {selectedIds.size} selected
+          </Text>
+          <TouchableOpacity
+            onPress={handleDeleteSelected}
+            disabled={selectedIds.size === 0}
+            style={[styles.bulkDeleteBtn, selectedIds.size === 0 && { opacity: 0.4 }]}
+          >
+            <Text style={{ color: "white", fontWeight: "bold" }}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* FAB */}
-      <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+      {!selectMode && (
+        <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
+          <Text style={styles.fabText}>+</Text>
+        </TouchableOpacity>
+      )}
 
       {/* MODAL */}
       <Modal transparent visible={modalVisible} animationType="slide">
@@ -290,6 +405,14 @@ export default function Notes() {
       {selectedType && (
         <View style={styles.fullScreenEditor}>
           <ScrollView>
+            {/* EDIT BADGE */}
+            {editingNote && (
+              <View style={styles.editBadge}>
+                <Ionicons name="pencil-outline" size={13} color="#1E88E5" />
+                <Text style={{ color: "#1E88E5", fontSize: 12, marginLeft: 4 }}>Editing note</Text>
+              </View>
+            )}
+
             {/* TITLE */}
             <TextInput
               style={styles.titleInput}
@@ -399,7 +522,7 @@ export default function Notes() {
 
             <TouchableOpacity
               style={styles.cancelButton}
-              onPress={() => setSelectedType(null)}
+              onPress={closeEditor}
             >
               <Text>Cancel</Text>
             </TouchableOpacity>
@@ -495,4 +618,52 @@ const styles = StyleSheet.create({
   },
   saveButton: { padding: 14, borderRadius: 8, alignItems: "center", marginBottom: 15 },
   cancelButton: { alignItems: "center", padding: 10 },
+  selectBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: "#ccc",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxSelected: {
+    backgroundColor: "#E53935",
+    borderColor: "#E53935",
+  },
+  bulkBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#333",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  bulkDeleteBtn: {
+    backgroundColor: "#E53935",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  editBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E3F2FD",
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
 });
