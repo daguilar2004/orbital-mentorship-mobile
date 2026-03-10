@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -72,8 +73,18 @@ export default function Journey() {
   const [goalRelevant, setGoalRelevant] = useState("");
   const [goalTimeBound, setGoalTimeBound] = useState("");
 
+  const [showGoalsHelp, setShowGoalsHelp] = useState(false);
+  const [hasSeenGoalsHelp, setHasSeenGoalsHelp] = useState(false);
+
   const [character, setCharacter] = useState("Persistent and curious");
   const [personality, setPersonality] = useState("Analytical problem solver");
+
+  useEffect(() => {
+    if (activeTab === "goals" && !hasSeenGoalsHelp) {
+      setShowGoalsHelp(true);
+      setHasSeenGoalsHelp(true);
+    }
+  }, [activeTab, hasSeenGoalsHelp]);
 
   const addHabit = () => {
     const title = habitInput.trim();
@@ -196,9 +207,7 @@ export default function Journey() {
   };
 
   const toggleGoal = (id: string) => {
-    if (selectedGoalId) {
-      return;
-    }
+    if (selectedGoalId) return;
     setExpandedGoalId((prev) => (prev === id ? null : id));
   };
 
@@ -291,6 +300,8 @@ export default function Journey() {
           cancelGoalForm={cancelGoalForm}
           deleteSelectedGoal={deleteSelectedGoal}
           markSelectedGoalCompleted={markSelectedGoalCompleted}
+          showGoalsHelp={showGoalsHelp}
+          setShowGoalsHelp={setShowGoalsHelp}
           character={character}
           setCharacter={setCharacter}
           personality={personality}
@@ -390,6 +401,8 @@ function MyJourneyScreen(props: {
   cancelGoalForm: () => void;
   deleteSelectedGoal: () => void;
   markSelectedGoalCompleted: () => void;
+  showGoalsHelp: boolean;
+  setShowGoalsHelp: (v: boolean) => void;
 
   character: string;
   setCharacter: (v: string) => void;
@@ -435,6 +448,8 @@ function MyJourneyScreen(props: {
     cancelGoalForm,
     deleteSelectedGoal,
     markSelectedGoalCompleted,
+    showGoalsHelp,
+    setShowGoalsHelp,
 
     character,
     setCharacter,
@@ -446,6 +461,11 @@ function MyJourneyScreen(props: {
 
   return (
     <View style={{ flex: 1 }}>
+      <GoalsHelpModal
+        visible={showGoalsHelp}
+        onClose={() => setShowGoalsHelp(false)}
+      />
+
       <Pressable style={{ flex: 1 }} onPress={clearSelectedGoal}>
         <ScrollView
           style={styles.scrollBg}
@@ -516,11 +536,22 @@ function MyJourneyScreen(props: {
           ) : activeTab === "goals" ? (
             <View style={{ gap: 14, paddingBottom: 110 }}>
               <View style={styles.card}>
-                <Text style={styles.sectionTitle}>Weekly SMART Goals</Text>
-                <Text style={styles.sectionSub}>
-                  Tap a goal to expand it. Hold a goal to select it for delete
-                  or complete.
-                </Text>
+                <View style={styles.goalHeaderTopRow}>
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text style={styles.sectionTitle}>Weekly SMART Goals</Text>
+                    <Text style={styles.sectionSub}>
+                      Tap a goal to expand it. Hold a goal to select it for
+                      delete or complete.
+                    </Text>
+                  </View>
+
+                  <Pressable
+                    style={styles.helpBtn}
+                    onPress={() => setShowGoalsHelp(true)}
+                  >
+                    <Text style={styles.helpBtnText}>?</Text>
+                  </Pressable>
+                </View>
 
                 {showGoalForm && (
                   <Pressable onPress={() => {}} style={styles.goalFormCard}>
@@ -781,6 +812,70 @@ function MyJourneyScreen(props: {
   );
 }
 
+function GoalsHelpModal(props: { visible: boolean; onClose: () => void }) {
+  const { visible, onClose } = props;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.helpModalCard}>
+          <View style={styles.helpIconWrap}>
+            <Text style={styles.helpIconText}>?</Text>
+          </View>
+
+          <Text style={styles.helpModalTitle}>How to Use Goals</Text>
+          <Text style={styles.helpModalSub}>
+            A quick guide to your SMART goals tab
+          </Text>
+
+          <View style={styles.helpList}>
+            <HelpRow emoji="👆" text="Tap a goal to expand or collapse it" />
+            <HelpRow emoji="✋" text="Hold a goal to select it" />
+            <HelpRow
+              emoji="🗑"
+              text="Use the trash button to delete a selected goal"
+            />
+            <HelpRow
+              emoji="✓"
+              text="Use the check button to mark a selected goal complete"
+            />
+            <HelpRow
+              emoji="＋"
+              text="Use the plus button to add a new SMART goal"
+            />
+            <HelpRow
+              emoji="?"
+              text="Tap the question mark anytime to open this again"
+            />
+          </View>
+
+          <Pressable style={styles.helpGotItBtn} onPress={onClose}>
+            <Text style={styles.helpGotItBtnText}>Got it</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function HelpRow(props: { emoji: string; text: string }) {
+  const { emoji, text } = props;
+
+  return (
+    <View style={styles.helpRow}>
+      <View style={styles.helpEmojiCircle}>
+        <Text style={styles.helpEmoji}>{emoji}</Text>
+      </View>
+      <Text style={styles.helpRowText}>{text}</Text>
+    </View>
+  );
+}
+
 function SmartGoalField(props: { label: string; text: string }) {
   const { label, text } = props;
 
@@ -1031,6 +1126,29 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 
+  goalHeaderTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  helpBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#F5F3FF",
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -2,
+  },
+  helpBtnText: {
+    color: "#7C3AED",
+    fontSize: 16,
+    fontWeight: "900",
+    marginTop: -1,
+  },
+
   goalFormCard: {
     marginTop: 14,
     borderRadius: 14,
@@ -1245,5 +1363,101 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "900",
     marginTop: -1,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(17,24,39,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 22,
+  },
+  helpModalCard: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#F3E8FF",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  helpIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F5F3FF",
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+  },
+  helpIconText: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#7C3AED",
+    marginTop: -1,
+  },
+  helpModalTitle: {
+    marginTop: 14,
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#111827",
+    textAlign: "center",
+  },
+  helpModalSub: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 18,
+    color: "#6B7280",
+    textAlign: "center",
+  },
+  helpList: {
+    marginTop: 18,
+    gap: 10,
+  },
+  helpRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  helpEmojiCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#FAF5FF",
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+    marginTop: 1,
+  },
+  helpEmoji: {
+    fontSize: 14,
+  },
+  helpRowText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: "#374151",
+    fontWeight: "600",
+  },
+  helpGotItBtn: {
+    marginTop: 18,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: "#7C3AED",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  helpGotItBtnText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
   },
 });
