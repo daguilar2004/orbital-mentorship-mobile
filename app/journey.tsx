@@ -539,10 +539,6 @@ function MyJourneyScreen(props: {
                 <View style={styles.goalHeaderTopRow}>
                   <View style={{ flex: 1, paddingRight: 12 }}>
                     <Text style={styles.sectionTitle}>Weekly SMART Goals</Text>
-                    <Text style={styles.sectionSub}>
-                      Tap a goal to expand it. Hold a goal to select it for
-                      delete or complete.
-                    </Text>
                   </View>
 
                   <Pressable
