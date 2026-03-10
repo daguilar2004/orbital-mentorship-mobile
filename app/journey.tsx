@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,22 +17,61 @@ type Item = {
   title: string;
 };
 
+type SmartGoal = {
+  id: string;
+  title: string;
+  time: string;
+  specific: string;
+  measurable: string;
+  achievable?: string;
+  relevant?: string;
+  timeBound: string;
+  completed: boolean;
+};
+
 export default function Journey() {
-  // Intro
   const [introDone, setIntroDone] = useState(false);
   const [reflection, setReflection] = useState("");
 
-  // Tabs
   const [activeTab, setActiveTab] = useState<TabKey>("habits");
 
-  // Habits
   const [habitInput, setHabitInput] = useState("");
   const [habits, setHabits] = useState<Item[]>([
     { id: "h1", title: "Morning meditation" },
     { id: "h2", title: "Daily coding practice" },
   ]);
 
-  // Discipline
+  const [goals, setGoals] = useState<SmartGoal[]>([
+    {
+      id: "g1",
+      title: "Practice clear communication",
+      time: "This week",
+      specific:
+        "Explain one technical concept in simple language to someone outside my field.",
+      measurable:
+        "They can repeat the idea back accurately without extra clarification.",
+      achievable:
+        "I have at least one opportunity this week to explain a concept to someone.",
+      relevant:
+        "Clear communication supports the kind of professional and leader I want to become.",
+      timeBound: "Complete by Sunday evening.",
+      completed: false,
+    },
+  ]);
+
+  const [expandedGoalId, setExpandedGoalId] = useState<string | null>("g1");
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+  const [showGoalForm, setShowGoalForm] = useState(false);
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
+
+  const [goalTitle, setGoalTitle] = useState("");
+  const [goalTime, setGoalTime] = useState("");
+  const [goalSpecific, setGoalSpecific] = useState("");
+  const [goalMeasurable, setGoalMeasurable] = useState("");
+  const [goalAchievable, setGoalAchievable] = useState("");
+  const [goalRelevant, setGoalRelevant] = useState("");
+  const [goalTimeBound, setGoalTimeBound] = useState("");
+
   const [character, setCharacter] = useState("Persistent and curious");
   const [personality, setPersonality] = useState("Analytical problem solver");
 
@@ -42,8 +82,166 @@ export default function Journey() {
     setHabitInput("");
   };
 
-  const removeHabit = (id: string) => {
-    setHabits((prev) => prev.filter((x) => x.id !== id));
+  const confirmRemoveHabit = (id: string) => {
+    Alert.alert("Delete habit?", "Do you want to delete this habit?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          setHabits((prev) => prev.filter((x) => x.id !== id));
+        },
+      },
+    ]);
+  };
+
+  const clearGoalForm = () => {
+    setGoalTitle("");
+    setGoalTime("");
+    setGoalSpecific("");
+    setGoalMeasurable("");
+    setGoalAchievable("");
+    setGoalRelevant("");
+    setGoalTimeBound("");
+    setEditingGoalId(null);
+  };
+
+  const cancelGoalForm = () => {
+    setShowGoalForm(false);
+    clearGoalForm();
+  };
+
+  const addGoal = () => {
+    if (
+      !goalTitle.trim() ||
+      !goalTime.trim() ||
+      !goalSpecific.trim() ||
+      !goalMeasurable.trim() ||
+      !goalTimeBound.trim()
+    ) {
+      return;
+    }
+
+    const newGoal: SmartGoal = {
+      id: String(Date.now()),
+      title: goalTitle.trim(),
+      time: goalTime.trim(),
+      specific: goalSpecific.trim(),
+      measurable: goalMeasurable.trim(),
+      achievable: goalAchievable.trim() || undefined,
+      relevant: goalRelevant.trim() || undefined,
+      timeBound: goalTimeBound.trim(),
+      completed: false,
+    };
+
+    setGoals((prev) => [newGoal, ...prev]);
+    setExpandedGoalId(newGoal.id);
+    setSelectedGoalId(null);
+    setShowGoalForm(false);
+    clearGoalForm();
+  };
+
+  const startEditGoal = (goal: SmartGoal) => {
+    setEditingGoalId(goal.id);
+    setGoalTitle(goal.title);
+    setGoalTime(goal.time);
+    setGoalSpecific(goal.specific);
+    setGoalMeasurable(goal.measurable);
+    setGoalAchievable(goal.achievable ?? "");
+    setGoalRelevant(goal.relevant ?? "");
+    setGoalTimeBound(goal.timeBound);
+    setExpandedGoalId(goal.id);
+    setSelectedGoalId(null);
+    setShowGoalForm(true);
+  };
+
+  const saveEditedGoal = () => {
+    if (
+      !editingGoalId ||
+      !goalTitle.trim() ||
+      !goalTime.trim() ||
+      !goalSpecific.trim() ||
+      !goalMeasurable.trim() ||
+      !goalTimeBound.trim()
+    ) {
+      return;
+    }
+
+    setGoals((prev) =>
+      prev.map((goal) =>
+        goal.id === editingGoalId
+          ? {
+              ...goal,
+              title: goalTitle.trim(),
+              time: goalTime.trim(),
+              specific: goalSpecific.trim(),
+              measurable: goalMeasurable.trim(),
+              achievable: goalAchievable.trim() || undefined,
+              relevant: goalRelevant.trim() || undefined,
+              timeBound: goalTimeBound.trim(),
+            }
+          : goal,
+      ),
+    );
+
+    setShowGoalForm(false);
+    clearGoalForm();
+  };
+
+  const removeGoal = (id: string) => {
+    setGoals((prev) => prev.filter((goal) => goal.id !== id));
+    if (expandedGoalId === id) setExpandedGoalId(null);
+    if (selectedGoalId === id) setSelectedGoalId(null);
+    if (editingGoalId === id) cancelGoalForm();
+  };
+
+  const toggleGoal = (id: string) => {
+    if (selectedGoalId) {
+      return;
+    }
+    setExpandedGoalId((prev) => (prev === id ? null : id));
+  };
+
+  const selectGoal = (id: string) => {
+    setSelectedGoalId(id);
+  };
+
+  const clearSelectedGoal = () => {
+    setSelectedGoalId(null);
+  };
+
+  const markSelectedGoalCompleted = () => {
+    if (!selectedGoalId) return;
+
+    setGoals((prev) =>
+      prev.map((goal) =>
+        goal.id === selectedGoalId
+          ? { ...goal, completed: !goal.completed }
+          : goal,
+      ),
+    );
+
+    setSelectedGoalId(null);
+  };
+
+  const deleteSelectedGoal = () => {
+    if (!selectedGoalId) return;
+
+    const selected = goals.find((goal) => goal.id === selectedGoalId);
+    Alert.alert(
+      "Delete SMART goal?",
+      selected ? `Delete "${selected.title}"?` : "Delete this SMART goal?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            removeGoal(selectedGoalId);
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -59,13 +257,40 @@ export default function Journey() {
         <MyJourneyScreen
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          // habits
           habitInput={habitInput}
           setHabitInput={setHabitInput}
           habits={habits}
           addHabit={addHabit}
-          removeHabit={removeHabit}
-          // discipline
+          removeHabit={confirmRemoveHabit}
+          goals={goals}
+          expandedGoalId={expandedGoalId}
+          selectedGoalId={selectedGoalId}
+          toggleGoal={toggleGoal}
+          selectGoal={selectGoal}
+          clearSelectedGoal={clearSelectedGoal}
+          showGoalForm={showGoalForm}
+          setShowGoalForm={setShowGoalForm}
+          goalTitle={goalTitle}
+          setGoalTitle={setGoalTitle}
+          goalTime={goalTime}
+          setGoalTime={setGoalTime}
+          goalSpecific={goalSpecific}
+          setGoalSpecific={setGoalSpecific}
+          goalMeasurable={goalMeasurable}
+          setGoalMeasurable={setGoalMeasurable}
+          goalAchievable={goalAchievable}
+          setGoalAchievable={setGoalAchievable}
+          goalRelevant={goalRelevant}
+          setGoalRelevant={setGoalRelevant}
+          goalTimeBound={goalTimeBound}
+          setGoalTimeBound={setGoalTimeBound}
+          addGoal={addGoal}
+          editingGoalId={editingGoalId}
+          startEditGoal={startEditGoal}
+          saveEditedGoal={saveEditedGoal}
+          cancelGoalForm={cancelGoalForm}
+          deleteSelectedGoal={deleteSelectedGoal}
+          markSelectedGoalCompleted={markSelectedGoalCompleted}
           character={character}
           setCharacter={setCharacter}
           personality={personality}
@@ -85,7 +310,10 @@ function WelcomeScreen(props: {
   const { reflection, setReflection, onBegin, onSkip } = props;
 
   return (
-    <ScrollView style={styles.scrollBg} contentContainerStyle={styles.centerWrap}>
+    <ScrollView
+      style={styles.scrollBg}
+      contentContainerStyle={styles.centerWrap}
+    >
       <View style={styles.welcomeCard}>
         <View style={styles.heartCircle}>
           <Text style={styles.heart}>♡</Text>
@@ -133,6 +361,36 @@ function MyJourneyScreen(props: {
   addHabit: () => void;
   removeHabit: (id: string) => void;
 
+  goals: SmartGoal[];
+  expandedGoalId: string | null;
+  selectedGoalId: string | null;
+  toggleGoal: (id: string) => void;
+  selectGoal: (id: string) => void;
+  clearSelectedGoal: () => void;
+  showGoalForm: boolean;
+  setShowGoalForm: (v: boolean) => void;
+  goalTitle: string;
+  setGoalTitle: (v: string) => void;
+  goalTime: string;
+  setGoalTime: (v: string) => void;
+  goalSpecific: string;
+  setGoalSpecific: (v: string) => void;
+  goalMeasurable: string;
+  setGoalMeasurable: (v: string) => void;
+  goalAchievable: string;
+  setGoalAchievable: (v: string) => void;
+  goalRelevant: string;
+  setGoalRelevant: (v: string) => void;
+  goalTimeBound: string;
+  setGoalTimeBound: (v: string) => void;
+  addGoal: () => void;
+  editingGoalId: string | null;
+  startEditGoal: (goal: SmartGoal) => void;
+  saveEditedGoal: () => void;
+  cancelGoalForm: () => void;
+  deleteSelectedGoal: () => void;
+  markSelectedGoalCompleted: () => void;
+
   character: string;
   setCharacter: (v: string) => void;
   personality: string;
@@ -148,179 +406,390 @@ function MyJourneyScreen(props: {
     addHabit,
     removeHabit,
 
+    goals,
+    expandedGoalId,
+    selectedGoalId,
+    toggleGoal,
+    selectGoal,
+    clearSelectedGoal,
+    showGoalForm,
+    setShowGoalForm,
+    goalTitle,
+    setGoalTitle,
+    goalTime,
+    setGoalTime,
+    goalSpecific,
+    setGoalSpecific,
+    goalMeasurable,
+    setGoalMeasurable,
+    goalAchievable,
+    setGoalAchievable,
+    goalRelevant,
+    setGoalRelevant,
+    goalTimeBound,
+    setGoalTimeBound,
+    addGoal,
+    editingGoalId,
+    startEditGoal,
+    saveEditedGoal,
+    cancelGoalForm,
+    deleteSelectedGoal,
+    markSelectedGoalCompleted,
+
     character,
     setCharacter,
     personality,
     setPersonality,
   } = props;
 
+  const selectedGoal = goals.find((goal) => goal.id === selectedGoalId);
+
   return (
-    <ScrollView style={styles.scrollBg} contentContainerStyle={styles.pagePad}>
-      <Text style={styles.pageTitle}>My Journey</Text>
-      <Text style={styles.pageSub}>Track your personal growth</Text>
+    <View style={{ flex: 1 }}>
+      <Pressable style={{ flex: 1 }} onPress={clearSelectedGoal}>
+        <ScrollView
+          style={styles.scrollBg}
+          contentContainerStyle={styles.pagePad}
+        >
+          <Text style={styles.pageTitle}>My Journey</Text>
+          <Text style={styles.pageSub}>Track your personal growth</Text>
 
-      <View style={styles.tabRow}>
-        <TabButton
-          label="Habits"
-          icon="♡"
-          active={activeTab === "habits"}
-          onPress={() => setActiveTab("habits")}
-        />
-        <TabButton
-          label="Goals"
-          icon="◎"
-          active={activeTab === "goals"}
-          onPress={() => setActiveTab("goals")}
-        />
-        <TabButton
-          label="Discipline"
-          icon="🏆"
-          active={activeTab === "discipline"}
-          onPress={() => setActiveTab("discipline")}
-        />
-      </View>
-
-      <View style={{ height: 16 }} />
-
-      {activeTab === "habits" ? (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Daily Habits</Text>
-          <Text style={styles.cardSub}>Positive habits you maintain daily</Text>
-
-          <View style={styles.addRow}>
-            <TextInput
-              value={habitInput}
-              onChangeText={setHabitInput}
-              placeholder="Add a new habit..."
-              placeholderTextColor="#9CA3AF"
-              style={styles.input}
-              returnKeyType="done"
-              onSubmitEditing={addHabit}
+          <View style={styles.tabRow}>
+            <TabButton
+              label="Habits"
+              icon="♡"
+              active={activeTab === "habits"}
+              onPress={() => setActiveTab("habits")}
             />
-            <Pressable style={styles.addBtnPurple} onPress={addHabit}>
-              <Text style={styles.addBtnText}>＋</Text>
-            </Pressable>
+            <TabButton
+              label="Goals"
+              icon="◎"
+              active={activeTab === "goals"}
+              onPress={() => setActiveTab("goals")}
+            />
+            <TabButton
+              label="Discipline"
+              icon="🏆"
+              active={activeTab === "discipline"}
+              onPress={() => setActiveTab("discipline")}
+            />
           </View>
 
-          <View style={{ height: 10 }} />
+          <View style={{ height: 16 }} />
 
-          {habits.map((h) => (
-            <View key={h.id} style={styles.rowPurple}>
-              <Text style={styles.rowText}>{h.title}</Text>
-              <Pressable onPress={() => removeHabit(h.id)} style={styles.rowXBtn}>
-                <Text style={styles.rowXText}>×</Text>
-              </Pressable>
+          {activeTab === "habits" ? (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Daily Habits</Text>
+              <Text style={styles.cardSub}>
+                Positive habits you maintain daily. Press and hold a habit to
+                delete it.
+              </Text>
+
+              <View style={styles.addRow}>
+                <TextInput
+                  value={habitInput}
+                  onChangeText={setHabitInput}
+                  placeholder="Add a new habit..."
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.input}
+                  returnKeyType="done"
+                  onSubmitEditing={addHabit}
+                />
+                <Pressable style={styles.addBtnPurple} onPress={addHabit}>
+                  <Text style={styles.addBtnText}>＋</Text>
+                </Pressable>
+              </View>
+
+              <View style={{ height: 10 }} />
+
+              {habits.map((h) => (
+                <Pressable
+                  key={h.id}
+                  style={styles.rowPurple}
+                  onLongPress={() => removeHabit(h.id)}
+                  delayLongPress={250}
+                >
+                  <Text style={styles.rowText}>{h.title}</Text>
+                </Pressable>
+              ))}
             </View>
-          ))}
-        </View>
+          ) : activeTab === "goals" ? (
+            <View style={{ gap: 14, paddingBottom: 110 }}>
+              <View style={styles.card}>
+                <Text style={styles.sectionTitle}>Weekly SMART Goals</Text>
+                <Text style={styles.sectionSub}>
+                  Tap a goal to expand it. Hold a goal to select it for delete
+                  or complete.
+                </Text>
+
+                {showGoalForm && (
+                  <Pressable onPress={() => {}} style={styles.goalFormCard}>
+                    <Text style={styles.goalFormTitle}>
+                      {editingGoalId
+                        ? "Edit SMART Goal"
+                        : "Create New SMART Goal"}
+                    </Text>
+
+                    <TextInput
+                      value={goalTitle}
+                      onChangeText={setGoalTitle}
+                      placeholder="Goal title"
+                      placeholderTextColor="#9CA3AF"
+                      style={styles.input}
+                    />
+
+                    <View style={{ height: 10 }} />
+
+                    <TextInput
+                      value={goalTime}
+                      onChangeText={setGoalTime}
+                      placeholder="Time / due date"
+                      placeholderTextColor="#9CA3AF"
+                      style={styles.input}
+                    />
+
+                    <View style={{ height: 10 }} />
+
+                    <TextInput
+                      value={goalSpecific}
+                      onChangeText={setGoalSpecific}
+                      placeholder="Specific"
+                      placeholderTextColor="#9CA3AF"
+                      multiline
+                      style={styles.formTextArea}
+                      textAlignVertical="top"
+                    />
+
+                    <View style={{ height: 10 }} />
+
+                    <TextInput
+                      value={goalMeasurable}
+                      onChangeText={setGoalMeasurable}
+                      placeholder="Measurable"
+                      placeholderTextColor="#9CA3AF"
+                      multiline
+                      style={styles.formTextArea}
+                      textAlignVertical="top"
+                    />
+
+                    <View style={{ height: 10 }} />
+
+                    <TextInput
+                      value={goalAchievable}
+                      onChangeText={setGoalAchievable}
+                      placeholder="Achievable (optional)"
+                      placeholderTextColor="#9CA3AF"
+                      multiline
+                      style={styles.formTextArea}
+                      textAlignVertical="top"
+                    />
+
+                    <View style={{ height: 10 }} />
+
+                    <TextInput
+                      value={goalRelevant}
+                      onChangeText={setGoalRelevant}
+                      placeholder="Relevant (optional)"
+                      placeholderTextColor="#9CA3AF"
+                      multiline
+                      style={styles.formTextArea}
+                      textAlignVertical="top"
+                    />
+
+                    <View style={{ height: 10 }} />
+
+                    <TextInput
+                      value={goalTimeBound}
+                      onChangeText={setGoalTimeBound}
+                      placeholder="Time-bound"
+                      placeholderTextColor="#9CA3AF"
+                      multiline
+                      style={styles.formTextArea}
+                      textAlignVertical="top"
+                    />
+
+                    <View style={styles.goalFormActions}>
+                      <Pressable
+                        style={styles.secondaryBtn}
+                        onPress={cancelGoalForm}
+                      >
+                        <Text style={styles.secondaryBtnText}>Cancel</Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={styles.primarySmallBtn}
+                        onPress={editingGoalId ? saveEditedGoal : addGoal}
+                      >
+                        <Text style={styles.primarySmallBtnText}>
+                          {editingGoalId ? "Save Changes" : "Save Goal"}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </Pressable>
+                )}
+
+                <View style={{ marginTop: 12 }}>
+                  {goals.map((goal) => {
+                    const expanded = expandedGoalId === goal.id;
+                    const selected = selectedGoalId === goal.id;
+
+                    return (
+                      <Pressable
+                        key={goal.id}
+                        onPress={() => toggleGoal(goal.id)}
+                        onLongPress={() => selectGoal(goal.id)}
+                        delayLongPress={250}
+                        style={[
+                          styles.smartGoalCard,
+                          selected && styles.smartGoalCardSelected,
+                          goal.completed && styles.smartGoalCardCompleted,
+                        ]}
+                      >
+                        <View style={styles.smartGoalHeader}>
+                          <View style={{ flex: 1, paddingRight: 10 }}>
+                            <View style={styles.goalTitleRow}>
+                              <Text
+                                style={[
+                                  styles.smartGoalTitle,
+                                  goal.completed && styles.completedTitle,
+                                ]}
+                              >
+                                {goal.title}
+                              </Text>
+                              {goal.completed ? (
+                                <View style={styles.completedBadge}>
+                                  <Text style={styles.completedBadgeText}>
+                                    Completed
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </View>
+
+                            <Text style={styles.smartGoalTime}>
+                              {goal.time}
+                            </Text>
+                          </View>
+
+                          <View style={styles.goalHeaderRight}>
+                            <Text style={styles.goalExpandIcon}>
+                              {expanded ? "−" : "+"}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {expanded && (
+                          <View style={styles.smartGoalExpanded}>
+                            <SmartGoalField label="S" text={goal.specific} />
+                            <SmartGoalField label="M" text={goal.measurable} />
+                            {goal.achievable ? (
+                              <SmartGoalField
+                                label="A"
+                                text={goal.achievable}
+                              />
+                            ) : null}
+                            {goal.relevant ? (
+                              <SmartGoalField label="R" text={goal.relevant} />
+                            ) : null}
+                            <SmartGoalField label="T" text={goal.timeBound} />
+
+                            <View style={styles.goalEditRow}>
+                              <Pressable
+                                style={styles.goalEditBtn}
+                                onPress={() => startEditGoal(goal)}
+                              >
+                                <Text style={styles.goalEditBtnText}>Edit</Text>
+                              </Pressable>
+                            </View>
+                          </View>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Personal Development</Text>
+
+              <Text style={styles.subHeader}>Character</Text>
+              <Text style={styles.sectionSub}>
+                Your core values and character traits
+              </Text>
+              <TextInput
+                value={character}
+                onChangeText={setCharacter}
+                multiline
+                style={styles.bigInput}
+                textAlignVertical="top"
+              />
+
+              <Text style={[styles.subHeader, { marginTop: 16 }]}>
+                Personality
+              </Text>
+              <Text style={styles.sectionSub}>
+                Your personality strengths and style
+              </Text>
+              <TextInput
+                value={personality}
+                onChangeText={setPersonality}
+                multiline
+                style={styles.bigInput}
+                textAlignVertical="top"
+              />
+
+              <View style={styles.tipBox}>
+                <Text style={styles.tipText}>
+                  💡 Regular reflection helps you stay aligned with your goals
+                  and maintain discipline.
+                </Text>
+              </View>
+            </View>
+          )}
+        </ScrollView>
+      </Pressable>
+
+      {activeTab === "goals" && selectedGoalId ? (
+        <>
+          <Pressable
+            style={styles.bottomLeftActionBtn}
+            onPress={deleteSelectedGoal}
+          >
+            <Text style={styles.bottomActionIcon}>🗑</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.floatingAddBtn}
+            onPress={markSelectedGoalCompleted}
+          >
+            <Text style={styles.bottomActionIcon}>
+              {selectedGoal?.completed ? "↺" : "✓"}
+            </Text>
+          </Pressable>
+        </>
       ) : activeTab === "goals" ? (
-        <View style={{ gap: 14 }}>
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Weekly SMART Goal</Text>
-
-            <Text style={styles.sectionSub}>Why you’re setting a SMART goal:</Text>
-            <Text style={styles.goalInfoText}>
-              Setting a SMART goal helps turn intention into action by making your focus
-              clear, specific, and measurable. People are far more likely to follow through
-              when goals are concrete, time-bound, and tied to a specific action rather than
-              vague intentions.
-            </Text>
-
-            <View style={{ height: 12 }} />
-
-            <GoalQuestion
-              label="Specific"
-              question="What is one specific action you can take this week that moves you closer to the professional role or leadership style you described above?"
-              example='“I want to practice explaining technical ideas in plain language so they are easily understood by someone outside my discipline.”'
-            />
-
-            <GoalQuestion
-              label="Measurable"
-              question="How will you know that you made progress on this by the end of the week?"
-              example='“Someone outside my technical background can accurately summarize my explanation without needing additional clarification.”'
-            />
-
-            <GoalQuestion
-              label="Achievable"
-              question="Why is this goal realistic to complete within the next 7 days?"
-              example='“This is achievable because I will have at least one opportunity this week to explain a technical idea to a non-technical audience and reflect on how clearly I communicated.”'
-            />
-
-            <GoalQuestion
-              label="Relevant"
-              question="How does this goal support the type of professional you want to become?"
-              example='“This supports the kind of professional I want to be because effective collaboration and leadership require the ability to communicate ideas clearly across different backgrounds.”'
-            />
-
-            <GoalQuestion
-              label="Time-bound"
-              question="When will you work on or complete this goal within the next 7 days?"
-              example='“I will work on this during my mentorship session this week and refine it by the end of the week.”'
-            />
-          </View>
-        </View>
-      ) : (
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Personal Development</Text>
-
-          <Text style={styles.subHeader}>Character</Text>
-          <Text style={styles.sectionSub}>Your core values and character traits</Text>
-          <TextInput
-            value={character}
-            onChangeText={setCharacter}
-            multiline
-            style={styles.bigInput}
-            textAlignVertical="top"
-          />
-
-          <Text style={[styles.subHeader, { marginTop: 16 }]}>Personality</Text>
-          <Text style={styles.sectionSub}>Your personality strengths and style</Text>
-          <TextInput
-            value={personality}
-            onChangeText={setPersonality}
-            multiline
-            style={styles.bigInput}
-            textAlignVertical="top"
-          />
-
-          <View style={styles.tipBox}>
-            <Text style={styles.tipText}>
-              💡 Regular reflection helps you stay aligned with your goals and maintain discipline.
-            </Text>
-          </View>
-        </View>
-      )}
-    </ScrollView>
+        <Pressable
+          style={styles.floatingAddBtn}
+          onPress={() => setShowGoalForm(!showGoalForm)}
+        >
+          <Text style={styles.floatingAddBtnText}>
+            {showGoalForm ? "×" : "+"}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
-function GoalQuestion(props: { label: string; question: string; example: string }) {
-  const { label, question, example } = props;
-  const [answer, setAnswer] = useState("");
+function SmartGoalField(props: { label: string; text: string }) {
+  const { label, text } = props;
 
   return (
-    <View style={styles.goalBlock}>
-      {/* Mini “SMART” tab-style label */}
-      <View style={styles.goalLabelRow}>
-        <View style={styles.goalPill}>
-          <Text style={styles.goalPillText}>{label}</Text>
-        </View>
+    <View style={styles.smartFieldWrap}>
+      <View style={styles.goalPill}>
+        <Text style={styles.goalPillText}>{label}</Text>
       </View>
-
-      {/* Removed the word "Prompt:" — just show the question */}
-      <Text style={styles.goalQuestionText}>{question}</Text>
-
-      <Text style={[styles.goalMetaTitle, { marginTop: 10 }]}>Example:</Text>
-      <Text style={styles.goalMetaText}>{example}</Text>
-
-      <TextInput
-        value={answer}
-        onChangeText={setAnswer}
-        placeholder="Short answer text"
-        placeholderTextColor="#9CA3AF"
-        style={styles.goalAnswerInput}
-        returnKeyType="done"
-      />
+      <Text style={styles.smartFieldText}>{text}</Text>
     </View>
   );
 }
@@ -335,8 +804,12 @@ function TabButton(props: {
 
   return (
     <Pressable onPress={onPress} style={styles.tabBtn}>
-      <Text style={[styles.tabIcon, active && styles.tabIconActive]}>{icon}</Text>
-      <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{label}</Text>
+      <Text style={[styles.tabIcon, active && styles.tabIconActive]}>
+        {icon}
+      </Text>
+      <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
+        {label}
+      </Text>
       {active && <View style={styles.simpleUnderline} />}
     </Pressable>
   );
@@ -346,7 +819,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#FFFFFF" },
   scrollBg: { flex: 1, backgroundColor: "#FFFFFF" },
 
-  // welcome
   centerWrap: { padding: 18, flexGrow: 1, justifyContent: "center" },
   welcomeCard: {
     backgroundColor: "#FFFFFF",
@@ -422,12 +894,10 @@ const styles = StyleSheet.create({
   skipWrap: { marginTop: 14, alignItems: "center" },
   skipText: { color: "#6B7280", fontSize: 13, fontWeight: "600" },
 
-  // page
   pagePad: { padding: 16, paddingBottom: 30 },
   pageTitle: { fontSize: 26, fontWeight: "900", color: "#111827" },
   pageSub: { marginTop: 4, fontSize: 13, color: "#6B7280" },
 
-  // tabs
   tabRow: {
     marginTop: 18,
     flexDirection: "row",
@@ -457,7 +927,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#7C3AED",
   },
 
-  // cards + inputs
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -489,11 +958,12 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: 42,
+    minHeight: 42,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     paddingHorizontal: 12,
+    paddingVertical: 10,
     fontSize: 13,
     color: "#111827",
     backgroundColor: "#FFFFFF",
@@ -511,7 +981,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
 
-  // add buttons
   addBtnPurple: {
     width: 46,
     height: 46,
@@ -527,7 +996,6 @@ const styles = StyleSheet.create({
     marginTop: -1,
   },
 
-  // rows
   rowText: {
     fontSize: 13,
     fontWeight: "700",
@@ -535,33 +1003,19 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: 10,
   },
-  rowXBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rowXText: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: "#9CA3AF",
-    marginTop: -2,
-  },
-
   rowPurple: {
-    height: 46,
+    minHeight: 46,
     borderRadius: 12,
     backgroundColor: "#F5F3FF",
     borderWidth: 1,
     borderColor: "#E9D5FF",
     paddingHorizontal: 12,
+    paddingVertical: 12,
     marginTop: 10,
     flexDirection: "row",
     alignItems: "center",
   },
 
-  // tip box
   tipBox: {
     marginTop: 16,
     borderRadius: 12,
@@ -577,29 +1031,146 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 
-  // GOALS tab styles
-  goalInfoText: {
-    marginTop: 6,
-    fontSize: 12,
-    lineHeight: 16,
-    color: "#374151",
-  },
-  goalBlock: {
+  goalFormCard: {
+    marginTop: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
+    borderColor: "#E9D5FF",
+    backgroundColor: "#FAF5FF",
     padding: 12,
-    marginTop: 12,
   },
-  goalLabelRow: {
+  goalFormTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#7C3AED",
+    marginBottom: 10,
+  },
+  formTextArea: {
+    minHeight: 74,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: "#111827",
+    backgroundColor: "#FFFFFF",
+  },
+  goalFormActions: {
+    marginTop: 12,
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
+    justifyContent: "flex-end",
+    gap: 10,
+  },
+  secondaryBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+  },
+  secondaryBtnText: {
+    color: "#374151",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  primarySmallBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#7C3AED",
+  },
+  primarySmallBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
   },
 
-  // soft purple mini-tab/pill (matches your Habits purple vibe)
+  smartGoalCard: {
+    marginTop: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    backgroundColor: "#FFFFFF",
+    overflow: "hidden",
+  },
+  smartGoalCardSelected: {
+    borderColor: "#7C3AED",
+    borderWidth: 2,
+  },
+  smartGoalCardCompleted: {
+    backgroundColor: "#FCFCFC",
+  },
+  smartGoalHeader: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: "#F5F3FF",
+  },
+  goalTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  smartGoalTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#111827",
+  },
+  completedTitle: {
+    textDecorationLine: "line-through",
+    color: "#6B7280",
+  },
+  smartGoalTime: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "600",
+  },
+  completedBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "#EDE9FE",
+    borderWidth: 1,
+    borderColor: "#DDD6FE",
+  },
+  completedBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#7C3AED",
+  },
+  goalHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  goalExpandIcon: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#7C3AED",
+    width: 22,
+    textAlign: "center",
+  },
+  smartGoalExpanded: {
+    padding: 12,
+    backgroundColor: "#FFFFFF",
+  },
+  smartFieldWrap: {
+    marginBottom: 12,
+  },
+  smartFieldText: {
+    marginTop: 8,
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#374151",
+  },
+
   goalPill: {
+    alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
@@ -613,31 +1184,66 @@ const styles = StyleSheet.create({
     color: "#7C3AED",
   },
 
-  goalQuestionText: {
-    fontSize: 12,
-    lineHeight: 16,
-    color: "#111827",
-    fontWeight: "600",
+  goalEditRow: {
+    marginTop: 4,
+    alignItems: "flex-end",
   },
-  goalMetaTitle: {
+  goalEditBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: "#F5F3FF",
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+  },
+  goalEditBtnText: {
     fontSize: 12,
     fontWeight: "800",
-    color: "#111827",
-    marginTop: 2,
+    color: "#7C3AED",
   },
-  goalMetaText: {
-    marginTop: 4,
-    fontSize: 12,
-    lineHeight: 16,
-    color: "#374151",
+
+  floatingAddBtn: {
+    position: "absolute",
+    right: 20,
+    bottom: 24,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: "#7C3AED",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
   },
-  goalAnswerInput: {
-    marginTop: 10,
-    height: 40,
-    borderBottomWidth: 1,
-    borderBottomColor: "#D1D5DB",
-    fontSize: 12,
-    color: "#111827",
-    paddingVertical: 6,
+  bottomLeftActionBtn: {
+    position: "absolute",
+    left: 20,
+    bottom: 24,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: "#111827",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
+  },
+  floatingAddBtnText: {
+    color: "#FFFFFF",
+    fontSize: 30,
+    fontWeight: "900",
+    marginTop: -2,
+  },
+  bottomActionIcon: {
+    color: "#FFFFFF",
+    fontSize: 24,
+    fontWeight: "900",
+    marginTop: -1,
   },
 });
