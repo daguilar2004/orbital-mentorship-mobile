@@ -100,6 +100,7 @@ type Note = {
   title: string;
   text: string | string[];
   formatting?: Formatting;
+  createdAt?: number;
 };
 
 export default function Notes() {
@@ -118,6 +119,10 @@ export default function Notes() {
 
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const [folderView, setFolderView] = useState(false);
+  const [openedFolder, setOpenedFolder] = useState<string | null>(null);
+  const [folderFilter, setFolderFilter] = useState<string | null>(null);
 
   const [editingNote, setEditingNote] = useState<Note | null>(null);
 
@@ -171,6 +176,12 @@ export default function Notes() {
     setFmt(defaultFormatting);
   };
 
+  const formatDateKey = (createdAt?: number, id?: string) => {
+    const ts = createdAt ?? (Number(id) ? Number(id) : undefined);
+    if (!ts) return "Unknown";
+    return new Date(ts).toLocaleDateString();
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -222,22 +233,31 @@ export default function Notes() {
       if (!text.trim()) return;
       noteContent = text;
     }
+    if (editingNote) {
+      const updatedNote: Note = {
+        id: editingNote.id,
+        type: selectedType!,
+        title: finalTitle,
+        text: noteContent,
+        formatting: fmt,
+        createdAt: editingNote.createdAt ?? Date.now(),
+      };
+      const updated = notes.map((n) => (n.id === editingNote.id ? updatedNote : n));
+      saveNotes(updated);
+    } else {
+      const newNote: Note = {
+        id: Date.now().toString(),
+        type: selectedType!,
+        title: finalTitle,
+        text: noteContent,
+        formatting: fmt,
+        createdAt: Date.now(),
+      };
+      saveNotes([newNote, ...notes]);
+    }
 
-    const newNote: Note = {
-      id: Date.now().toString(),
-      type: selectedType!,
-      title: finalTitle,
-      text: noteContent,
-      formatting: fmt,
-    };
-
-    saveNotes([newNote, ...notes]);
-
-    setText("");
-    setMultiText([]);
-    setNoteTitle("");
-    setSelectedType(null);
-    setFmt(defaultFormatting);
+    // Reset editor state
+    closeEditor();
   };
 
   /* FILTER NOTES */
@@ -289,64 +309,201 @@ export default function Notes() {
               {selectMode ? "Cancel" : "Select"}
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              setFolderView((v) => {
+                const next = !v;
+                if (!next) {
+                  setOpenedFolder(null);
+                  setFolderFilter(null);
+                }
+                return next;
+              });
+            }}
+            style={[
+              styles.selectBtn,
+              folderView && { backgroundColor: "#1E88E5" },
+            ]}
+          >
+            <Text style={{ color: folderView ? "white" : "#333", fontSize: 13 }}>
+              {folderView ? "Folders (On)" : "Folders"}
+            </Text>
+          </TouchableOpacity>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {options.map((opt) => (
-            <TouchableOpacity
-              key={opt}
-              onPress={() => setActiveFilter(activeFilter === opt ? null : opt)}
-              style={[
-                styles.filterBtn,
-                activeFilter === opt && { backgroundColor: categoryColors[opt] },
-              ]}
-            >
-              <Text style={{ color: activeFilter === opt ? "white" : "#333" }}>
-                {opt}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {!folderView && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {options.map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                onPress={() => setActiveFilter(activeFilter === opt ? null : opt)}
+                style={[
+                  styles.filterBtn,
+                  activeFilter === opt && { backgroundColor: categoryColors[opt] },
+                ]}
+              >
+                <Text style={{ color: activeFilter === opt ? "white" : "#333" }}>
+                  {opt}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
       </View>
 
-      {/* NOTES LIST */}
-      <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
-        {options.map((category) =>
-          groupedNotes[category]?.length ? (
-            <View key={category} style={{ marginBottom: 25 }}>
-              <Text style={[styles.groupTitle, { color: categoryColors[category] }]}>
-                {displayLabels[category] ?? category}
-              </Text>
+      {/* NOTES LIST OR FOLDER VIEW */}
+      {!folderView ? (
+        <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
+          {options.map((category) =>
+            groupedNotes[category]?.length ? (
+              <View key={category} style={{ marginBottom: 25 }}>
+                <Text style={[styles.groupTitle, { color: categoryColors[category] }]}> 
+                  {displayLabels[category] ?? category}
+                </Text>
 
-              {groupedNotes[category].map((item) => (
-                <View
-                  key={item.id}
-                  style={[styles.noteCard, { borderLeftColor: categoryColors[category] }]}
-                >
+                {groupedNotes[category].map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    onPress={() => (selectMode ? toggleSelectNote(item.id) : openEditNote(item))}
+                    onLongPress={() => {
+                      setSelectMode(true);
+                      toggleSelectNote(item.id);
+                    }}
+                    style={[styles.noteCard, { borderLeftColor: categoryColors[category], flexDirection: "row", alignItems: "flex-start" }]}
+                  >
+                    {selectMode && (
+                      <TouchableOpacity
+                        onPress={() => toggleSelectNote(item.id)}
+                        style={[styles.checkbox, selectedIds.has(item.id) && styles.checkboxSelected, { marginRight: 12 }]}
+                      />
+                    )}
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.noteTitle}>{item.title}</Text>
+
+                      {Array.isArray(item.text)
+                        ? item.text.map((section, index) => (
+                          <View key={index} style={{ marginBottom: 10 }}>
+                            <Text style={styles.sectionLabel}>
+                              {getLabels(category)[index]}
+                            </Text>
+                            <Text style={noteTextStyle(item.formatting)}>{section}</Text>
+                          </View>
+                        ))
+                        : (
+                          <>
+                            <Text style={styles.sectionLabel}>
+                              {getLabels(category)}
+                            </Text>
+                            <Text style={noteTextStyle(item.formatting)}>{item.text}</Text>
+                          </>
+                        )}
+
+                      {!selectMode && (
+                        <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 8 }}>
+                          <TouchableOpacity onPress={() => openEditNote(item)} style={{ marginRight: 12 }}>
+                            <Text style={{ color: "#1E88E5" }}>Edit</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity onPress={() => handleDeleteOne(item.id)}>
+                            <Text style={{ color: "#E53935" }}>Delete</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null
+          )}
+        </ScrollView>
+      ) : (
+        // Folder view
+        (() => {
+          const folders: Record<string, Note[]> = {};
+          notes.forEach((n) => {
+            const key = formatDateKey(n.createdAt, n.id);
+            if (!folders[key]) folders[key] = [];
+            folders[key].push(n);
+          });
+
+          const folderKeys = Object.keys(folders).sort((a, b) => {
+            // sort by newest first using Date parse where possible
+            const ta = new Date(a).getTime();
+            const tb = new Date(b).getTime();
+            return tb - ta;
+          });
+
+          if (!openedFolder) {
+            return (
+              <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
+                {folderKeys.map((key) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.noteCard, { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}
+                    onPress={() => setOpenedFolder(key)}
+                  >
+                    <Text style={{ fontSize: 16 }}>{key}</Text>
+                    <Text style={{ color: "#666" }}>{folders[key].length} notes</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            );
+          }
+
+          // opened folder: show all notes in that folder
+          const folderNotesAll = folders[openedFolder] || [];
+          const folderNotes = folderFilter ? folderNotesAll.filter((n) => n.type === folderFilter) : folderNotesAll;
+          
+          return (
+            <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
+              <TouchableOpacity onPress={() => { setOpenedFolder(null); setFolderFilter(null); }} style={{ marginBottom: 12 }}>
+                <Text style={{ color: "#1E88E5" }}>&lt; Back to folders</Text>
+              </TouchableOpacity>
+
+              {/* Folder-level type filter */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                {options.map((opt) => (
+                  <TouchableOpacity
+                    key={opt}
+                    onPress={() => setFolderFilter(folderFilter === opt ? null : opt)}
+                    style={[
+                      styles.filterBtn,
+                      folderFilter === opt && { backgroundColor: categoryColors[opt] },
+                    ]}
+                  >
+                    <Text style={{ color: folderFilter === opt ? "white" : "#333" }}>{opt}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {folderNotes.map((item) => (
+                <View key={item.id} style={[styles.noteCard, { borderLeftColor: categoryColors[item.type] ?? "#999" }] }>
                   <Text style={styles.noteTitle}>{item.title}</Text>
-
-                  {Array.isArray(item.text)
-                    ? item.text.map((section, index) => (
-                      <View key={index} style={{ marginBottom: 10 }}>
-                        <Text style={styles.sectionLabel}>
-                          {getLabels(category)[index]}
-                        </Text>
-                        <Text style={noteTextStyle(item.formatting)}>{section}</Text>
+                  {Array.isArray(item.text) ? (
+                    item.text.map((s, i) => (
+                      <View key={i} style={{ marginBottom: 8 }}>
+                        <Text style={noteTextStyle(item.formatting)}>{s}</Text>
                       </View>
                     ))
-                    : (
-                      <>
-                        <Text style={styles.sectionLabel}>
-                          {getLabels(category)}
-                        </Text>
-                        <Text style={noteTextStyle(item.formatting)}>{item.text}</Text>
-                      </>
-                    )}
+                  ) : (
+                    <Text style={noteTextStyle(item.formatting)}>{item.text}</Text>
+                  )}
+
+                  <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 8 }}>
+                    <TouchableOpacity onPress={() => openEditNote(item)} style={{ marginRight: 12 }}>
+                      <Text style={{ color: "#1E88E5" }}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDeleteOne(item.id)}>
+                      <Text style={{ color: "#E53935" }}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ))}
-            </View>
-          ) : null
-        )}
-      </ScrollView>
+            </ScrollView>
+          );
+        })()
+      )}
 
       {/* BULK DELETE BAR */}
       {selectMode && (
