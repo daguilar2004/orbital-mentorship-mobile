@@ -529,7 +529,13 @@ export default function Notes() {
       )}
 
       {/* BOTTOM SHEET */}
-      <Modal transparent visible={modalVisible} animationType="slide">
+      <Modal
+        transparent={true}
+        visible={modalVisible}
+        animationType="slide"
+        presentationStyle="overFullScreen"
+        statusBarTranslucent={true}
+      >
         <Pressable style={styles.overlay1} onPress={() => setModalVisible(false)}>
           <View style={styles.bottomSheet}>
             {options.map((option) => (
@@ -716,12 +722,16 @@ const styles = StyleSheet.create({
   fabText: { color: "white", fontSize: 34 },
   overlay1: { flex: 1, justifyContent: "flex-end" },
   bottomSheet: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: "white",
     paddingVertical: 20,
     paddingHorizontal: 30,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    minWidth: "100%",
+    width: "100%",
     maxWidth: 600,
     elevation: 10,
   },
