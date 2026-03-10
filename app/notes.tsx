@@ -25,6 +25,13 @@ const categoryColors: Record<string, string> = {
 };
 
 const options = ["Pre", "During", "Post", "Daily", "New"];
+const displayLabels: Record<string, string> = {
+  Pre: "Pre-Session",
+  During: "In Session",
+  Post: "Post-Session",
+  Daily: "Daily Reflection",
+  New: "+ New Note",
+};
 
 /* DEFAULT LABELS */
 const defaultLabels = {
@@ -239,7 +246,7 @@ export default function Notes() {
           groupedNotes[category]?.length ? (
             <View key={category} style={{ marginBottom: 25 }}>
               <Text style={[styles.groupTitle, { color: categoryColors[category] }]}>
-                {category}
+                {displayLabels[category] ?? category}
               </Text>
 
               {groupedNotes[category].map((item) => (
@@ -295,7 +302,7 @@ export default function Notes() {
                 }}
               >
                 <Text style={{ fontSize: 18, color: categoryColors[option] }}>
-                  {option}
+                  {displayLabels[option] ?? option}
                 </Text>
               </TouchableOpacity>
             ))}
