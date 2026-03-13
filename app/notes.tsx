@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
 import {
+  BackHandler,
   Modal,
   Pressable,
   ScrollView,
@@ -11,6 +12,9 @@ import {
   View,
 } from "react-native";
 import { useApp } from "./context/AppContext"; // App context with userRole
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
+
 
 /* STORAGE */
 const NOTES_KEY = "NOTES_STORAGE";
@@ -134,7 +138,11 @@ export default function Notes() {
   const toggleSelectNote = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   };
@@ -202,6 +210,239 @@ export default function Notes() {
     await AsyncStorage.setItem(NOTES_KEY, JSON.stringify(updated));
   };
 
+  const escapeHtml = (text: string) => {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/\n/g, '<br>');
+  };
+
+  useEffect(() => {
+    const onBackPress = () => {
+      if (selectedType) {
+        closeEditor();
+        return true;
+      }
+
+      if (modalVisible) {
+        setModalVisible(false);
+        return true;
+      }
+
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [selectedType, modalVisible]);
+
+  const exportNoteToPDF = async (note: Note) => {
+    const htmlContent = generateNoteHTML(note);
+    try {
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false,
+      });
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Share Note PDF',
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    }
+  };
+
+  const exportSelectedNotesToPDF = async () => {
+    const selectedNotes = notes.filter((n) => selectedIds.has(n.id));
+    if (selectedNotes.length === 0) return;
+
+    const htmlContent = generateMultiPageNoteHTML(selectedNotes);
+    try {
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false,
+      });
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Share Selected Notes PDF',
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    }
+  };
+
+  const generateNoteHTML = (note: Note) => {
+    const date = note.createdAt ? new Date(note.createdAt).toLocaleDateString() : '';
+    let html = `
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${note.title}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 40px;
+              line-height: 1.6;
+              -webkit-font-smoothing: antialiased;
+              -moz-osx-font-smoothing: grayscale;
+            }
+            h1 {
+              color: #333;
+              margin-bottom: 10px;
+              font-weight: bold;
+            }
+            .type {
+              color: #666;
+              font-size: 14px;
+              margin-bottom: 20px;
+            }
+            .content {
+              margin: 20px 0;
+              white-space: pre-wrap;
+              word-wrap: break-word;
+            }
+            .section {
+              margin-bottom: 15px;
+            }
+            .section-label {
+              font-weight: bold;
+              margin-bottom: 5px;
+            }
+            .date {
+              font-size: 12px;
+              color: #666;
+              margin-top: 30px;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${escapeHtml(note.title)}</h1>
+          <div class="type">${escapeHtml(displayLabels[note.type] || note.type)}</div>
+    `;
+
+    if (Array.isArray(note.text)) {
+      note.text.forEach((section, index) => {
+        const label = getLabels(note.type)[index] || '';
+        html += `
+          <div class="section">
+            <div class="section-label">${label}</div>
+            <div class="content">${escapeHtml(section)}</div>
+          </div>
+        `;
+      });
+    } else {
+      const label = getLabels(note.type) || '';
+      html += `
+        <div class="section">
+          <div class="section-label">${label}</div>
+          <div class="content">${escapeHtml(note.text)}</div>
+        </div>
+      `;
+    }
+
+    if (date) {
+      html += `<div class="date">Created: ${escapeHtml(date)}</div>`;
+    }
+
+    html += `
+        </body>
+      </html>
+    `;
+
+    return html;
+  };
+
+  const generateMultiPageNoteHTML = (selectedNotes: Note[]) => {
+    let html = `
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Selected Notes</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 40px;
+              line-height: 1.6;
+              -webkit-font-smoothing: antialiased;
+              -moz-osx-font-smoothing: grayscale;
+            }
+            .page { page-break-after: always; }
+            h1 {
+              color: #333;
+              margin-bottom: 10px;
+              font-weight: bold;
+            }
+            .type {
+              color: #666;
+              font-size: 14px;
+              margin-bottom: 20px;
+            }
+            .content {
+              margin: 20px 0;
+              white-space: pre-wrap;
+              word-wrap: break-word;
+            }
+            .section {
+              margin-bottom: 15px;
+            }
+            .section-label {
+              font-weight: bold;
+              margin-bottom: 5px;
+            }
+            .date {
+              font-size: 12px;
+              color: #666;
+              margin-top: 30px;
+            }
+          </style>
+        </head>
+        <body>
+    `;
+
+    selectedNotes.forEach((note) => {
+      const date = note.createdAt ? new Date(note.createdAt).toLocaleDateString() : '';
+      html += `<div class="page">`;
+      html += `<h1>${note.title}</h1>`;
+      html += `<div class="type">${displayLabels[note.type] || note.type}</div>`;
+
+      if (Array.isArray(note.text)) {
+        note.text.forEach((section, index) => {
+          const label = getLabels(note.type)[index] || '';
+          html += `
+            <div class="section">
+              <div class="section-label">${label}</div>
+              <div class="content">${escapeHtml(section)}</div>
+            </div>
+          `;
+        });
+      } else {
+        const label = getLabels(note.type) || '';
+        html += `
+          <div class="section">
+            <div class="section-label">${label}</div>
+            <div class="content">${escapeHtml(note.text)}</div>
+          </div>
+        `;
+      }
+
+      if (date) {
+        html += `<div class="date">Created: ${escapeHtml(date)}</div>`;
+      }
+
+      html += `</div>`;
+    });
+
+    html += `
+        </body>
+      </html>
+    `;
+
+    return html;
+  };
+
   /* MODE-SENSITIVE LABELS */
   const getLabels = (type: string | null) => {
     if (!type) return [];
@@ -212,7 +453,7 @@ export default function Notes() {
           "What tendency of mine should I be mindful of in this conversation?",
           "How can I guide this conversation in a way that builds the mentee’s independent thinking not reliance on me?",
           "What would “showing up well” as a mentor look like in this meeting, regardless of the outcome?"
-          ]
+        ]
         : defaultLabels.Pre;
     }
     return (defaultLabels as any)[type];
@@ -259,6 +500,7 @@ export default function Notes() {
     // Reset editor state
     closeEditor();
   };
+  
 
   /* FILTER NOTES */
   const filteredNotes = notes.filter((n) => {
@@ -357,7 +599,7 @@ export default function Notes() {
           {options.map((category) =>
             groupedNotes[category]?.length ? (
               <View key={category} style={{ marginBottom: 25 }}>
-                <Text style={[styles.groupTitle, { color: categoryColors[category] }]}> 
+                <Text style={[styles.groupTitle, { color: categoryColors[category] }]}>
                   {displayLabels[category] ?? category}
                 </Text>
 
@@ -401,6 +643,9 @@ export default function Notes() {
 
                       {!selectMode && (
                         <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 8 }}>
+                          <TouchableOpacity onPress={() => exportNoteToPDF(item)} style={{ marginRight: 12 }}>
+                            <Text style={{ color: "#4CAF50" }}>Export</Text>
+                          </TouchableOpacity>
                           <TouchableOpacity onPress={() => openEditNote(item)} style={{ marginRight: 12 }}>
                             <Text style={{ color: "#1E88E5" }}>Edit</Text>
                           </TouchableOpacity>
@@ -454,7 +699,7 @@ export default function Notes() {
           // opened folder: show all notes in that folder
           const folderNotesAll = folders[openedFolder] || [];
           const folderNotes = folderFilter ? folderNotesAll.filter((n) => n.type === folderFilter) : folderNotesAll;
-          
+
           return (
             <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
               <TouchableOpacity onPress={() => { setOpenedFolder(null); setFolderFilter(null); }} style={{ marginBottom: 12 }}>
@@ -478,27 +723,85 @@ export default function Notes() {
               </ScrollView>
 
               {folderNotes.map((item) => (
-                <View key={item.id} style={[styles.noteCard, { borderLeftColor: categoryColors[item.type] ?? "#999" }] }>
-                  <Text style={styles.noteTitle}>{item.title}</Text>
-                  {Array.isArray(item.text) ? (
-                    item.text.map((s, i) => (
-                      <View key={i} style={{ marginBottom: 8 }}>
-                        <Text style={noteTextStyle(item.formatting)}>{s}</Text>
-                      </View>
-                    ))
-                  ) : (
-                    <Text style={noteTextStyle(item.formatting)}>{item.text}</Text>
+                <TouchableOpacity
+                  key={item.id}
+                  onPress={() => (selectMode ? toggleSelectNote(item.id) : openEditNote(item))}
+                  onLongPress={() => {
+                    setSelectMode(true);
+                    toggleSelectNote(item.id);
+                  }}
+                  style={[
+                    styles.noteCard,
+                    {
+                      borderLeftColor: categoryColors[item.type] ?? "#999",
+                      flexDirection: "row",
+                      alignItems: "flex-start",
+                    },
+                  ]}
+                >
+                  {selectMode && (
+                    <TouchableOpacity
+                      onPress={() => toggleSelectNote(item.id)}
+                      style={[
+                        styles.checkbox,
+                        selectedIds.has(item.id) && styles.checkboxSelected,
+                        { marginRight: 12 },
+                      ]}
+                    />
                   )}
 
-                  <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 8 }}>
-                    <TouchableOpacity onPress={() => openEditNote(item)} style={{ marginRight: 12 }}>
-                      <Text style={{ color: "#1E88E5" }}>Edit</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleDeleteOne(item.id)}>
-                      <Text style={{ color: "#E53935" }}>Delete</Text>
-                    </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.noteTitle}>{item.title}</Text>
+
+                    {Array.isArray(item.text)
+                      ? item.text.map((section, index) => (
+                        <View key={index} style={{ marginBottom: 10 }}>
+                          <Text style={styles.sectionLabel}>
+                            {getLabels(item.type)?.[index]}
+                          </Text>
+
+                          <Text style={noteTextStyle(item.formatting)}>
+                            {section}
+                          </Text>
+                        </View>
+                      ))
+                      : (
+                        <>
+                          <Text style={styles.sectionLabel}>
+                            {getLabels(item.type)}
+                          </Text>
+
+                          <Text style={noteTextStyle(item.formatting)}>
+                            {item.text}
+                          </Text>
+                        </>
+                      )}
+
+                    {!selectMode && (
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "flex-end",
+                          marginTop: 8,
+                        }}
+                      >
+                        <TouchableOpacity onPress={() => exportNoteToPDF(item)} style={{ marginRight: 12 }}>
+                          <Text style={{ color: "#4CAF50" }}>Export</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => openEditNote(item)}
+                          style={{ marginRight: 12 }}
+                        >
+                          <Text style={{ color: "#1E88E5" }}>Edit</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity onPress={() => handleDeleteOne(item.id)}>
+                          <Text style={{ color: "#E53935" }}>Delete</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </ScrollView>
           );
@@ -511,13 +814,22 @@ export default function Notes() {
           <Text style={{ color: "white", fontSize: 14 }}>
             {selectedIds.size} selected
           </Text>
-          <TouchableOpacity
-            onPress={handleDeleteSelected}
-            disabled={selectedIds.size === 0}
-            style={[styles.bulkDeleteBtn, selectedIds.size === 0 && { opacity: 0.4 }]}
-          >
-            <Text style={{ color: "white", fontWeight: "bold" }}>Delete</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <TouchableOpacity
+              onPress={exportSelectedNotesToPDF}
+              disabled={selectedIds.size === 0}
+              style={[styles.bulkExportBtn, selectedIds.size === 0 && { opacity: 0.4 }]}
+            >
+              <Text style={{ color: "white", fontWeight: "bold" }}>Export</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleDeleteSelected}
+              disabled={selectedIds.size === 0}
+              style={[styles.bulkDeleteBtn, selectedIds.size === 0 && { opacity: 0.4 }]}
+            >
+              <Text style={{ color: "white", fontWeight: "bold" }}>Delete</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -732,7 +1044,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     width: "100%",
-    maxWidth: 600,
     elevation: 10,
   },
   option: { paddingVertical: 15 },
@@ -799,6 +1110,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 24,
     paddingVertical: 16,
+  },
+  bulkExportBtn: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
   bulkDeleteBtn: {
     backgroundColor: "#E53935",
