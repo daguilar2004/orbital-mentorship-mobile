@@ -1,16 +1,16 @@
+import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
+  Alert,
   Modal,
-  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
+  View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useApp, Phase, Task } from "./context/AppContext";
+import { Phase, Task, useApp } from "./context/AppContext";
 
 export default function Home() {
   const {
@@ -25,7 +25,7 @@ export default function Home() {
 
   const currentPhase = useMemo(
     () => phases.find((p) => p.status === "current"),
-    [phases]
+    [phases],
   );
 
   // accordion
@@ -39,19 +39,11 @@ export default function Home() {
   const [draftDesc, setDraftDesc] = useState("");
   const [draftResponse, setDraftResponse] = useState("");
   const [draftFeedback, setDraftFeedback] = useState("");
+  const [draftReflection, setDraftReflection] = useState("");
 
   useEffect(() => {
     if (currentPhase) setExpanded(new Set([currentPhase.id]));
   }, [currentPhase?.id]);
-
-  const completedPhases = phases.filter((p) => p.status === "completed").length;
-  const totalPhases = phases.length;
-
-  const pendingTasksCount = useMemo(() => {
-    return phases
-      .flatMap((p) => p.tasks)
-      .filter((t) => t.status === "pending" || t.status === "submitted").length;
-  }, [phases]);
 
   const activePhase = useMemo(() => {
     if (!activePhaseId) return null;
@@ -63,12 +55,12 @@ export default function Home() {
     return activePhase.tasks.find((t) => t.id === activeTaskId) ?? null;
   }, [activePhase, activeTaskId]);
 
-  // When opening a task, seed drafts from state
   useEffect(() => {
     if (!activeTask) return;
     setDraftDesc(activeTask.description ?? "");
     setDraftResponse(activeTask.submittedResponse ?? "");
     setDraftFeedback(activeTask.mentorFeedback ?? "");
+    setDraftReflection("");
   }, [activeTask?.id]);
 
   function togglePhase(phase: Phase) {
@@ -92,6 +84,62 @@ export default function Home() {
     setDraftDesc("");
     setDraftResponse("");
     setDraftFeedback("");
+    setDraftReflection("");
+  }
+
+  function getTasksNeedingAttention(phase: Phase) {
+    if (userRole === "mentor") {
+      return phase.tasks.filter((t) => t.status === "submitted");
+    }
+
+    return phase.tasks.filter(
+      (t) => t.status === "pending" || t.status === "rejected",
+    );
+  }
+
+  function handleSubmitTask() {
+    if (!activePhase || !activeTask) return;
+
+    const trimmedResponse = draftResponse.trim();
+    const trimmedReflection = draftReflection.trim();
+
+    if (activeTask.status === "rejected") {
+      if (!trimmedResponse) {
+        Alert.alert(
+          "Response required",
+          "Please update your response before resubmitting.",
+        );
+        return;
+      }
+
+      if (!trimmedReflection) {
+        Alert.alert(
+          "Reflection required",
+          "Please answer the reflection question before resubmitting.",
+        );
+        return;
+      }
+
+      const combinedSubmission = `${trimmedResponse}
+
+--- Revision Reflection ---
+Based on mentor feedback, what problems did you run into, and how can you fix them?
+
+${trimmedReflection}`;
+
+      submitTask(activePhase.id, activeTask.id, combinedSubmission);
+      return;
+    }
+
+    if (!trimmedResponse) {
+      Alert.alert(
+        "Response required",
+        "Please write your response before submitting.",
+      );
+      return;
+    }
+
+    submitTask(activePhase.id, activeTask.id, trimmedResponse);
   }
 
   return (
@@ -115,20 +163,6 @@ export default function Home() {
           label="Total XP"
           value={`${totalXP}`}
         />
-        <StatCard
-          icon="trending-up"
-          iconBg="#DBEAFE"
-          iconColor="#2563EB"
-          label="Progress"
-          value={`${completedPhases}/${totalPhases}`}
-        />
-        <StatCard
-          icon="flag"
-          iconBg="#DCFCE7"
-          iconColor="#16A34A"
-          label={userRole === "mentee" ? "Pending Tasks" : "Tasks to Review"}
-          value={`${pendingTasksCount}`}
-        />
       </View>
 
       {/* Phases on Home */}
@@ -140,18 +174,20 @@ export default function Home() {
           const isLocked = phase.status === "upcoming";
 
           const approvedCount = phase.tasks.filter(
-            (t) => t.status === "approved"
+            (t) => t.status === "approved",
           ).length;
           const totalTasks = phase.tasks.length;
           const progressPct =
             totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
 
+          const tasksNeedingAttention = getTasksNeedingAttention(phase);
+
           const cardStyle =
             phase.status === "current"
               ? styles.phaseCardCurrent
               : phase.status === "completed"
-              ? styles.phaseCardCompleted
-              : styles.phaseCardUpcoming;
+                ? styles.phaseCardCompleted
+                : styles.phaseCardUpcoming;
 
           return (
             <View key={phase.id} style={[styles.phaseCardBase, cardStyle]}>
@@ -192,7 +228,11 @@ export default function Home() {
 
                 <View style={styles.phaseRight}>
                   {phase.status === "completed" ? (
-                    <Ionicons name="checkmark-circle" size={20} color="#16A34A" />
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={20}
+                      color="#16A34A"
+                    />
                   ) : null}
 
                   {phase.status === "upcoming" ? (
@@ -227,6 +267,65 @@ export default function Home() {
                   />
                 </View>
               </View>
+
+              {/* Pending tasks under progress bar */}
+              {!isLocked ? (
+                <View style={styles.pendingSection}>
+                  <View style={styles.rowBetween}>
+                    <Text style={styles.pendingSectionTitle}>
+                      {userRole === "mentor"
+                        ? "Tasks to Review"
+                        : "Pending Tasks"}
+                    </Text>
+                    <Text style={[styles.small, styles.bold]}>
+                      {tasksNeedingAttention.length}
+                    </Text>
+                  </View>
+
+                  {tasksNeedingAttention.length > 0 ? (
+                    <View style={styles.pendingList}>
+                      {tasksNeedingAttention.map((task) => (
+                        <Pressable
+                          key={task.id}
+                          onPress={() => openTask(phase, task)}
+                          style={({ pressed }) => [
+                            styles.pendingTaskRow,
+                            pressed && styles.taskPressed,
+                          ]}
+                        >
+                          <View style={styles.taskLeft}>
+                            <Ionicons
+                              name={taskStatusIcon(task.status)}
+                              size={18}
+                              color={taskStatusColor(task.status)}
+                            />
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.taskTitle}>{task.title}</Text>
+                              <Text style={styles.taskMeta}>
+                                <Text style={styles.xpText}>{task.xp} XP</Text>
+                                {"  •  "}
+                                Due {task.dueDate}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <Ionicons
+                            name="chevron-forward"
+                            size={18}
+                            color="#9CA3AF"
+                          />
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.smallMuted}>
+                      {userRole === "mentor"
+                        ? "No tasks need review right now."
+                        : "No pending tasks right now."}
+                    </Text>
+                  )}
+                </View>
+              ) : null}
 
               {isExpanded && !isLocked ? (
                 <View style={styles.phaseBody}>
@@ -287,16 +386,31 @@ export default function Home() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-
             {/* Status chip */}
             <View style={{ alignItems: "center", marginBottom: 10 }}>
-              <View style={[styles.statusChip, { borderColor: taskStatusColor(activeTask?.status ?? "pending") }]}>
+              <View
+                style={[
+                  styles.statusChip,
+                  {
+                    borderColor: taskStatusColor(
+                      activeTask?.status ?? "pending",
+                    ),
+                  },
+                ]}
+              >
                 <Ionicons
                   name={taskStatusIcon(activeTask?.status ?? "pending")}
                   size={16}
                   color={taskStatusColor(activeTask?.status ?? "pending")}
                 />
-                <Text style={[styles.statusChipText, { color: taskStatusColor(activeTask?.status ?? "pending") }]}>
+                <Text
+                  style={[
+                    styles.statusChipText,
+                    {
+                      color: taskStatusColor(activeTask?.status ?? "pending"),
+                    },
+                  ]}
+                >
                   {statusLabel(activeTask?.status ?? "pending")}
                 </Text>
               </View>
@@ -305,7 +419,7 @@ export default function Home() {
             {/* Title */}
             <Text style={styles.modalTitle}>{activeTask?.title}</Text>
 
-            {/* Description (mentor can edit, mentee view-only) */}
+            {/* Description */}
             <View style={styles.modalCard}>
               <Text style={styles.cardHeading}>Task Description</Text>
 
@@ -322,7 +436,11 @@ export default function Home() {
                     style={styles.primaryBtn}
                     onPress={() => {
                       if (!activePhase || !activeTask) return;
-                      updateTaskDescription(activePhase.id, activeTask.id, draftDesc.trim());
+                      updateTaskDescription(
+                        activePhase.id,
+                        activeTask.id,
+                        draftDesc.trim(),
+                      );
                     }}
                   >
                     <Text style={styles.primaryBtnText}>Save Description</Text>
@@ -339,15 +457,24 @@ export default function Home() {
                 <Text style={styles.metaText}>Due: {activeTask?.dueDate}</Text>
 
                 <Ionicons name="ribbon-outline" size={16} color="#6B7280" />
-                <Text style={[styles.metaText, { color: "#7C3AED", fontWeight: "800" }]}>
+                <Text
+                  style={[
+                    styles.metaText,
+                    { color: "#7C3AED", fontWeight: "800" },
+                  ]}
+                >
                   {activeTask?.xp} XP
                 </Text>
               </View>
             </View>
 
-            {/* Submitted Response (mentee can edit/submit, mentor read-only) */}
+            {/* Submitted Response */}
             <View style={styles.modalCard}>
-              <Text style={styles.cardHeading}>Submitted Response</Text>
+              <Text style={styles.cardHeading}>
+                {activeTask?.status === "rejected"
+                  ? "Updated Response"
+                  : "Submitted Response"}
+              </Text>
 
               {userRole === "mentee" ? (
                 <>
@@ -356,8 +483,29 @@ export default function Home() {
                     onChangeText={setDraftResponse}
                     multiline
                     style={styles.textArea}
-                    placeholder="Write your response…"
+                    placeholder={
+                      activeTask?.status === "rejected"
+                        ? "Update your response based on the mentor feedback…"
+                        : "Write your response…"
+                    }
                   />
+
+                  {activeTask?.status === "rejected" ? (
+                    <View style={styles.reflectionCard}>
+                      <Text style={styles.reflectionPrompt}>
+                        Based on mentor feedback, what problems did you run
+                        into, and how can you fix them?
+                      </Text>
+                      <TextInput
+                        value={draftReflection}
+                        onChangeText={setDraftReflection}
+                        multiline
+                        style={styles.textArea}
+                        placeholder="Describe the issues you ran into and how you plan to address them…"
+                      />
+                    </View>
+                  ) : null}
+
                   <View style={styles.rowGap}>
                     <Pressable
                       style={styles.secondaryBtn}
@@ -367,18 +515,20 @@ export default function Home() {
                       }}
                     >
                       <Ionicons name="attach" size={16} color="#111827" />
-                      <Text style={styles.secondaryBtnText}>Add Attachment</Text>
+                      <Text style={styles.secondaryBtnText}>
+                        Add Attachment
+                      </Text>
                     </Pressable>
 
                     <Pressable
                       style={styles.primaryBtn}
-                      onPress={() => {
-                        if (!activePhase || !activeTask) return;
-                        submitTask(activePhase.id, activeTask.id, draftResponse.trim());
-                      }}
+                      onPress={handleSubmitTask}
                     >
                       <Text style={styles.primaryBtnText}>
-                        {activeTask?.status === "submitted" ? "Resubmit" : "Submit"}
+                        {activeTask?.status === "submitted" ||
+                        activeTask?.status === "rejected"
+                          ? "Resubmit"
+                          : "Submit"}
                       </Text>
                     </Pressable>
                   </View>
@@ -413,17 +563,31 @@ export default function Home() {
                 <View style={{ gap: 10, marginTop: 8 }}>
                   {activeTask.attachments.map((a) => (
                     <View key={a.id} style={styles.fileRow}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
-                        <Ionicons name="document-outline" size={18} color="#6B7280" />
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 10,
+                          flex: 1,
+                        }}
+                      >
+                        <Ionicons
+                          name="document-outline"
+                          size={18}
+                          color="#6B7280"
+                        />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.fileName}>{a.name}</Text>
                           <Text style={styles.fileSize}>{a.sizeLabel}</Text>
                         </View>
                       </View>
 
-                      {/* download icon placeholder */}
                       <Pressable onPress={() => {}}>
-                        <Ionicons name="download-outline" size={18} color="#2563EB" />
+                        <Ionicons
+                          name="download-outline"
+                          size={18}
+                          color="#2563EB"
+                        />
                       </Pressable>
                     </View>
                   ))}
@@ -451,7 +615,12 @@ export default function Home() {
                     style={styles.rejectBtn}
                     onPress={() => {
                       if (!activePhase || !activeTask) return;
-                      reviewTask(activePhase.id, activeTask.id, "rejected", draftFeedback.trim());
+                      reviewTask(
+                        activePhase.id,
+                        activeTask.id,
+                        "rejected",
+                        draftFeedback.trim(),
+                      );
                     }}
                   >
                     <Text style={styles.rejectBtnText}>Reject</Text>
@@ -461,7 +630,12 @@ export default function Home() {
                     style={styles.approveBtn}
                     onPress={() => {
                       if (!activePhase || !activeTask) return;
-                      reviewTask(activePhase.id, activeTask.id, "approved", draftFeedback.trim());
+                      reviewTask(
+                        activePhase.id,
+                        activeTask.id,
+                        "approved",
+                        draftFeedback.trim(),
+                      );
                     }}
                   >
                     <Text style={styles.approveBtnText}>Accept</Text>
@@ -469,24 +643,31 @@ export default function Home() {
                 </View>
 
                 {activeTask?.reviewedAt ? (
-                  <Text style={styles.smallMuted}>Reviewed on {activeTask.reviewedAt}</Text>
+                  <Text style={styles.smallMuted}>
+                    Reviewed on {activeTask.reviewedAt}
+                  </Text>
                 ) : null}
               </View>
-            ) : (
-              // Mentee sees feedback if exists
-              activeTask?.mentorFeedback ? (
-                <View style={styles.modalCard}>
-                  <Text style={styles.cardHeading}>Mentor Feedback</Text>
-                  <Text style={styles.bodyText}>{activeTask.mentorFeedback}</Text>
-                  {activeTask.reviewedAt ? (
-                    <Text style={styles.smallMuted}>Reviewed on {activeTask.reviewedAt}</Text>
-                  ) : null}
-                </View>
-              ) : null
-            )}
+            ) : activeTask?.mentorFeedback ? (
+              <View style={styles.modalCard}>
+                <Text style={styles.cardHeading}>Mentor Feedback</Text>
+                <Text style={styles.bodyText}>{activeTask.mentorFeedback}</Text>
+                {activeTask.reviewedAt ? (
+                  <Text style={styles.smallMuted}>
+                    Reviewed on {activeTask.reviewedAt}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
 
             {/* Close */}
-            <Pressable onPress={closeTask} style={[styles.secondaryBtn, { marginTop: 10, justifyContent: "center" }]}>
+            <Pressable
+              onPress={closeTask}
+              style={[
+                styles.secondaryBtn,
+                { marginTop: 10, justifyContent: "center" },
+              ]}
+            >
               <Text style={styles.secondaryBtnText}>Close</Text>
             </Pressable>
           </ScrollView>
@@ -512,7 +693,9 @@ function statusLabel(status: Task["status"]) {
   }
 }
 
-function taskStatusIcon(status: Task["status"]): keyof typeof Ionicons.glyphMap {
+function taskStatusIcon(
+  status: Task["status"],
+): keyof typeof Ionicons.glyphMap {
   switch (status) {
     case "approved":
       return "checkmark-circle";
@@ -565,7 +748,6 @@ function StatCard(props: {
 /* ---------- styles ---------- */
 
 const styles = StyleSheet.create({
-  
   screen: { flex: 1, backgroundColor: "#F7F7FB" },
   container: { padding: 16, paddingBottom: 28, gap: 16 },
 
@@ -596,16 +778,32 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 12, color: "#6B7280" },
   statValue: { fontSize: 22, fontWeight: "800", marginTop: 2 },
 
-  phaseCardBase: { backgroundColor: "white", borderRadius: 16, padding: 14, borderWidth: 1 },
+  phaseCardBase: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+  },
   phaseCardCompleted: { borderColor: "#86EFAC" },
   phaseCardCurrent: { borderColor: "#C4B5FD" },
   phaseCardUpcoming: { borderColor: "#E5E7EB", opacity: 0.75 },
 
-  phaseHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  phaseHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   phaseLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   phaseRight: { flexDirection: "row", alignItems: "center", gap: 8 },
 
-  phaseIndexBubble: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "#E5E7EB" },
+  phaseIndexBubble: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E5E7EB",
+  },
   bubbleCompleted: { backgroundColor: "#DCFCE7" },
   bubbleCurrent: { backgroundColor: "#EDE9FE" },
   bubbleUpcoming: { backgroundColor: "#F3F4F6" },
@@ -615,18 +813,63 @@ const styles = StyleSheet.create({
   phaseTitle: { fontSize: 16, fontWeight: "800" },
   phaseDates: { fontSize: 12, color: "#6B7280", marginTop: 2 },
 
-  badgeActive: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: "#EDE9FE" },
+  badgeActive: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#EDE9FE",
+  },
   badgeActiveText: { fontSize: 12, fontWeight: "800", color: "#7C3AED" },
 
-  rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  rowBetween: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
   small: { fontSize: 13, color: "#374151" },
   smallMuted: { fontSize: 13, color: "#6B7280" },
   bold: { fontWeight: "800" },
 
-  progressTrack: { height: 8, backgroundColor: "#E5E7EB", borderRadius: 999, overflow: "hidden" },
+  progressTrack: {
+    height: 8,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 999,
+    overflow: "hidden",
+  },
   progressFill: { height: "100%", borderRadius: 999 },
 
-  phaseBody: { marginTop: 12, gap: 10 },
+  pendingSection: {
+    marginTop: 14,
+    gap: 8,
+  },
+  pendingSectionTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  pendingList: {
+    gap: 10,
+  },
+  pendingTaskRow: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "white",
+  },
+
+  phaseBody: {
+    marginTop: 14,
+    gap: 10,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
+  },
 
   taskRow: {
     borderWidth: 1,
@@ -647,14 +890,13 @@ const styles = StyleSheet.create({
 
   pressed: { opacity: 0.9 },
 
-  // Modal
-    modalRoot: {
-  flex: 1,
-  justifyContent: "flex-end",
+  modalRoot: {
+    flex: 1,
+    justifyContent: "flex-end",
   },
 
   modalContent: {
-    paddingBottom: 24, // lets you scroll past the last button
+    paddingBottom: 24,
   },
 
   modalSheet: {
@@ -671,7 +913,14 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
   },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)" },
-  modalGrabber: { alignSelf: "center", width: 48, height: 5, borderRadius: 999, backgroundColor: "#E5E7EB", marginBottom: 10 },
+  modalGrabber: {
+    alignSelf: "center",
+    width: 48,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#E5E7EB",
+    marginBottom: 10,
+  },
 
   statusChip: {
     flexDirection: "row",
@@ -685,7 +934,12 @@ const styles = StyleSheet.create({
   },
   statusChipText: { fontSize: 12, fontWeight: "900" },
 
-  modalTitle: { fontSize: 18, fontWeight: "900", color: "#111827", marginBottom: 10 },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#111827",
+    marginBottom: 10,
+  },
 
   modalCard: {
     backgroundColor: "white",
@@ -699,7 +953,12 @@ const styles = StyleSheet.create({
   cardHeading: { fontSize: 14, fontWeight: "900", color: "#111827" },
 
   bodyText: { fontSize: 13, color: "#111827", lineHeight: 19 },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
   metaText: { fontSize: 12, color: "#6B7280" },
 
   textArea: {
@@ -714,9 +973,36 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
 
-  rowGap: { flexDirection: "row", gap: 10, alignItems: "center", justifyContent: "space-between" },
+  reflectionCard: {
+    marginTop: 2,
+    gap: 8,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  reflectionPrompt: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111827",
+    lineHeight: 19,
+  },
 
-  primaryBtn: { backgroundColor: "#7C3AED", paddingVertical: 12, borderRadius: 12, alignItems: "center", flex: 1 },
+  rowGap: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  primaryBtn: {
+    backgroundColor: "#7C3AED",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    flex: 1,
+  },
   primaryBtnText: { color: "white", fontWeight: "900" },
 
   secondaryBtn: {
@@ -744,8 +1030,21 @@ const styles = StyleSheet.create({
   fileSize: { fontSize: 12, color: "#6B7280", marginTop: 2 },
 
   reviewBtnRow: { flexDirection: "row", gap: 10 },
-  rejectBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: "#FCA5A5", alignItems: "center" },
+  rejectBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+    alignItems: "center",
+  },
   rejectBtnText: { fontWeight: "900", color: "#DC2626" },
-  approveBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: "#16A34A", alignItems: "center" },
+  approveBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#16A34A",
+    alignItems: "center",
+  },
   approveBtnText: { fontWeight: "900", color: "white" },
 });
