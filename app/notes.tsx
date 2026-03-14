@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
 import {
+  BackHandler,
   Modal,
   Pressable,
   ScrollView,
@@ -12,6 +13,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "./context/AppContext";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 
 /* STORAGE */
 const NOTES_KEY = "NOTES_STORAGE";
@@ -117,6 +120,7 @@ const viewMenuModes: {
   { key: "list", label: "List" },
   { key: "folder", label: "Folders" },
   { key: "timeline", label: "Timeline" },
+  { key: "favorites", label: "Favorites" },
   { key: "graph", label: "Graph" },
 ];
 
@@ -535,12 +539,14 @@ function FavoritesView({
   notes,
   onOpenNote,
   onToggleFavorite,
+  onExport,
   onDelete,
   getLabels,
 }: {
   notes: Note[];
   onOpenNote: (note: Note) => void;
   onToggleFavorite: (id: string) => void;
+  onExport: (note: Note) => void;
   onDelete: (id: string) => void;
   getLabels: (type: string | null) => any;
 }) {
@@ -605,6 +611,9 @@ function FavoritesView({
           </Text>
 
           <View style={favStyles.actions}>
+            <TouchableOpacity onPress={() => onExport(item)}>
+              <Text style={styles.noteActionExport}>Export</Text>
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => onOpenNote(item)}>
               <Text style={{ color: "#1E88E5", fontSize: 13 }}>Edit</Text>
             </TouchableOpacity>
@@ -696,11 +705,14 @@ export default function Notes() {
     saveNotes(notes.filter((n) => n.id !== id));
   };
 
-  const toggleSelectNote = (id: string) => {
+ const toggleSelectNote = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   };
@@ -776,6 +788,248 @@ export default function Notes() {
     await AsyncStorage.setItem(NOTES_KEY, JSON.stringify(updated));
   };
 
+  const escapeHtml = (text: string) => {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
+      .replace(/\n/g, "<br>");
+  };
+
+  useEffect(() => {
+    const onBackPress = () => {
+      if (selectedType) {
+        closeEditor();
+        return true;
+      }
+
+      if (modalVisible) {
+        setModalVisible(false);
+        return true;
+      }
+
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      onBackPress
+    );
+    return () => subscription.remove();
+  }, [selectedType, modalVisible]);
+
+  const sharePdf = async (uri: string, dialogTitle: string) => {
+    if (!(await Sharing.isAvailableAsync())) {
+      console.warn("Sharing is not available on this device.");
+      return;
+    }
+
+    await Sharing.shareAsync(uri, {
+      mimeType: "application/pdf",
+      dialogTitle,
+    });
+  };
+
+  const exportNoteToPDF = async (note: Note) => {
+    const htmlContent = generateNoteHTML(note);
+    try {
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false,
+      });
+      await sharePdf(uri, "Share Note PDF");
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+    }
+  };
+
+  const exportSelectedNotesToPDF = async () => {
+    const selectedNotes = notes.filter((n) => selectedIds.has(n.id));
+    if (selectedNotes.length === 0) return;
+
+    const htmlContent = generateMultiPageNoteHTML(selectedNotes);
+    try {
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false,
+      });
+      await sharePdf(uri, "Share Selected Notes PDF");
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+    }
+  };
+
+  const generateNoteHTML = (note: Note) => {
+    const date = note.createdAt ? new Date(note.createdAt).toLocaleDateString() : '';
+    let html = `
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${note.title}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 40px;
+              line-height: 1.6;
+              -webkit-font-smoothing: antialiased;
+              -moz-osx-font-smoothing: grayscale;
+            }
+            h1 {
+              color: #333;
+              margin-bottom: 10px;
+              font-weight: bold;
+            }
+            .type {
+              color: #666;
+              font-size: 14px;
+              margin-bottom: 20px;
+            }
+            .content {
+              margin: 20px 0;
+              white-space: pre-wrap;
+              word-wrap: break-word;
+            }
+            .section {
+              margin-bottom: 15px;
+            }
+            .section-label {
+              font-weight: bold;
+              margin-bottom: 5px;
+            }
+            .date {
+              font-size: 12px;
+              color: #666;
+              margin-top: 30px;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${escapeHtml(note.title)}</h1>
+          <div class="type">${escapeHtml(displayLabels[note.type] || note.type)}</div>
+    `;
+
+    if (Array.isArray(note.text)) {
+      note.text.forEach((section, index) => {
+        const label = getLabels(note.type)[index] || '';
+        html += `
+          <div class="section">
+            <div class="section-label">${label}</div>
+            <div class="content">${escapeHtml(section)}</div>
+          </div>
+        `;
+      });
+    } else {
+      const label = getLabels(note.type) || '';
+      html += `
+        <div class="section">
+          <div class="section-label">${label}</div>
+          <div class="content">${escapeHtml(note.text)}</div>
+        </div>
+      `;
+    }
+
+    if (date) {
+      html += `<div class="date">Created: ${escapeHtml(date)}</div>`;
+    }
+
+    html += `
+        </body>
+      </html>
+    `;
+
+    return html;
+  };
+
+  const generateMultiPageNoteHTML = (selectedNotes: Note[]) => {
+    let html = `
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Selected Notes</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 40px;
+              line-height: 1.6;
+              -webkit-font-smoothing: antialiased;
+              -moz-osx-font-smoothing: grayscale;
+            }
+            .page { page-break-after: always; }
+            h1 {
+              color: #333;
+              margin-bottom: 10px;
+              font-weight: bold;
+            }
+            .type {
+              color: #666;
+              font-size: 14px;
+              margin-bottom: 20px;
+            }
+            .content {
+              margin: 20px 0;
+              white-space: pre-wrap;
+              word-wrap: break-word;
+            }
+            .section {
+              margin-bottom: 15px;
+            }
+            .section-label {
+              font-weight: bold;
+              margin-bottom: 5px;
+            }
+            .date {
+              font-size: 12px;
+              color: #666;
+              margin-top: 30px;
+            }
+          </style>
+        </head>
+        <body>
+    `;
+
+    selectedNotes.forEach((note) => {
+      const date = note.createdAt ? new Date(note.createdAt).toLocaleDateString() : '';
+      html += `<div class="page">`;
+      html += `<h1>${note.title}</h1>`;
+      html += `<div class="type">${displayLabels[note.type] || note.type}</div>`;
+
+      if (Array.isArray(note.text)) {
+        note.text.forEach((section, index) => {
+          const label = getLabels(note.type)[index] || '';
+          html += `
+            <div class="section">
+              <div class="section-label">${label}</div>
+              <div class="content">${escapeHtml(section)}</div>
+            </div>
+          `;
+        });
+      } else {
+        const label = getLabels(note.type) || '';
+        html += `
+          <div class="section">
+            <div class="section-label">${label}</div>
+            <div class="content">${escapeHtml(note.text)}</div>
+          </div>
+        `;
+      }
+
+      if (date) {
+        html += `<div class="date">Created: ${escapeHtml(date)}</div>`;
+      }
+
+      html += `</div>`;
+    });
+
+    html += `
+        </body>
+      </html>
+    `;
+
+    return html;
+  };
+
   /* ── LABELS ───────────────────────────────────────────── */
   const getLabels = (type: string | null) => {
     if (!type) return [];
@@ -787,6 +1041,7 @@ export default function Notes() {
             "How can I guide this conversation in a way that builds the mentee's independent thinking not reliance on me?",
             "What would 'showing up well' as a mentor look like in this meeting, regardless of the outcome?",
           ]
+          
         : defaultLabels.Pre;
     }
     return (defaultLabels as any)[type];
@@ -830,6 +1085,7 @@ export default function Notes() {
     }
     closeEditor();
   };
+  
 
   /* ── FILTER ───────────────────────────────────────────── */
   const filteredNotes = notes.filter((n) => {
@@ -1060,50 +1316,274 @@ export default function Notes() {
       </View>
 
       <View style={styles.contentShell}>
-        {/* ── VIEWS ────────────────────────────────────────── */}
+        {viewMode === "list" && (
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            {visibleNotes.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateTitle}>No notes found</Text>
+                <Text style={styles.emptyStateText}>
+                  Try a different search or clear the current filter.
+                </Text>
+              </View>
+            ) : (
+              options.map((category) =>
+                groupedNotes[category]?.length ? (
+                  <View key={category} style={styles.groupSection}>
+                    <View style={styles.groupHeader}>
+                      <View
+                        style={[
+                          styles.groupAccent,
+                          { backgroundColor: categoryColors[category] },
+                        ]}
+                      />
+                      <Text style={styles.groupTitle}>
+                        {displayLabels[category] ?? category}
+                      </Text>
+                      <View
+                        style={[
+                          styles.groupCount,
+                          { backgroundColor: `${categoryColors[category]}18` },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.groupCountText,
+                            { color: categoryColors[category] },
+                          ]}
+                        >
+                          {groupedNotes[category].length}
+                        </Text>
+                      </View>
+                    </View>
 
-      {/* LIST */}
-      {viewMode === "list" && (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {visibleNotes.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateTitle}>No notes found</Text>
-              <Text style={styles.emptyStateText}>
-                Try a different search or clear the current filter.
-              </Text>
-            </View>
-          ) : (
-            options.map((category) =>
-              groupedNotes[category]?.length ? (
-                <View key={category} style={styles.groupSection}>
-                  <View style={styles.groupHeader}>
-                    <View
+                    {groupedNotes[category].map((item) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        onPress={() =>
+                          selectMode
+                            ? toggleSelectNote(item.id)
+                            : openEditNote(item)
+                        }
+                        onLongPress={() => {
+                          setSelectMode(true);
+                          toggleSelectNote(item.id);
+                        }}
+                        style={[
+                          styles.noteCard,
+                          {
+                            borderLeftColor: categoryColors[category],
+                            flexDirection: "row",
+                            alignItems: "flex-start",
+                          },
+                          selectedIds.has(item.id) && styles.noteCardSelected,
+                        ]}
+                      >
+                        {selectMode && (
+                          <TouchableOpacity
+                            onPress={() => toggleSelectNote(item.id)}
+                            style={[
+                              styles.checkbox,
+                              selectedIds.has(item.id) &&
+                                styles.checkboxSelected,
+                              { marginRight: 12 },
+                            ]}
+                          />
+                        )}
+
+                        <View style={{ flex: 1 }}>
+                          <View style={styles.noteHeader}>
+                            <Text style={styles.noteTitle}>{item.title}</Text>
+                            {!selectMode && (
+                              <TouchableOpacity
+                                onPress={() => toggleFavorite(item.id)}
+                                hitSlop={{
+                                  top: 8,
+                                  bottom: 8,
+                                  left: 8,
+                                  right: 8,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 18,
+                                    color: item.favorite
+                                      ? "#FB8C00"
+                                      : "#D0D5DD",
+                                  }}
+                                >
+                                  ★
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+
+                          {Array.isArray(item.text) ? (
+                            item.text.map((section, index) => (
+                              <View key={index} style={styles.noteSection}>
+                                <Text style={styles.sectionLabel}>
+                                  {getLabels(category)[index]}
+                                </Text>
+                                <Text style={noteTextStyle(item.formatting)}>
+                                  {section}
+                                </Text>
+                              </View>
+                            ))
+                          ) : (
+                            <>
+                              <Text style={styles.sectionLabel}>
+                                {getLabels(category)}
+                              </Text>
+                              <Text style={noteTextStyle(item.formatting)}>
+                                {item.text}
+                              </Text>
+                            </>
+                          )}
+
+                          {!selectMode && (
+                            <View style={styles.noteActions}>
+                              <TouchableOpacity
+                                onPress={() => exportNoteToPDF(item)}
+                              >
+                                <Text style={styles.noteActionExport}>
+                                  Export
+                                </Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => openEditNote(item)}
+                              >
+                                <Text style={styles.noteActionEdit}>Edit</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => handleDeleteOne(item.id)}
+                              >
+                                <Text style={styles.noteActionDelete}>
+                                  Delete
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : null
+              )
+            )}
+          </ScrollView>
+        )}
+
+        {viewMode === "timeline" && (
+          <TimelineView
+            notes={visibleNotes}
+            onOpenNote={openEditNote}
+            getLabels={getLabels}
+          />
+        )}
+
+        {viewMode === "favorites" && (
+          <FavoritesView
+            notes={notes}
+            onOpenNote={openEditNote}
+            onToggleFavorite={toggleFavorite}
+            onExport={exportNoteToPDF}
+            onDelete={handleDeleteOne}
+            getLabels={getLabels}
+          />
+        )}
+
+        {viewMode === "graph" && (
+          <GraphView notes={visibleNotes} onOpenNote={openEditNote} />
+        )}
+
+        {viewMode === "folder" &&
+          (() => {
+            const folders: Record<string, Note[]> = {};
+            visibleNotes.forEach((n) => {
+              const key = formatDateKey(n.createdAt, n.id);
+              if (!folders[key]) folders[key] = [];
+              folders[key].push(n);
+            });
+
+            const folderKeys = Object.keys(folders).sort((a, b) => {
+              const ta = new Date(a).getTime();
+              const tb = new Date(b).getTime();
+              return tb - ta;
+            });
+
+            if (!openedFolder) {
+              return (
+                <ScrollView contentContainerStyle={styles.scrollContent}>
+                  {folderKeys.map((key) => (
+                    <TouchableOpacity
+                      key={key}
+                      style={[styles.noteCard, styles.folderCard]}
+                      onPress={() => setOpenedFolder(key)}
+                    >
+                      <Text style={styles.folderTitle}>{key}</Text>
+                      <Text style={styles.folderCount}>
+                        {folders[key].length} notes
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              );
+            }
+
+            const folderNotes = (folders[openedFolder] || []).filter((note) =>
+              folderFilter ? note.type === folderFilter : true
+            );
+
+            return (
+              <ScrollView contentContainerStyle={styles.scrollContent}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setOpenedFolder(null);
+                    setFolderFilter(null);
+                  }}
+                  style={styles.backButton}
+                >
+                  <Text style={styles.backButtonText}>‹ Back to folders</Text>
+                </TouchableOpacity>
+
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.filterRow}
+                >
+                  {options.map((opt) => (
+                    <TouchableOpacity
+                      key={opt}
+                      onPress={() =>
+                        setFolderFilter(folderFilter === opt ? null : opt)
+                      }
                       style={[
-                        styles.groupAccent,
-                        { backgroundColor: categoryColors[category] },
-                      ]}
-                    />
-                    <Text style={styles.groupTitle}>
-                      {displayLabels[category] ?? category}
-                    </Text>
-                    <View
-                      style={[
-                        styles.groupCount,
-                        { backgroundColor: `${categoryColors[category]}18` },
+                        styles.filterBtn,
+                        folderFilter === opt && {
+                          backgroundColor: categoryColors[opt],
+                        },
                       ]}
                     >
                       <Text
                         style={[
-                          styles.groupCountText,
-                          { color: categoryColors[category] },
+                          styles.filterBtnText,
+                          folderFilter === opt && styles.filterBtnTextActive,
                         ]}
                       >
-                        {groupedNotes[category].length}
+                        {opt}
                       </Text>
-                    </View>
-                  </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
 
-                  {groupedNotes[category].map((item) => (
+                {folderNotes.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyStateTitle}>No notes found</Text>
+                    <Text style={styles.emptyStateText}>
+                      Try a different folder filter.
+                    </Text>
+                  </View>
+                ) : (
+                  folderNotes.map((item) => (
                     <TouchableOpacity
                       key={item.id}
                       onPress={() =>
@@ -1118,7 +1598,7 @@ export default function Notes() {
                       style={[
                         styles.noteCard,
                         {
-                          borderLeftColor: categoryColors[category],
+                          borderLeftColor: categoryColors[item.type] ?? "#999",
                           flexDirection: "row",
                           alignItems: "flex-start",
                         },
@@ -1130,7 +1610,8 @@ export default function Notes() {
                           onPress={() => toggleSelectNote(item.id)}
                           style={[
                             styles.checkbox,
-                            selectedIds.has(item.id) && styles.checkboxSelected,
+                            selectedIds.has(item.id) &&
+                              styles.checkboxSelected,
                             { marginRight: 12 },
                           ]}
                         />
@@ -1142,12 +1623,19 @@ export default function Notes() {
                           {!selectMode && (
                             <TouchableOpacity
                               onPress={() => toggleFavorite(item.id)}
-                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              hitSlop={{
+                                top: 8,
+                                bottom: 8,
+                                left: 8,
+                                right: 8,
+                              }}
                             >
                               <Text
                                 style={{
                                   fontSize: 18,
-                                  color: item.favorite ? "#FB8C00" : "#D0D5DD",
+                                  color: item.favorite
+                                    ? "#FB8C00"
+                                    : "#D0D5DD",
                                 }}
                               >
                                 ★
@@ -1160,7 +1648,7 @@ export default function Notes() {
                           item.text.map((section, index) => (
                             <View key={index} style={styles.noteSection}>
                               <Text style={styles.sectionLabel}>
-                                {getLabels(category)[index]}
+                                {getLabels(item.type)?.[index]}
                               </Text>
                               <Text style={noteTextStyle(item.formatting)}>
                                 {section}
@@ -1170,7 +1658,7 @@ export default function Notes() {
                         ) : (
                           <>
                             <Text style={styles.sectionLabel}>
-                              {getLabels(category)}
+                              {getLabels(item.type)}
                             </Text>
                             <Text style={noteTextStyle(item.formatting)}>
                               {item.text}
@@ -1180,172 +1668,34 @@ export default function Notes() {
 
                         {!selectMode && (
                           <View style={styles.noteActions}>
-                            <TouchableOpacity onPress={() => openEditNote(item)}>
+                            <TouchableOpacity
+                              onPress={() => exportNoteToPDF(item)}
+                            >
+                              <Text style={styles.noteActionExport}>
+                                Export
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => openEditNote(item)}
+                            >
                               <Text style={styles.noteActionEdit}>Edit</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                               onPress={() => handleDeleteOne(item.id)}
                             >
-                              <Text style={styles.noteActionDelete}>Delete</Text>
+                              <Text style={styles.noteActionDelete}>
+                                Delete
+                              </Text>
                             </TouchableOpacity>
                           </View>
                         )}
                       </View>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              ) : null
-            )
-          )}
-        </ScrollView>
-      )}
-
-      {/* TIMELINE */}
-      {viewMode === "timeline" && (
-        <TimelineView
-          notes={visibleNotes}
-          onOpenNote={openEditNote}
-          getLabels={getLabels}
-        />
-      )}
-
-      {/* FAVORITES */}
-      {viewMode === "favorites" && (
-        <FavoritesView
-          notes={notes}
-          onOpenNote={openEditNote}
-          onToggleFavorite={toggleFavorite}
-          onDelete={handleDeleteOne}
-          getLabels={getLabels}
-        />
-      )}
-
-      {/* GRAPH */}
-      {viewMode === "graph" && (
-        <GraphView notes={visibleNotes} onOpenNote={openEditNote} />
-      )}
-
-      {/* FOLDER */}
-      {viewMode === "folder" &&
-        (() => {
-          const folders: Record<string, Note[]> = {};
-          visibleNotes.forEach((n) => {
-            const key = formatDateKey(n.createdAt, n.id);
-            if (!folders[key]) folders[key] = [];
-            folders[key].push(n);
-          });
-
-          const folderKeys = Object.keys(folders).sort((a, b) => {
-            const ta = new Date(a).getTime();
-            const tb = new Date(b).getTime();
-            return tb - ta;
-          });
-
-          if (!openedFolder) {
-            return (
-              <ScrollView contentContainerStyle={styles.scrollContent}>
-                {folderKeys.map((key) => (
-                  <TouchableOpacity
-                    key={key}
-                    style={[
-                      styles.noteCard,
-                      styles.folderCard,
-                    ]}
-                    onPress={() => setOpenedFolder(key)}
-                  >
-                    <Text style={styles.folderTitle}>{key}</Text>
-                    <Text style={styles.folderCount}>
-                      {folders[key].length} notes
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                  ))
+                )}
               </ScrollView>
             );
-          }
-
-          const folderNotesAll = folders[openedFolder] || [];
-          const folderNotes = folderFilter
-            ? folderNotesAll.filter((n) => n.type === folderFilter)
-            : folderNotesAll;
-
-          return (
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-              <TouchableOpacity
-                onPress={() => {
-                  setOpenedFolder(null);
-                  setFolderFilter(null);
-                }}
-                style={styles.backButton}
-              >
-                <Text style={styles.backButtonText}>‹ Back to folders</Text>
-              </TouchableOpacity>
-
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.filterRow}
-              >
-                {options.map((opt) => (
-                  <TouchableOpacity
-                    key={opt}
-                    onPress={() =>
-                      setFolderFilter(folderFilter === opt ? null : opt)
-                    }
-                    style={[
-                      styles.filterBtn,
-                      folderFilter === opt && {
-                        backgroundColor: categoryColors[opt],
-                      },
-                    ]}
-                    >
-                      <Text
-                        style={[
-                          styles.filterBtnText,
-                          folderFilter === opt && styles.filterBtnTextActive,
-                        ]}
-                      >
-                        {opt}
-                      </Text>
-                    </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              {folderNotes.map((item) => (
-                <View
-                  key={item.id}
-                  style={[
-                    styles.noteCard,
-                    {
-                      borderLeftColor:
-                        categoryColors[item.type] ?? "#999",
-                    },
-                  ]}
-                  >
-                  <Text style={styles.noteTitle}>{item.title}</Text>
-                  {Array.isArray(item.text) ? (
-                    item.text.map((s, i) => (
-                      <View key={i} style={styles.noteSection}>
-                        <Text style={noteTextStyle(item.formatting)}>{s}</Text>
-                      </View>
-                    ))
-                  ) : (
-                    <Text style={noteTextStyle(item.formatting)}>
-                      {item.text}
-                    </Text>
-                  )}
-                  <View style={styles.noteActions}>
-                    <TouchableOpacity onPress={() => openEditNote(item)}>
-                      <Text style={styles.noteActionEdit}>Edit</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleDeleteOne(item.id)}>
-                      <Text style={styles.noteActionDelete}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-          );
-        })()}
+          })()}
       </View>
 
       {/* ── BULK DELETE BAR ──────────────────────────────── */}
@@ -1354,16 +1704,28 @@ export default function Notes() {
           <Text style={{ color: "white", fontSize: 14 }}>
             {selectedIds.size} selected
           </Text>
-          <TouchableOpacity
-            onPress={handleDeleteSelected}
-            disabled={selectedIds.size === 0}
-            style={[
-              styles.bulkDeleteBtn,
-              selectedIds.size === 0 && { opacity: 0.4 },
-            ]}
-          >
-            <Text style={{ color: "white", fontWeight: "bold" }}>Delete</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <TouchableOpacity
+              onPress={exportSelectedNotesToPDF}
+              disabled={selectedIds.size === 0}
+              style={[
+                styles.bulkExportBtn,
+                selectedIds.size === 0 && { opacity: 0.4 },
+              ]}
+            >
+              <Text style={{ color: "white", fontWeight: "bold" }}>Export</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleDeleteSelected}
+              disabled={selectedIds.size === 0}
+              style={[
+                styles.bulkDeleteBtn,
+                selectedIds.size === 0 && { opacity: 0.4 },
+              ]}
+            >
+              <Text style={{ color: "white", fontWeight: "bold" }}>Delete</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -1793,6 +2155,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
   },
+  noteActionExport: {
+    color: "#16A34A",
+    fontSize: 13,
+    fontWeight: "600",
+  },
   noteActionDelete: {
     color: "#DC2626",
     fontSize: 13,
@@ -1858,6 +2225,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
+    width: "100%",
     elevation: 10,
   },
   option: {
@@ -1951,6 +2319,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 16,
     borderRadius: 20,
+  },
+  bulkExportBtn: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
   bulkDeleteBtn: {
     backgroundColor: "#E53935",
