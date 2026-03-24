@@ -9,6 +9,7 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 type TabKey = "habits" | "goals" | "discipline";
 
@@ -41,12 +42,12 @@ const HABIT_FIELDS: { key: keyof HabitAnswers; label: string; placeholder: strin
 ];
 
 /* ─── Goal form fields ─── */
-const GOAL_FIELDS: { key: keyof GoalAnswers; label: string; placeholder: string; multiline?: boolean }[] = [
+const GOAL_FIELDS: { key: keyof GoalAnswers; label: string; placeholder: string; multiline?: boolean; isDate?: boolean }[] = [
   { key: "specific",   label: "Specific",       placeholder: "What action moves you toward your goal?", multiline: true },
   { key: "measurable", label: "Measurable",     placeholder: "How will you measure progress?",          multiline: true },
   { key: "achievable", label: "Achievable",     placeholder: "Why is it realistic? (optional)",         multiline: true },
   { key: "relevant",   label: "Relevant",       placeholder: "Why does this matter? (optional)",        multiline: true },
-  { key: "timebound",  label: "Time / Due Date",placeholder: "When will it be completed?" },
+  { key: "timebound",  label: "Time / Due Date",placeholder: "When will it be completed?",              isDate: true },
 ];
 
 /* ════════════════════════════════════════
@@ -63,7 +64,7 @@ function ItemForm<T extends Record<string, string>>({
 }: {
   heading: string;
   titlePlaceholder: string;
-  fields: { key: keyof T; label: string; placeholder: string; multiline?: boolean }[];
+  fields: { key: keyof T; label: string; placeholder: string; multiline?: boolean; isDate?: boolean }[];
   onSave: (title: string, answers: T) => void;
   onCancel: () => void;
   initialTitle?: string;
@@ -73,6 +74,8 @@ function ItemForm<T extends Record<string, string>>({
   const [answers, setAnswers] = useState<T>(
     initialAnswers ?? (Object.fromEntries(fields.map((f) => [f.key, ""])) as T)
   );
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   const set = (key: keyof T, val: string) =>
     setAnswers((prev) => ({ ...prev, [key]: val }));
@@ -89,17 +92,60 @@ function ItemForm<T extends Record<string, string>>({
         style={styles.formInput}
       />
 
-      {fields.map((f) => (
-        <TextInput
-          key={String(f.key)}
-          value={answers[f.key]}
-          onChangeText={(v) => set(f.key, v)}
-          placeholder={f.label + " — " + f.placeholder}
-          placeholderTextColor="#9CA3AF"
-          multiline={f.multiline}
-          style={[styles.formInput, f.multiline && styles.formInputMulti]}
-        />
-      ))}
+      {fields.map((f) => {
+        if (f.isDate) {
+          return (
+            <View key={String(f.key)}>
+              <Pressable
+                onPress={() => setShowDatePicker(true)}
+                style={[styles.formInput, { justifyContent: "center" }]}
+              >
+                <Text style={{ color: answers[f.key] ? "#111827" : "#9CA3AF", fontSize: 14 }}>
+                  {answers[f.key] || "Time / Due Date — When will it be completed?"}
+                </Text>
+              </Pressable>
+
+              {showDatePicker && (
+                <DateTimePicker
+                  value={selectedDate}
+                  mode="date"
+                  display="inline"
+                  themeVariant="light"
+                  accentColor="#7C3AED"
+                  onChange={(event, date) => {
+                    if (event.type === "dismissed") {
+                      setShowDatePicker(false);
+                      return;
+                    }
+                    if (date) {
+                      setSelectedDate(date);
+                      const formatted = date.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      });
+                      set(f.key, formatted);
+                      setShowDatePicker(false);
+                    }
+                  }}
+                />
+              )}
+            </View>
+          );
+        }
+
+        return (
+          <TextInput
+            key={String(f.key)}
+            value={answers[f.key]}
+            onChangeText={(v) => set(f.key, v)}
+            placeholder={f.label + " — " + f.placeholder}
+            placeholderTextColor="#9CA3AF"
+            multiline={f.multiline}
+            style={[styles.formInput, f.multiline && styles.formInputMulti]}
+          />
+        );
+      })}
 
       <View style={styles.formActions}>
         <Pressable style={styles.cancelBtn} onPress={onCancel}>
