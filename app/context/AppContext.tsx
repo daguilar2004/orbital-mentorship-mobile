@@ -1,6 +1,5 @@
 ///////////////////////////////CURRENT CONTEXT FOR TESTING, WILL BE REPLACED WITH ORBITAL CONTEXT////////////////////////////
 
-
 import React, { createContext, useContext, useMemo, useState } from "react";
 
 export type UserRole = "mentee" | "mentor";
@@ -25,6 +24,24 @@ export type Task = {
   description: string;
   xp: number;
   dueDate: string;
+
+  // New fields for detailed task requirements
+  expectedTime?: {
+    value: number;
+    unit: "hours" | "days" | "weeks";
+  };
+  skills?: string[];
+  resources?: {
+    type: "link" | "file";
+    value: string;
+    label?: string;
+    fileInfo?: {
+      name: string;
+      size: number;
+      uri: string;
+      mimeType?: string;
+    };
+  }[];
 
   // submission
   status: TaskStatus;
@@ -73,19 +90,52 @@ type AppContextValue = {
   toggleRole: () => void;
 
   totalXP: number;
+  xpGoal: number; // for progress bar
   phases: Phase[];
+
+  // mentee/editor actions
+  addPhase: (name: string, startDate: string, endDate: string) => void;
+  editPhase: (
+    phaseId: string,
+    name: string,
+    startDate: string,
+    endDate: string,
+  ) => void;
+  deletePhase: (phaseId: string) => void;
+  addTaskToPhase: (
+    phaseId: string,
+    title: string,
+    dueDate?: string,
+    expectedTime?: { value: number; unit: "hours" | "days" | "weeks" },
+    skills?: string[],
+    resources?: { type: "link" | "file"; value: string; label?: string }[],
+  ) => void;
+  editTask: (
+    phaseId: string,
+    taskId: string,
+    title: string,
+    dueDate: string,
+    expectedTime?: { value: number; unit: "hours" | "days" | "weeks" },
+    skills?: string[],
+    resources?: { type: "link" | "file"; value: string; label?: string }[],
+  ) => void;
+  deleteTask: (phaseId: string, taskId: string) => void;
 
   // mentee actions
   submitTask: (phaseId: string, taskId: string, response: string) => void;
   addMockAttachment: (phaseId: string, taskId: string) => void;
 
   // mentor actions
-  updateTaskDescription: (phaseId: string, taskId: string, desc: string) => void;
+  updateTaskDescription: (
+    phaseId: string,
+    taskId: string,
+    desc: string,
+  ) => void;
   reviewTask: (
     phaseId: string,
     taskId: string,
     decision: "approved" | "rejected",
-    feedback: string
+    feedback: string,
   ) => void;
 };
 
@@ -113,14 +163,17 @@ function recomputePhaseStatuses(phases: Phase[]): Phase[] {
   }
 
   return phases.map((p, idx) => {
-    if (idx < firstIncompleteIndex) return { ...p, status: "completed" as const };
-    if (idx === firstIncompleteIndex) return { ...p, status: "current" as const };
+    if (idx < firstIncompleteIndex)
+      return { ...p, status: "completed" as const };
+    if (idx === firstIncompleteIndex)
+      return { ...p, status: "current" as const };
     return { ...p, status: "upcoming" as const };
   });
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [userRole, setUserRole] = useState<UserRole>("mentee");
+  const xpGoal = 2000; // goal for progress bar
 
   // Mock data (replace later with API)
   const [phases, setPhases] = useState<Phase[]>([
@@ -230,10 +283,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                       status: "submitted",
                       submittedResponse: response,
                       submittedAt: todayISO(),
-                    }
+                    },
               ),
-            }
-      )
+            },
+      ),
     );
   }
 
@@ -253,12 +306,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 };
                 return { ...t, attachments: [...(t.attachments ?? []), next] };
               }),
-            }
-      )
+            },
+      ),
     );
   }
 
-  function updateTaskDescription(phaseId: string, taskId: string, desc: string) {
+  function updateTaskDescription(
+    phaseId: string,
+    taskId: string,
+    desc: string,
+  ) {
     setPhases((prev) =>
       prev.map((p) =>
         p.id !== phaseId
@@ -266,10 +323,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           : {
               ...p,
               tasks: p.tasks.map((t) =>
-                t.id !== taskId ? t : { ...t, description: desc }
+                t.id !== taskId ? t : { ...t, description: desc },
               ),
-            }
-      )
+            },
+      ),
     );
   }
 
@@ -277,7 +334,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     phaseId: string,
     taskId: string,
     decision: "approved" | "rejected",
-    feedback: string
+    feedback: string,
   ) {
     setPhases((prev) =>
       prev.map((p) =>
@@ -293,10 +350,124 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                       status: decision,
                       mentorFeedback: feedback,
                       reviewedAt: todayISO(),
-                    }
+                    },
               ),
-            }
-      )
+            },
+      ),
+    );
+  }
+
+  function addPhase(name: string, startDate: string, endDate: string) {
+    const newPhase: Phase = {
+      id: `p-${Math.random().toString(16).slice(2)}`,
+      name,
+      status: "upcoming",
+      startDate,
+      endDate,
+      tasks: [],
+    };
+    setPhases((prev) => [...prev, newPhase]);
+  }
+
+  function addTaskToPhase(
+    phaseId: string,
+    title: string,
+    dueDate?: string,
+    expectedTime?: { value: number; unit: "hours" | "days" | "weeks" },
+    skills?: string[],
+    resources?: { type: "link" | "file"; value: string; label?: string }[],
+  ) {
+    setPhases((prev) =>
+      prev.map((p) =>
+        p.id !== phaseId
+          ? p
+          : {
+              ...p,
+              tasks: [
+                ...p.tasks,
+                {
+                  id: `t-${Math.random().toString(16).slice(2)}`,
+                  title,
+                  description: "",
+                  xp: 100,
+                  dueDate: dueDate || new Date().toISOString().split("T")[0],
+                  expectedTime,
+                  skills,
+                  resources,
+                  status: "pending",
+                } as Task,
+              ],
+            },
+      ),
+    );
+  }
+
+  function editPhase(
+    phaseId: string,
+    name: string,
+    startDate: string,
+    endDate: string,
+  ) {
+    setPhases((prev) =>
+      prev.map((p) =>
+        p.id !== phaseId
+          ? p
+          : {
+              ...p,
+              name,
+              startDate,
+              endDate,
+            },
+      ),
+    );
+  }
+
+  function deletePhase(phaseId: string) {
+    setPhases((prev) => prev.filter((p) => p.id !== phaseId));
+  }
+
+  function editTask(
+    phaseId: string,
+    taskId: string,
+    title: string,
+    dueDate: string,
+    expectedTime?: { value: number; unit: "hours" | "days" | "weeks" },
+    skills?: string[],
+    resources?: { type: "link" | "file"; value: string; label?: string }[],
+  ) {
+    setPhases((prev) =>
+      prev.map((p) =>
+        p.id !== phaseId
+          ? p
+          : {
+              ...p,
+              tasks: p.tasks.map((t) =>
+                t.id !== taskId
+                  ? t
+                  : {
+                      ...t,
+                      title,
+                      dueDate,
+                      expectedTime,
+                      skills,
+                      resources,
+                    },
+              ),
+            },
+      ),
+    );
+  }
+
+  function deleteTask(phaseId: string, taskId: string) {
+    setPhases((prev) =>
+      prev.map((p) =>
+        p.id !== phaseId
+          ? p
+          : {
+              ...p,
+              tasks: p.tasks.filter((t) => t.id !== taskId),
+            },
+      ),
     );
   }
 
@@ -306,13 +477,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       toggleRole: () =>
         setUserRole((r) => (r === "mentee" ? "mentor" : "mentee")),
       totalXP,
-      phases,
+      xpGoal,
+      phases: recomputePhaseStatuses(phases),
+      addPhase,
+      editPhase,
+      deletePhase,
+      addTaskToPhase,
+      editTask,
+      deleteTask,
       submitTask,
       addMockAttachment,
       updateTaskDescription,
       reviewTask,
     };
-  }, [userRole, totalXP, phases, profileData, questionnaireAnswers]);
+  }, [userRole, totalXP, xpGoal, phases]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
