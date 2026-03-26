@@ -1,27 +1,61 @@
+import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
+  Alert,
   Modal,
-  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
+  View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useApp, Phase, Task } from "./context/AppContext";
+import { Phase, Task, useApp } from "./context/AppContext";
 
 export default function Home() {
   const {
     phases,
     totalXP,
+    xpGoal,
     userRole,
+    addPhase,
+    editPhase,
+    deletePhase,
+    addTaskToPhase,
+    editTask,
+    deleteTask,
     submitTask,
     addMockAttachment,
     updateTaskDescription,
     reviewTask,
   } = useApp();
+
+  // State for adding phase/task
+  const [addingPhase, setAddingPhase] = useState(false);
+  const [newPhaseName, setNewPhaseName] = useState("");
+  const [newPhaseDescription, setNewPhaseDescription] = useState("");
+  const [newPhaseStart, setNewPhaseStart] = useState("");
+  const [newPhaseEnd, setNewPhaseEnd] = useState("");
+  const [editingPhaseId, setEditingPhaseId] = useState<string | null>(null);
+  const [addingTaskToPhaseId, setAddingTaskToPhaseId] = useState<string | null>(
+    null,
+  );
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDueDate, setNewTaskDueDate] = useState("");
+  const [newTaskExpectedTimeValue, setNewTaskExpectedTimeValue] = useState("");
+  const [newTaskExpectedTimeUnit, setNewTaskExpectedTimeUnit] = useState<
+    "hours" | "days" | "weeks"
+  >("hours");
+  const [newTaskSkills, setNewTaskSkills] = useState("");
+  const [newTaskResources, setNewTaskResources] = useState<
+    { type: "link" | "file"; value: string; label?: string }[]
+  >([]);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTaskPhaseId, setEditingTaskPhaseId] = useState<string | null>(
+    null,
+  );
+
+  const xpPercent = Math.min(100, Math.round((totalXP / xpGoal) * 100));
 
   const currentPhase = useMemo(
     () => phases.find((p) => p.status === "current"),
@@ -39,19 +73,11 @@ export default function Home() {
   const [draftDesc, setDraftDesc] = useState("");
   const [draftResponse, setDraftResponse] = useState("");
   const [draftFeedback, setDraftFeedback] = useState("");
+  const [draftReflection, setDraftReflection] = useState("");
 
   useEffect(() => {
     if (currentPhase) setExpanded(new Set([currentPhase.id]));
   }, [currentPhase?.id]);
-
-  const completedPhases = phases.filter((p) => p.status === "completed").length;
-  const totalPhases = phases.length;
-
-  const pendingTasksCount = useMemo(() => {
-    return phases
-      .flatMap((p) => p.tasks)
-      .filter((t) => t.status === "pending" || t.status === "submitted").length;
-  }, [phases]);
 
   const activePhase = useMemo(() => {
     if (!activePhaseId) return null;
@@ -63,12 +89,12 @@ export default function Home() {
     return activePhase.tasks.find((t) => t.id === activeTaskId) ?? null;
   }, [activePhase, activeTaskId]);
 
-  // When opening a task, seed drafts from state
   useEffect(() => {
     if (!activeTask) return;
     setDraftDesc(activeTask.description ?? "");
     setDraftResponse(activeTask.submittedResponse ?? "");
     setDraftFeedback(activeTask.mentorFeedback ?? "");
+    setDraftReflection("");
   }, [activeTask?.id]);
 
   function togglePhase(phase: Phase) {
@@ -92,6 +118,62 @@ export default function Home() {
     setDraftDesc("");
     setDraftResponse("");
     setDraftFeedback("");
+    setDraftReflection("");
+  }
+
+  function getTasksNeedingAttention(phase: Phase) {
+    if (userRole === "mentor") {
+      return phase.tasks.filter((t) => t.status === "submitted");
+    }
+
+    return phase.tasks.filter(
+      (t) => t.status === "pending" || t.status === "rejected",
+    );
+  }
+
+  function handleSubmitTask() {
+    if (!activePhase || !activeTask) return;
+
+    const trimmedResponse = draftResponse.trim();
+    const trimmedReflection = draftReflection.trim();
+
+    if (activeTask.status === "rejected") {
+      if (!trimmedResponse) {
+        Alert.alert(
+          "Response required",
+          "Please update your response before resubmitting.",
+        );
+        return;
+      }
+
+      if (!trimmedReflection) {
+        Alert.alert(
+          "Reflection required",
+          "Please answer the reflection question before resubmitting.",
+        );
+        return;
+      }
+
+      const combinedSubmission = `${trimmedResponse}
+
+--- Revision Reflection ---
+Based on mentor feedback, what problems did you run into, and how can you fix them?
+
+${trimmedReflection}`;
+
+      submitTask(activePhase.id, activeTask.id, combinedSubmission);
+      return;
+    }
+
+    if (!trimmedResponse) {
+      Alert.alert(
+        "Response required",
+        "Please write your response before submitting.",
+      );
+      return;
+    }
+
+    submitTask(activePhase.id, activeTask.id, trimmedResponse);
   }
 
   return (
@@ -114,25 +196,26 @@ export default function Home() {
           iconColor="#7C3AED"
           label="Total XP"
           value={`${totalXP}`}
-        />
-        <StatCard
-          icon="trending-up"
-          iconBg="#DBEAFE"
-          iconColor="#2563EB"
-          label="Progress"
-          value={`${completedPhases}/${totalPhases}`}
-        />
-        <StatCard
-          icon="flag"
-          iconBg="#DCFCE7"
-          iconColor="#16A34A"
-          label={userRole === "mentee" ? "Pending Tasks" : "Tasks to Review"}
-          value={`${pendingTasksCount}`}
+          progress={xpPercent}
+          progressMax={xpGoal}
         />
       </View>
 
       {/* Phases on Home */}
-      <Text style={styles.sectionTitle}>Phases</Text>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>Phases</Text>
+        {userRole === "mentee" && (
+          <Pressable
+            onPress={() => setAddingPhase(true)}
+            style={({ pressed }) => [
+              styles.addButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Ionicons name="add-circle" size={24} color="#7C3AED" />
+          </Pressable>
+        )}
+      </View>
 
       <View style={{ gap: 12 }}>
         {phases.map((phase, idx) => {
@@ -140,18 +223,20 @@ export default function Home() {
           const isLocked = phase.status === "upcoming";
 
           const approvedCount = phase.tasks.filter(
-            (t) => t.status === "approved"
+            (t) => t.status === "approved",
           ).length;
           const totalTasks = phase.tasks.length;
           const progressPct =
             totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
 
+          const tasksNeedingAttention = getTasksNeedingAttention(phase);
+
           const cardStyle =
             phase.status === "current"
               ? styles.phaseCardCurrent
               : phase.status === "completed"
-              ? styles.phaseCardCompleted
-              : styles.phaseCardUpcoming;
+                ? styles.phaseCardCompleted
+                : styles.phaseCardUpcoming;
 
           return (
             <View key={phase.id} style={[styles.phaseCardBase, cardStyle]}>
@@ -192,7 +277,11 @@ export default function Home() {
 
                 <View style={styles.phaseRight}>
                   {phase.status === "completed" ? (
-                    <Ionicons name="checkmark-circle" size={20} color="#16A34A" />
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={20}
+                      color="#16A34A"
+                    />
                   ) : null}
 
                   {phase.status === "upcoming" ? (
@@ -203,6 +292,54 @@ export default function Home() {
                       size={18}
                       color="#6B7280"
                     />
+                  )}
+
+                  {userRole === "mentee" && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        // Show menu options for edit/delete
+                        Alert.alert("Phase Options", "Choose an action", [
+                          {
+                            text: "Edit",
+                            onPress: () => {
+                              setEditingPhaseId(phase.id);
+                              setNewPhaseName(phase.name);
+                              setNewPhaseDescription(""); // Add description if needed
+                              setNewPhaseStart(phase.startDate);
+                              setNewPhaseEnd(phase.endDate);
+                              setAddingPhase(true);
+                            },
+                          },
+                          {
+                            text: "Delete",
+                            style: "destructive",
+                            onPress: () => {
+                              Alert.alert(
+                                "Delete Phase",
+                                "Are you sure you want to delete this phase?",
+                                [
+                                  { text: "Cancel", style: "cancel" },
+                                  {
+                                    text: "Delete",
+                                    style: "destructive",
+                                    onPress: () => deletePhase(phase.id),
+                                  },
+                                ],
+                              );
+                            },
+                          },
+                          { text: "Cancel", style: "cancel" },
+                        ]);
+                      }}
+                      style={{ padding: 4, marginLeft: 8 }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name="ellipsis-vertical"
+                        size={16}
+                        color="#6B7280"
+                      />
+                    </TouchableOpacity>
                   )}
                 </View>
               </Pressable>
@@ -227,6 +364,65 @@ export default function Home() {
                   />
                 </View>
               </View>
+
+              {/* Pending tasks under progress bar */}
+              {!isLocked ? (
+                <View style={styles.pendingSection}>
+                  <View style={styles.rowBetween}>
+                    <Text style={styles.pendingSectionTitle}>
+                      {userRole === "mentor"
+                        ? "Tasks to Review"
+                        : "Pending Tasks"}
+                    </Text>
+                    <Text style={[styles.small, styles.bold]}>
+                      {tasksNeedingAttention.length}
+                    </Text>
+                  </View>
+
+                  {tasksNeedingAttention.length > 0 ? (
+                    <View style={styles.pendingList}>
+                      {tasksNeedingAttention.map((task) => (
+                        <Pressable
+                          key={task.id}
+                          onPress={() => openTask(phase, task)}
+                          style={({ pressed }) => [
+                            styles.pendingTaskRow,
+                            pressed && styles.taskPressed,
+                          ]}
+                        >
+                          <View style={styles.taskLeft}>
+                            <Ionicons
+                              name={taskStatusIcon(task.status)}
+                              size={18}
+                              color={taskStatusColor(task.status)}
+                            />
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.taskTitle}>{task.title}</Text>
+                              <Text style={styles.taskMeta}>
+                                <Text style={styles.xpText}>{task.xp} XP</Text>
+                                {"  •  "}
+                                Due {task.dueDate}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <Ionicons
+                            name="chevron-forward"
+                            size={18}
+                            color="#9CA3AF"
+                          />
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.smallMuted}>
+                      {userRole === "mentor"
+                        ? "No tasks need review right now."
+                        : "No pending tasks right now."}
+                    </Text>
+                  )}
+                </View>
+              ) : null}
 
               {isExpanded && !isLocked ? (
                 <View style={styles.phaseBody}>
@@ -255,13 +451,91 @@ export default function Home() {
                         </View>
                       </View>
 
-                      <Ionicons
-                        name="chevron-forward"
-                        size={18}
-                        color="#9CA3AF"
-                      />
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        {userRole === "mentee" && (
+                          <TouchableOpacity
+                            onPress={() => {
+                              Alert.alert("Task Options", "Choose an action", [
+                                {
+                                  text: "Edit",
+                                  onPress: () => {
+                                    setEditingTaskId(task.id);
+                                    setEditingTaskPhaseId(phase.id);
+                                    setNewTaskTitle(task.title);
+                                    setNewTaskDueDate(task.dueDate);
+                                    setNewTaskExpectedTimeValue(
+                                      task.expectedTime?.value?.toString() ||
+                                        "",
+                                    );
+                                    setNewTaskExpectedTimeUnit(
+                                      task.expectedTime?.unit || "hours",
+                                    );
+                                    setNewTaskSkills(
+                                      task.skills?.join(", ") || "",
+                                    );
+                                    setNewTaskResources(task.resources || []);
+                                    setAddingTaskToPhaseId(phase.id);
+                                  },
+                                },
+                                {
+                                  text: "Delete",
+                                  style: "destructive",
+                                  onPress: () => {
+                                    Alert.alert(
+                                      "Delete Task",
+                                      "Are you sure you want to delete this task?",
+                                      [
+                                        { text: "Cancel", style: "cancel" },
+                                        {
+                                          text: "Delete",
+                                          style: "destructive",
+                                          onPress: () =>
+                                            deleteTask(phase.id, task.id),
+                                        },
+                                      ],
+                                    );
+                                  },
+                                },
+                                { text: "Cancel", style: "cancel" },
+                              ]);
+                            }}
+                            style={{ padding: 4 }}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons
+                              name="ellipsis-vertical"
+                              size={14}
+                              color="#6B7280"
+                            />
+                          </TouchableOpacity>
+                        )}
+
+                        <Ionicons
+                          name="chevron-forward"
+                          size={18}
+                          color="#9CA3AF"
+                        />
+                      </View>
                     </Pressable>
                   ))}
+                  {userRole === "mentee" && (
+                    <Pressable
+                      onPress={() => setAddingTaskToPhaseId(phase.id)}
+                      style={({ pressed }) => [
+                        styles.addTaskButton,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Ionicons name="add" size={18} color="#7C3AED" />
+                      <Text style={styles.addTaskButtonText}>Add Task</Text>
+                    </Pressable>
+                  )}
                 </View>
               ) : null}
             </View>
@@ -273,30 +547,168 @@ export default function Home() {
       <Modal
         visible={!!activeTask}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={closeTask}
       >
-        <Pressable style={styles.modalBackdrop} onPress={closeTask} />
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeTask} />
+          <View style={styles.modalCenterContainer}>
+            <View
+              style={[
+                styles.modalPopupContent,
+                {
+                  maxHeight: "90%",
+                  paddingHorizontal: 28,
+                  paddingVertical: 32,
+                },
+              ]}
+            >
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingBottom: 20 }}
+              >
+                {/* Status chip */}
+                <View style={{ alignItems: "center", marginBottom: 10 }}>
+                  <View
+                    style={[
+                      styles.statusChip,
+                      {
+                        borderColor: taskStatusColor(
+                          activeTask?.status ?? "pending",
+                        ),
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={taskStatusIcon(activeTask?.status ?? "pending")}
+                      size={16}
+                      color={taskStatusColor(activeTask?.status ?? "pending")}
+                    />
+                    <Text
+                      style={[
+                        styles.statusChipText,
+                        {
+                          color: taskStatusColor(
+                            activeTask?.status ?? "pending",
+                          ),
+                        },
+                      ]}
+                    >
+                      {statusLabel(activeTask?.status ?? "pending")}
+                    </Text>
+                  </View>
+                </View>
 
-        <View style={styles.modalSheet}>
-          <View style={styles.modalGrabber} />
+                {/* Title */}
+                <Text style={styles.modalTitle}>{activeTask?.title}</Text>
 
+                {/* Description (mentor can edit, mentee view-only) */}
+                <View style={styles.modalCard}>
+                  <Text style={styles.cardHeading}>Task Description</Text>
+
+                  {userRole === "mentor" ? (
+                    <>
+                      <TextInput
+                        value={draftDesc}
+                        onChangeText={setDraftDesc}
+                        multiline
+                        style={styles.textArea}
+                        placeholder="Write the task description…"
+                      />
+                      <Pressable
+                        style={styles.primaryBtn}
+                        onPress={() => {
+                          if (!activePhase || !activeTask) return;
+                          updateTaskDescription(
+                            activePhase.id,
+                            activeTask.id,
+                            draftDesc.trim(),
+                          );
+                        }}
+                      >
+                        <Text style={styles.primaryBtnText}>
+                          Save Description
+                        </Text>
+                      </Pressable>
+                    </>
+                  ) : (
+                    <Text style={styles.bodyText}>
+                      {activeTask?.description || "No description."}
+                    </Text>
+                  )}
+
+                  {/* Skills Required */}
+                  {activeTask?.skills && activeTask.skills.length > 0 && (
+                    <View style={{ marginTop: 16 }}>
+                      <Text style={[styles.cardHeading, { marginBottom: 8 }]}>
+                        Skills Required
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          flexWrap: "wrap",
+                          gap: 8,
+                        }}
+                      >
+                        {activeTask.skills.map((skill, index) => (
+                          <View key={index} style={styles.skillBubble}>
+                            <Text style={styles.skillBubbleText}>{skill}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Expected Time */}
+                  {activeTask?.expectedTime && (
+                    <View style={{ marginTop: 16 }}>
+                      <Text style={[styles.cardHeading, { marginBottom: 4 }]}>
+                        Expected Time
+                      </Text>
+                      <Text style={styles.bodyText}>
+                        {activeTask.expectedTime.value}{" "}
+                        {activeTask.expectedTime.unit}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Resources */}
+                  {activeTask?.resources && activeTask.resources.length > 0 && (
+                    <View style={{ marginTop: 16 }}>
+                      <Text style={[styles.cardHeading, { marginBottom: 8 }]}>
+                        Resources
           <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={styles.modalContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-
             {/* Status chip */}
             <View style={{ alignItems: "center", marginBottom: 10 }}>
-              <View style={[styles.statusChip, { borderColor: taskStatusColor(activeTask?.status ?? "pending") }]}>
+              <View
+                style={[
+                  styles.statusChip,
+                  {
+                    borderColor: taskStatusColor(
+                      activeTask?.status ?? "pending",
+                    ),
+                  },
+                ]}
+              >
                 <Ionicons
                   name={taskStatusIcon(activeTask?.status ?? "pending")}
                   size={16}
                   color={taskStatusColor(activeTask?.status ?? "pending")}
                 />
-                <Text style={[styles.statusChipText, { color: taskStatusColor(activeTask?.status ?? "pending") }]}>
+                <Text
+                  style={[
+                    styles.statusChipText,
+                    {
+                      color: taskStatusColor(activeTask?.status ?? "pending"),
+                    },
+                  ]}
+                >
                   {statusLabel(activeTask?.status ?? "pending")}
                 </Text>
               </View>
@@ -305,7 +717,7 @@ export default function Home() {
             {/* Title */}
             <Text style={styles.modalTitle}>{activeTask?.title}</Text>
 
-            {/* Description (mentor can edit, mentee view-only) */}
+            {/* Description */}
             <View style={styles.modalCard}>
               <Text style={styles.cardHeading}>Task Description</Text>
 
@@ -322,7 +734,11 @@ export default function Home() {
                     style={styles.primaryBtn}
                     onPress={() => {
                       if (!activePhase || !activeTask) return;
-                      updateTaskDescription(activePhase.id, activeTask.id, draftDesc.trim());
+                      updateTaskDescription(
+                        activePhase.id,
+                        activeTask.id,
+                        draftDesc.trim(),
+                      );
                     }}
                   >
                     <Text style={styles.primaryBtnText}>Save Description</Text>
@@ -339,15 +755,24 @@ export default function Home() {
                 <Text style={styles.metaText}>Due: {activeTask?.dueDate}</Text>
 
                 <Ionicons name="ribbon-outline" size={16} color="#6B7280" />
-                <Text style={[styles.metaText, { color: "#7C3AED", fontWeight: "800" }]}>
+                <Text
+                  style={[
+                    styles.metaText,
+                    { color: "#7C3AED", fontWeight: "800" },
+                  ]}
+                >
                   {activeTask?.xp} XP
                 </Text>
               </View>
             </View>
 
-            {/* Submitted Response (mentee can edit/submit, mentor read-only) */}
+            {/* Submitted Response */}
             <View style={styles.modalCard}>
-              <Text style={styles.cardHeading}>Submitted Response</Text>
+              <Text style={styles.cardHeading}>
+                {activeTask?.status === "rejected"
+                  ? "Updated Response"
+                  : "Submitted Response"}
+              </Text>
 
               {userRole === "mentee" ? (
                 <>
@@ -356,8 +781,29 @@ export default function Home() {
                     onChangeText={setDraftResponse}
                     multiline
                     style={styles.textArea}
-                    placeholder="Write your response…"
+                    placeholder={
+                      activeTask?.status === "rejected"
+                        ? "Update your response based on the mentor feedback…"
+                        : "Write your response…"
+                    }
                   />
+
+                  {activeTask?.status === "rejected" ? (
+                    <View style={styles.reflectionCard}>
+                      <Text style={styles.reflectionPrompt}>
+                        Based on mentor feedback, what problems did you run
+                        into, and how can you fix them?
+                      </Text>
+                      <TextInput
+                        value={draftReflection}
+                        onChangeText={setDraftReflection}
+                        multiline
+                        style={styles.textArea}
+                        placeholder="Describe the issues you ran into and how you plan to address them…"
+                      />
+                    </View>
+                  ) : null}
+
                   <View style={styles.rowGap}>
                     <Pressable
                       style={styles.secondaryBtn}
@@ -367,126 +813,717 @@ export default function Home() {
                       }}
                     >
                       <Ionicons name="attach" size={16} color="#111827" />
-                      <Text style={styles.secondaryBtnText}>Add Attachment</Text>
+                      <Text style={styles.secondaryBtnText}>
+                        Add Attachment
+                      </Text>
                     </Pressable>
 
                     <Pressable
                       style={styles.primaryBtn}
-                      onPress={() => {
-                        if (!activePhase || !activeTask) return;
-                        submitTask(activePhase.id, activeTask.id, draftResponse.trim());
-                      }}
+                      onPress={handleSubmitTask}
                     >
                       <Text style={styles.primaryBtnText}>
-                        {activeTask?.status === "submitted" ? "Resubmit" : "Submit"}
+                        {activeTask?.status === "submitted" ||
+                        activeTask?.status === "rejected"
+                          ? "Resubmit"
+                          : "Submit"}
                       </Text>
-                    </Pressable>
+                      <View style={{ gap: 8 }}>
+                        {activeTask.resources.map((resource, index) => (
+                          <TouchableOpacity
+                            key={index}
+                            onPress={() => {
+                              if (resource.type === "link") {
+                                // Open link (would need Linking from react-native)
+                                Alert.alert(
+                                  "Open Link",
+                                  `Open ${resource.value}?`,
+                                );
+                              } else {
+                                // Handle file download/view
+                                Alert.alert(
+                                  "File",
+                                  `File: ${resource.fileInfo?.name || resource.label}\nSize: ${(resource.fileInfo?.size || 0) / 1024} KB`,
+                                );
+                              }
+                            }}
+                            style={styles.resourceItem}
+                          >
+                            <Ionicons
+                              name={
+                                resource.type === "link" ? "link" : "document"
+                              }
+                              size={16}
+                              color="#7C3AED"
+                            />
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.resourceText}>
+                                {resource.fileInfo?.name ||
+                                  resource.label ||
+                                  (resource.type === "link" ? "Link" : "File")}
+                              </Text>
+                              {resource.fileInfo?.size && (
+                                <Text
+                                  style={{ fontSize: 12, color: "#6B7280" }}
+                                >
+                                  {(resource.fileInfo.size / 1024).toFixed(1)}{" "}
+                                  KB
+                                </Text>
+                              )}
+                            </View>
+                            <Ionicons
+                              name="chevron-forward"
+                              size={16}
+                              color="#6B7280"
+                            />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  <View style={styles.metaRow}>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={16}
+                      color="#6B7280"
+                    />
+                    <Text style={styles.metaText}>
+                      Due: {activeTask?.dueDate}
+                    </Text>
+
+                    <Ionicons name="ribbon-outline" size={16} color="#6B7280" />
+                    <Text
+                      style={[
+                        styles.metaText,
+                        { color: "#7C3AED", fontWeight: "800" },
+                      ]}
+                    >
+                      {activeTask?.xp} XP
+                    </Text>
                   </View>
+                </View>
 
-                  {activeTask?.submittedAt ? (
-                    <Text style={styles.smallMuted}>
-                      Submitted on {activeTask.submittedAt}
-                    </Text>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  <Text style={styles.bodyText}>
-                    {activeTask?.submittedResponse
-                      ? activeTask.submittedResponse
-                      : "No response submitted yet."}
-                  </Text>
-                  {activeTask?.submittedAt ? (
-                    <Text style={styles.smallMuted}>
-                      Submitted on {activeTask.submittedAt}
-                    </Text>
-                  ) : null}
-                </>
-              )}
-            </View>
+                {/* Submitted Response (mentee can edit/submit, mentor read-only) */}
+                <View style={styles.modalCard}>
+                  <Text style={styles.cardHeading}>Submitted Response</Text>
 
-            {/* Attachments */}
-            <View style={styles.modalCard}>
-              <Text style={styles.cardHeading}>Attached Files</Text>
+                  {userRole === "mentee" ? (
+                    <>
+                      <TextInput
+                        value={draftResponse}
+                        onChangeText={setDraftResponse}
+                        multiline
+                        style={styles.textArea}
+                        placeholder="Write your response…"
+                      />
+                      <View style={styles.rowGap}>
+                        <Pressable
+                          style={styles.secondaryBtn}
+                          onPress={() => {
+                            if (!activePhase || !activeTask) return;
+                            addMockAttachment(activePhase.id, activeTask.id);
+                          }}
+                        >
+                          <Ionicons name="attach" size={16} color="#111827" />
+                          <Text style={styles.secondaryBtnText}>
+                            Add Attachment
+                          </Text>
+                        </Pressable>
 
+                        <Pressable
+                          style={styles.primaryBtn}
+                          onPress={() => {
+                            if (!activePhase || !activeTask) return;
+                            submitTask(
+                              activePhase.id,
+                              activeTask.id,
+                              draftResponse.trim(),
+                            );
+                          }}
+                        >
+                          <Text style={styles.primaryBtnText}>
+                            {activeTask?.status === "submitted"
+                              ? "Resubmit"
+                              : "Submit"}
+                          </Text>
+                        </Pressable>
+                      </View>
+
+                      {activeTask?.submittedAt ? (
+                        <Text style={styles.smallMuted}>
+                          Submitted on {activeTask.submittedAt}
+                        </Text>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.bodyText}>
+                        {activeTask?.submittedResponse
+                          ? activeTask.submittedResponse
+                          : "No response submitted yet."}
+                      </Text>
+                      {activeTask?.submittedAt ? (
+                        <Text style={styles.smallMuted}>
+                          Submitted on {activeTask.submittedAt}
+                        </Text>
+                      ) : null}
+                    </>
+                  )}
+                </View>
+
+                {/* Attachments */}
+                <View style={styles.modalCard}>
+                  <Text style={styles.cardHeading}>Attached Files</Text>
+
+                  {activeTask?.attachments &&
+                  activeTask.attachments.length > 0 ? (
+                    <View style={{ gap: 10, marginTop: 8 }}>
+                      {activeTask.attachments.map((a) => (
+                        <View key={a.id} style={styles.fileRow}>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 10,
+                              flex: 1,
+                            }}
+                          >
+                            <Ionicons
+                              name="document-outline"
+                              size={18}
+                              color="#6B7280"
+                            />
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.fileName}>{a.name}</Text>
+                              <Text style={styles.fileSize}>{a.sizeLabel}</Text>
+                            </View>
+                          </View>
+
+                          {/* download icon placeholder */}
+                          <Pressable onPress={() => {}}>
+                            <Ionicons
+                              name="download-outline"
+                              size={18}
+                              color="#2563EB"
+                            />
+                          </Pressable>
               {activeTask?.attachments && activeTask.attachments.length > 0 ? (
                 <View style={{ gap: 10, marginTop: 8 }}>
                   {activeTask.attachments.map((a) => (
                     <View key={a.id} style={styles.fileRow}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
-                        <Ionicons name="document-outline" size={18} color="#6B7280" />
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 10,
+                          flex: 1,
+                        }}
+                      >
+                        <Ionicons
+                          name="document-outline"
+                          size={18}
+                          color="#6B7280"
+                        />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.fileName}>{a.name}</Text>
                           <Text style={styles.fileSize}>{a.sizeLabel}</Text>
                         </View>
-                      </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.smallMuted}>No files attached.</Text>
+                  )}
+                </View>
 
-                      {/* download icon placeholder */}
+                {/* Mentor Review Section */}
+                {userRole === "mentor" ? (
+                  <View style={styles.modalCard}>
+                    <Text style={styles.cardHeading}>Task Review</Text>
+
+                    <TextInput
+                      value={draftFeedback}
+                      onChangeText={setDraftFeedback}
+                      multiline
+                      style={styles.textArea}
+                      placeholder="Leave feedback for the mentee…"
+                    />
+
+                    <View style={styles.reviewBtnRow}>
+                      <Pressable
+                        style={styles.rejectBtn}
+                        onPress={() => {
+                          if (!activePhase || !activeTask) return;
+                          reviewTask(
+                            activePhase.id,
+                            activeTask.id,
+                            "rejected",
+                            draftFeedback.trim(),
+                          );
+                        }}
+                      >
+                        <Text style={styles.rejectBtnText}>Reject</Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={styles.approveBtn}
+                        onPress={() => {
+                          if (!activePhase || !activeTask) return;
+                          reviewTask(
+                            activePhase.id,
+                            activeTask.id,
+                            "approved",
+                            draftFeedback.trim(),
+                          );
+                        }}
+                      >
+                        <Text style={styles.approveBtnText}>Accept</Text>
                       <Pressable onPress={() => {}}>
-                        <Ionicons name="download-outline" size={18} color="#2563EB" />
+                        <Ionicons
+                          name="download-outline"
+                          size={18}
+                          color="#2563EB"
+                        />
                       </Pressable>
                     </View>
-                  ))}
-                </View>
-              ) : (
-                <Text style={styles.smallMuted}>No files attached.</Text>
-              )}
+
+                    {activeTask?.reviewedAt ? (
+                      <Text style={styles.smallMuted}>
+                        Reviewed on {activeTask.reviewedAt}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : // Mentee sees feedback if exists
+                activeTask?.mentorFeedback ? (
+                  <View style={styles.modalCard}>
+                    <Text style={styles.cardHeading}>Mentor Feedback</Text>
+                    <Text style={styles.bodyText}>
+                      {activeTask.mentorFeedback}
+                    </Text>
+                    {activeTask.reviewedAt ? (
+                      <Text style={styles.smallMuted}>
+                        Reviewed on {activeTask.reviewedAt}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                {/* Close */}
+                <Pressable
+                  onPress={closeTask}
+                  style={[
+                    styles.secondaryBtn,
+                    { marginTop: 10, justifyContent: "center" },
+                  ]}
+                >
+                  <Text style={styles.secondaryBtnText}>Close</Text>
+                </Pressable>
+              </ScrollView>
             </View>
+          </View>
+        </View>
+      </Modal>
 
-            {/* Mentor Review Section */}
-            {userRole === "mentor" ? (
-              <View style={styles.modalCard}>
-                <Text style={styles.cardHeading}>Task Review</Text>
+      {/* Modal for adding a new phase */}
+      <Modal visible={addingPhase} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setAddingPhase(false)}
+          />
+          <View style={styles.modalCenterContainer}>
+            <View style={styles.modalPopupContent}>
+              <Text style={styles.modalTitle}>
+                {editingPhaseId ? "Edit Phase" : "Add New Phase"}
+              </Text>
 
+              <Text style={styles.label}>Phase Name</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Advanced Skills"
+                value={newPhaseName}
+                onChangeText={setNewPhaseName}
+              />
+
+              <Text style={styles.label}>Description</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Phase description"
+                value={newPhaseDescription}
+                onChangeText={setNewPhaseDescription}
+                multiline
+              />
+
+              <Text style={styles.label}>Start Date</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="YYYY-MM-DD"
+                value={newPhaseStart}
+                onChangeText={setNewPhaseStart}
+              />
+
+              <Text style={styles.label}>End Date</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="YYYY-MM-DD"
+                value={newPhaseEnd}
+                onChangeText={setNewPhaseEnd}
+              />
+
+              <View style={styles.rowGap}>
+                <Pressable
+                  style={styles.primaryBtn}
+                  onPress={() => {
+                    if (newPhaseName.trim()) {
+                      if (editingPhaseId) {
+                        editPhase(
+                          editingPhaseId,
+                          newPhaseName,
+                          newPhaseStart,
+                          newPhaseEnd,
+                        );
+                      } else {
+                        addPhase(newPhaseName, newPhaseStart, newPhaseEnd);
+                      }
+                      setAddingPhase(false);
+                      setEditingPhaseId(null);
+                      setNewPhaseName("");
+                      setNewPhaseDescription("");
+                      setNewPhaseStart("");
+                      setNewPhaseEnd("");
+                    }
+                  }}
+                >
+                  <Text style={styles.primaryBtnText}>
+                    {editingPhaseId ? "Update Phase" : "Add Phase"}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.secondaryBtn}
+                  onPress={() => {
+                    setAddingPhase(false);
+                    setEditingPhaseId(null);
+                    setNewPhaseName("");
+                    setNewPhaseDescription("");
+                    setNewPhaseStart("");
+                    setNewPhaseEnd("");
+                  }}
+                >
+                  <Text style={styles.secondaryBtnText}>Cancel</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal for adding a new task */}
+      <Modal visible={!!addingTaskToPhaseId} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setAddingTaskToPhaseId(null)}
+          />
+          <View style={styles.modalCenterContainer}>
+            <View style={styles.modalPopupContent}>
+              <Text style={styles.modalTitle}>
+                {editingTaskId ? "Edit Task" : "Add New Task"}
+              </Text>
+
+              <Text style={styles.label}>Task Title</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Complete project"
+                value={newTaskTitle}
+                onChangeText={setNewTaskTitle}
+              />
+
+              <Text style={styles.label}>Due Date</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="YYYY-MM-DD"
+                value={newTaskDueDate}
+                onChangeText={setNewTaskDueDate}
+              />
+
+              <Text style={styles.label}>Expected Time Required</Text>
+              <View style={{ flexDirection: "row", gap: 8 }}>
                 <TextInput
-                  value={draftFeedback}
-                  onChangeText={setDraftFeedback}
-                  multiline
-                  style={styles.textArea}
-                  placeholder="Leave feedback for the mentee…"
+                  style={[styles.input, { flex: 1 }]}
+                  placeholder="e.g. 2"
+                  value={newTaskExpectedTimeValue}
+                  onChangeText={setNewTaskExpectedTimeValue}
+                  keyboardType="numeric"
                 />
+                <View
+                  style={[
+                    styles.input,
+                    { flex: 1, paddingVertical: 0, paddingHorizontal: 0 },
+                  ]}
+                >
+                  <Picker
+                    selectedValue={newTaskExpectedTimeUnit}
+                    onValueChange={(itemValue) =>
+                      setNewTaskExpectedTimeUnit(itemValue)
+                    }
+                    style={{ height: 40 }}
+                  >
+                    <Picker.Item label="Hours" value="hours" />
+                    <Picker.Item label="Days" value="days" />
+                    <Picker.Item label="Weeks" value="weeks" />
+                  </Picker>
+                </View>
+              </View>
 
+              <Text style={styles.label}>Skills Required</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. JavaScript, React, Problem Solving"
+                value={newTaskSkills}
+                onChangeText={setNewTaskSkills}
+                multiline
+              />
+
+              <Text style={styles.label}>Resources</Text>
+              <View style={{ gap: 8 }}>
+                {newTaskResources.map((resource, index) => (
+                  <View
+                    key={index}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                      backgroundColor: "#F9FAFB",
+                      padding: 12,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: "#E5E7EB",
                 <View style={styles.reviewBtnRow}>
                   <Pressable
                     style={styles.rejectBtn}
                     onPress={() => {
                       if (!activePhase || !activeTask) return;
-                      reviewTask(activePhase.id, activeTask.id, "rejected", draftFeedback.trim());
+                      reviewTask(
+                        activePhase.id,
+                        activeTask.id,
+                        "rejected",
+                        draftFeedback.trim(),
+                      );
                     }}
                   >
-                    <Text style={styles.rejectBtnText}>Reject</Text>
-                  </Pressable>
-
-                  <Pressable
-                    style={styles.approveBtn}
+                    <Ionicons
+                      name={resource.type === "link" ? "link" : "document"}
+                      size={20}
+                      color="#6B7280"
+                    />
+                    <View style={{ flex: 1 }}>
+                      {resource.type === "link" ? (
+                        <TextInput
+                          style={[
+                            styles.input,
+                            { marginBottom: 0, borderWidth: 0, padding: 0 },
+                          ]}
+                          placeholder="https://..."
+                          value={resource.value}
+                          onChangeText={(text) => {
+                            const updated = [...newTaskResources];
+                            updated[index].value = text;
+                            setNewTaskResources(updated);
+                          }}
+                        />
+                      ) : (
+                        <View>
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              fontWeight: "500",
+                              color: "#111827",
+                            }}
+                          >
+                            {resource.fileInfo?.name || resource.label}
+                          </Text>
+                          {resource.fileInfo?.size && (
+                            <Text style={{ fontSize: 12, color: "#6B7280" }}>
+                              {(resource.fileInfo.size / 1024).toFixed(1)} KB
+                            </Text>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const updated = newTaskResources.filter(
+                          (_, i) => i !== index,
+                        );
+                        setNewTaskResources(updated);
+                      }}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons name="trash" size={16} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <TouchableOpacity
                     onPress={() => {
-                      if (!activePhase || !activeTask) return;
-                      reviewTask(activePhase.id, activeTask.id, "approved", draftFeedback.trim());
+                      setNewTaskResources([
+                        ...newTaskResources,
+                        { type: "link", value: "", label: "Link" },
+                      ]);
                     }}
+                    style={[styles.secondaryBtn, { flex: 1 }]}
                   >
-                    <Text style={styles.approveBtnText}>Accept</Text>
-                  </Pressable>
-                </View>
+                    <Ionicons name="link" size={16} color="#111827" />
+                    <Text style={styles.secondaryBtnText}>Add Link</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      try {
+                        const result = await DocumentPicker.getDocumentAsync({
+                          type: "*/*",
+                          copyToCacheDirectory: true,
+                        });
 
+                        if (result.type === "success") {
+                          setNewTaskResources([
+                            ...newTaskResources,
+                            {
+                              type: "file",
+                              value: result.uri,
+                              label: result.name,
+                              fileInfo: {
+                                name: result.name,
+                                size: result.size,
+                                uri: result.uri,
+                                mimeType: result.mimeType,
+                              },
+                            },
+                          ]);
+                        }
+                      } catch (err) {
+                        console.error("Document picker error:", err);
+                        Alert.alert("Error", "Failed to pick document");
+                      }
+                      if (!activePhase || !activeTask) return;
+                      reviewTask(
+                        activePhase.id,
+                        activeTask.id,
+                        "approved",
+                        draftFeedback.trim(),
+                      );
+                    }}
+                    style={[styles.secondaryBtn, { flex: 1 }]}
+                  >
+                    <Ionicons name="document" size={16} color="#111827" />
+                    <Text style={styles.secondaryBtnText}>Upload File</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.rowGap}>
+                <Pressable
+                  style={styles.primaryBtn}
+                  onPress={() => {
+                    if (newTaskTitle.trim() && addingTaskToPhaseId) {
+                      const expectedTime = newTaskExpectedTimeValue.trim()
+                        ? {
+                            value: parseInt(newTaskExpectedTimeValue),
+                            unit: newTaskExpectedTimeUnit,
+                          }
+                        : undefined;
+
+                      const skills = newTaskSkills.trim()
+                        ? newTaskSkills
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter((s) => s.length > 0)
+                        : undefined;
+
+                      if (editingTaskId) {
+                        editTask(
+                          addingTaskToPhaseId,
+                          editingTaskId,
+                          newTaskTitle,
+                          newTaskDueDate,
+                          expectedTime,
+                          skills,
+                          newTaskResources.length > 0
+                            ? newTaskResources
+                            : undefined,
+                        );
+                      } else {
+                        addTaskToPhase(
+                          addingTaskToPhaseId,
+                          newTaskTitle,
+                          newTaskDueDate,
+                          expectedTime,
+                          skills,
+                          newTaskResources.length > 0
+                            ? newTaskResources
+                            : undefined,
+                        );
+                      }
+                      setAddingTaskToPhaseId(null);
+                      setEditingTaskId(null);
+                      setEditingTaskPhaseId(null);
+                      setNewTaskTitle("");
+                      setNewTaskDueDate("");
+                      setNewTaskExpectedTimeValue("");
+                      setNewTaskExpectedTimeUnit("hours");
+                      setNewTaskSkills("");
+                      setNewTaskResources([]);
+                    }
+                  }}
+                >
+                  <Text style={styles.primaryBtnText}>
+                    {editingTaskId ? "Update Task" : "Add Task"}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.secondaryBtn}
+                  onPress={() => {
+                    setAddingTaskToPhaseId(null);
+                    setEditingTaskId(null);
+                    setEditingTaskPhaseId(null);
+                    setNewTaskTitle("");
+                    setNewTaskDueDate("");
+                    setNewTaskExpectedTimeValue("");
+                    setNewTaskExpectedTimeUnit("hours");
+                    setNewTaskSkills("");
+                    setNewTaskResources([]);
+                  }}
+                >
+                  <Text style={styles.secondaryBtnText}>Cancel</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
                 {activeTask?.reviewedAt ? (
-                  <Text style={styles.smallMuted}>Reviewed on {activeTask.reviewedAt}</Text>
+                  <Text style={styles.smallMuted}>
+                    Reviewed on {activeTask.reviewedAt}
+                  </Text>
                 ) : null}
               </View>
-            ) : (
-              // Mentee sees feedback if exists
-              activeTask?.mentorFeedback ? (
-                <View style={styles.modalCard}>
-                  <Text style={styles.cardHeading}>Mentor Feedback</Text>
-                  <Text style={styles.bodyText}>{activeTask.mentorFeedback}</Text>
-                  {activeTask.reviewedAt ? (
-                    <Text style={styles.smallMuted}>Reviewed on {activeTask.reviewedAt}</Text>
-                  ) : null}
-                </View>
-              ) : null
-            )}
+            ) : activeTask?.mentorFeedback ? (
+              <View style={styles.modalCard}>
+                <Text style={styles.cardHeading}>Mentor Feedback</Text>
+                <Text style={styles.bodyText}>{activeTask.mentorFeedback}</Text>
+                {activeTask.reviewedAt ? (
+                  <Text style={styles.smallMuted}>
+                    Reviewed on {activeTask.reviewedAt}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
 
             {/* Close */}
-            <Pressable onPress={closeTask} style={[styles.secondaryBtn, { marginTop: 10, justifyContent: "center" }]}>
+            <Pressable
+              onPress={closeTask}
+              style={[
+                styles.secondaryBtn,
+                { marginTop: 10, justifyContent: "center" },
+              ]}
+            >
               <Text style={styles.secondaryBtnText}>Close</Text>
             </Pressable>
           </ScrollView>
@@ -512,7 +1549,9 @@ function statusLabel(status: Task["status"]) {
   }
 }
 
-function taskStatusIcon(status: Task["status"]): keyof typeof Ionicons.glyphMap {
+function taskStatusIcon(
+  status: Task["status"],
+): keyof typeof Ionicons.glyphMap {
   switch (status) {
     case "approved":
       return "checkmark-circle";
@@ -546,6 +1585,8 @@ function StatCard(props: {
   iconColor: string;
   label: string;
   value: string;
+  progress?: number; // percentage 0-100
+  progressMax?: number; // max value for display
 }) {
   return (
     <View style={styles.statCard}>
@@ -558,6 +1599,27 @@ function StatCard(props: {
           <Text style={styles.statValue}>{props.value}</Text>
         </View>
       </View>
+      {typeof props.progress === "number" && (
+        <>
+          <View style={[styles.progressBar, { marginTop: 8 }]}>
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${props.progress}%`,
+                  backgroundColor: props.iconColor,
+                },
+              ]}
+            />
+          </View>
+          <Text
+            style={[styles.progressLabel, { marginTop: 4, textAlign: "right" }]}
+          >
+            {props.progress}%{" "}
+            {props.progressMax ? `(${props.progressMax} XP goal)` : ""}
+          </Text>
+        </>
+      )}
     </View>
   );
 }
@@ -565,7 +1627,6 @@ function StatCard(props: {
 /* ---------- styles ---------- */
 
 const styles = StyleSheet.create({
-  
   screen: { flex: 1, backgroundColor: "#F7F7FB" },
   container: { padding: 16, paddingBottom: 28, gap: 16 },
 
@@ -574,6 +1635,14 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, color: "#4B5563" },
 
   sectionTitle: { fontSize: 18, fontWeight: "800" },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  addButton: {
+    padding: 4,
+  },
 
   statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   statCard: {
@@ -595,17 +1664,41 @@ const styles = StyleSheet.create({
   },
   statLabel: { fontSize: 12, color: "#6B7280" },
   statValue: { fontSize: 22, fontWeight: "800", marginTop: 2 },
+  progressBar: {
+    height: 8,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  progressFill: { height: "100%" },
+  progressLabel: { fontSize: 11, color: "#6B7280" },
 
-  phaseCardBase: { backgroundColor: "white", borderRadius: 16, padding: 14, borderWidth: 1 },
+  phaseCardBase: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+  },
   phaseCardCompleted: { borderColor: "#86EFAC" },
   phaseCardCurrent: { borderColor: "#C4B5FD" },
   phaseCardUpcoming: { borderColor: "#E5E7EB", opacity: 0.75 },
 
-  phaseHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  phaseHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   phaseLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   phaseRight: { flexDirection: "row", alignItems: "center", gap: 8 },
 
-  phaseIndexBubble: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "#E5E7EB" },
+  phaseIndexBubble: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E5E7EB",
+  },
   bubbleCompleted: { backgroundColor: "#DCFCE7" },
   bubbleCurrent: { backgroundColor: "#EDE9FE" },
   bubbleUpcoming: { backgroundColor: "#F3F4F6" },
@@ -615,18 +1708,80 @@ const styles = StyleSheet.create({
   phaseTitle: { fontSize: 16, fontWeight: "800" },
   phaseDates: { fontSize: 12, color: "#6B7280", marginTop: 2 },
 
-  badgeActive: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: "#EDE9FE" },
+  badgeActive: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#EDE9FE",
+  },
   badgeActiveText: { fontSize: 12, fontWeight: "800", color: "#7C3AED" },
 
-  rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  rowBetween: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
   small: { fontSize: 13, color: "#374151" },
   smallMuted: { fontSize: 13, color: "#6B7280" },
   bold: { fontWeight: "800" },
 
-  progressTrack: { height: 8, backgroundColor: "#E5E7EB", borderRadius: 999, overflow: "hidden" },
+  progressTrack: {
+    height: 8,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 999,
+    overflow: "hidden",
+  },
   progressFill: { height: "100%", borderRadius: 999 },
 
   phaseBody: { marginTop: 12, gap: 10 },
+  addTaskButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#C4B5FD",
+    backgroundColor: "#F3E8FF",
+  },
+  addTaskButtonText: {
+    fontSize: 13,
+    color: "#7C3AED",
+    fontWeight: "600",
+  pendingSection: {
+    marginTop: 14,
+    gap: 8,
+  },
+  pendingSectionTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  pendingList: {
+    gap: 10,
+  },
+  pendingTaskRow: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "white",
+  },
+
+  phaseBody: {
+    marginTop: 14,
+    gap: 10,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
+  },
 
   taskRow: {
     borderWidth: 1,
@@ -648,30 +1803,59 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.9 },
 
   // Modal
-    modalRoot: {
-  flex: 1,
-  justifyContent: "flex-end",
+  modalRoot: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  modalContent: {
+    paddingBottom: 24,
+  },
+
+  modalCenterContainer: {
+    width: "100%",
+    paddingHorizontal: 20,
+    alignItems: "center",
+    zIndex: 50,
+  },
+
+  modalPopupContent: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 36,
+    width: "100%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
 
   modalContent: {
     paddingBottom: 24, // lets you scroll past the last button
   },
-
-  modalSheet: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    maxHeight: "92%",
-    backgroundColor: "white",
-    padding: 16,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    borderTopWidth: 1,
-    borderColor: "#E5E7EB",
+  modalGrabber: {
+    alignSelf: "center",
+    width: 48,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#E5E7EB",
+    marginBottom: 10,
   },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)" },
-  modalGrabber: { alignSelf: "center", width: 48, height: 5, borderRadius: 999, backgroundColor: "#E5E7EB", marginBottom: 10 },
+  modalGrabber: {
+    alignSelf: "center",
+    width: 48,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#E5E7EB",
+    marginBottom: 10,
+  },
 
   statusChip: {
     flexDirection: "row",
@@ -685,7 +1869,12 @@ const styles = StyleSheet.create({
   },
   statusChipText: { fontSize: 12, fontWeight: "900" },
 
-  modalTitle: { fontSize: 18, fontWeight: "900", color: "#111827", marginBottom: 10 },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#111827",
+    marginBottom: 10,
+  },
 
   modalCard: {
     backgroundColor: "white",
@@ -699,7 +1888,12 @@ const styles = StyleSheet.create({
   cardHeading: { fontSize: 14, fontWeight: "900", color: "#111827" },
 
   bodyText: { fontSize: 13, color: "#111827", lineHeight: 19 },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
   metaText: { fontSize: 12, color: "#6B7280" },
 
   textArea: {
@@ -714,22 +1908,84 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
 
-  rowGap: { flexDirection: "row", gap: 10, alignItems: "center", justifyContent: "space-between" },
+  label: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#374151",
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 13,
+    color: "#111827",
+    backgroundColor: "#FFFFFF",
+  },
 
-  primaryBtn: { backgroundColor: "#7C3AED", paddingVertical: 12, borderRadius: 12, alignItems: "center", flex: 1 },
+  rowGap: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 24,
+    marginBottom: 12,
+  },
+
+  primaryBtn: {
+    backgroundColor: "#7C3AED",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    alignItems: "center",
+    flex: 1,
+  },
+  primaryBtnText: { color: "white", fontWeight: "900", fontSize: 12 },
+  reflectionCard: {
+    marginTop: 2,
+    gap: 8,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  reflectionPrompt: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111827",
+    lineHeight: 19,
+  },
+
+  rowGap: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  primaryBtn: {
+    backgroundColor: "#7C3AED",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    flex: 1,
+  },
   primaryBtnText: { color: "white", fontWeight: "900" },
 
   secondaryBtn: {
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
-    paddingHorizontal: 12,
   },
-  secondaryBtnText: { color: "#111827", fontWeight: "900" },
+  secondaryBtnText: { color: "#111827", fontWeight: "900", fontSize: 12 },
 
   fileRow: {
     flexDirection: "row",
@@ -744,8 +2000,52 @@ const styles = StyleSheet.create({
   fileSize: { fontSize: 12, color: "#6B7280", marginTop: 2 },
 
   reviewBtnRow: { flexDirection: "row", gap: 10 },
-  rejectBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: "#FCA5A5", alignItems: "center" },
+  rejectBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+    alignItems: "center",
+  },
   rejectBtnText: { fontWeight: "900", color: "#DC2626" },
-  approveBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: "#16A34A", alignItems: "center" },
+  approveBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#16A34A",
+    alignItems: "center",
+  },
   approveBtnText: { fontWeight: "900", color: "white" },
+
+  // New styles for task requirements
+  skillBubble: {
+    backgroundColor: "#F3E8FF",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+  },
+  skillBubbleText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#7C3AED",
+  },
+
+  resourceItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    backgroundColor: "#F9FAFB",
+  },
+  resourceText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#111827",
+  },
 });
