@@ -573,14 +573,20 @@ function MyJourneyScreen(props: {
                   style={styles.input}
                   returnKeyType="done"
                   onSubmitEditing={() =>
-                    showHabitForm ? (editingHabitId ? saveEditedHabit() : addHabit()) : setShowHabitForm(true)
+                    showHabitForm
+                      ? editingHabitId
+                        ? saveEditedHabit()
+                        : addHabit()
+                      : setShowHabitForm(true)
                   }
                 />
                 <Pressable
                   style={styles.addBtnPurple}
                   onPress={() => setShowHabitForm(!showHabitForm)}
                 >
-                  <Text style={styles.addBtnText}>{showHabitForm ? "×" : "＋"}</Text>
+                  <Text style={styles.addBtnText}>
+                    {showHabitForm ? "×" : "＋"}
+                  </Text>
                 </Pressable>
               </View>
 
@@ -628,7 +634,10 @@ function MyJourneyScreen(props: {
                 return (
                   <Pressable
                     key={habit.id}
-                    style={[styles.smartGoalCard, habit.completed && styles.taskCardCompleted]}
+                    style={[
+                      styles.smartGoalCard,
+                      habit.completed && styles.taskCardCompleted,
+                    ]}
                     onPress={() => toggleHabit(habit.id)}
                     onLongPress={() => removeHabit(habit.id)}
                     delayLongPress={250}
@@ -640,7 +649,9 @@ function MyJourneyScreen(props: {
                             <Text style={styles.taskTileIconText}>T</Text>
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={styles.smartGoalTitle}>{habit.title}</Text>
+                            <Text style={styles.smartGoalTitle}>
+                              {habit.title}
+                            </Text>
                           </View>
                         </View>
                       </View>
@@ -652,7 +663,12 @@ function MyJourneyScreen(props: {
                         >
                           <Text style={styles.goalEditBtnText}>Edit</Text>
                         </Pressable>
-                        <Text style={[styles.taskCheckIcon, habit.completed && styles.taskCheckIconCompleted]}>
+                        <Text
+                          style={[
+                            styles.taskCheckIcon,
+                            habit.completed && styles.taskCheckIconCompleted,
+                          ]}
+                        >
                           {habit.completed ? "✓" : ""}
                         </Text>
                       </View>
@@ -1588,3 +1604,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 });
+/*
+remove the edit, and keep the check mark 
+there all the time so when we finish the 
+task all we need to touch it and the 
+entire tab turns green.
+*/
