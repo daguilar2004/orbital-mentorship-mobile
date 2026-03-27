@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Modal,
@@ -11,11 +11,15 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type TabKey = "habits" | "goals" | "discipline";
+type TabKey = "habits" | "goals";
+type DayKey = "S" | "M" | "T" | "W" | "T2" | "F" | "S2";
 
-type Item = {
+type DailyHabit = {
   id: string;
   title: string;
+  days: DayKey[];
+  completedOn?: string | null;
+  linkedGoalId?: string;
 };
 
 type SmartGoal = {
@@ -28,19 +32,60 @@ type SmartGoal = {
   relevant?: string;
   timeBound: string;
   completed: boolean;
+  linkedHabitId?: string;
 };
+
+const DAY_OPTIONS: { key: DayKey; label: string; short: string }[] = [
+  { key: "S", label: "Sunday", short: "S" },
+  { key: "M", label: "Monday", short: "M" },
+  { key: "T", label: "Tuesday", short: "T" },
+  { key: "W", label: "Wednesday", short: "W" },
+  { key: "T2", label: "Thursday", short: "T" },
+  { key: "F", label: "Friday", short: "F" },
+  { key: "S2", label: "Saturday", short: "S" },
+];
+
+function getTodayKey(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = `${now.getMonth() + 1}`.padStart(2, "0");
+  const day = `${now.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayDayKey(): DayKey {
+  const day = new Date().getDay();
+  const map: DayKey[] = ["S", "M", "T", "W", "T2", "F", "S2"];
+  return map[day];
+}
 
 export default function Journey() {
   const [introDone, setIntroDone] = useState(false);
   const [reflection, setReflection] = useState("");
-
   const [activeTab, setActiveTab] = useState<TabKey>("habits");
 
-  const [habitInput, setHabitInput] = useState("");
-  const [habits, setHabits] = useState<Item[]>([
-    { id: "h1", title: "Morning meditation" },
-    { id: "h2", title: "Daily coding practice" },
+  const todayKey = getTodayKey();
+  const todayDayKey = getTodayDayKey();
+
+  const [habits, setHabits] = useState<DailyHabit[]>([
+    {
+      id: "h1",
+      title: "Morning meditation",
+      days: ["S", "M", "T", "W", "T2", "F", "S2"],
+      completedOn: null,
+    },
+    {
+      id: "h2",
+      title: "Daily coding practice",
+      days: ["S", "M", "T", "W", "T2", "F", "S2"],
+      completedOn: null,
+    },
   ]);
+
+  const [showHabitForm, setShowHabitForm] = useState(false);
+  const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
+  const [habitTitle, setHabitTitle] = useState("");
+  const [habitDays, setHabitDays] = useState<DayKey[]>([]);
 
   const [goals, setGoals] = useState<SmartGoal[]>([
     {
@@ -57,8 +102,26 @@ export default function Journey() {
         "Clear communication supports the kind of professional and leader I want to become.",
       timeBound: "Complete by Sunday evening.",
       completed: false,
+      linkedHabitId: "g1-habit",
     },
   ]);
+
+  useEffect(() => {
+    setHabits((prev) => {
+      const exists = prev.some((habit) => habit.id === "g1-habit");
+      if (exists) return prev;
+      return [
+        ...prev,
+        {
+          id: "g1-habit",
+          title: "Practice explaining one idea clearly",
+          days: ["M", "W", "F"],
+          completedOn: null,
+          linkedGoalId: "g1",
+        },
+      ];
+    });
+  }, []);
 
   const [expandedGoalId, setExpandedGoalId] = useState<string | null>("g1");
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
@@ -73,11 +136,11 @@ export default function Journey() {
   const [goalRelevant, setGoalRelevant] = useState("");
   const [goalTimeBound, setGoalTimeBound] = useState("");
 
+  const [goalHabitTitle, setGoalHabitTitle] = useState("");
+  const [goalHabitDays, setGoalHabitDays] = useState<DayKey[]>([]);
+
   const [showGoalsHelp, setShowGoalsHelp] = useState(false);
   const [hasSeenGoalsHelp, setHasSeenGoalsHelp] = useState(false);
-
-  const [character, setCharacter] = useState("Persistent and curious");
-  const [personality, setPersonality] = useState("Analytical problem solver");
 
   useEffect(() => {
     if (activeTab === "goals" && !hasSeenGoalsHelp) {
@@ -86,24 +149,105 @@ export default function Journey() {
     }
   }, [activeTab, hasSeenGoalsHelp]);
 
-  const addHabit = () => {
-    const title = habitInput.trim();
-    if (!title) return;
-    setHabits((prev) => [{ id: String(Date.now()), title }, ...prev]);
-    setHabitInput("");
+  const clearHabitForm = () => {
+    setHabitTitle("");
+    setHabitDays([]);
+    setEditingHabitId(null);
   };
 
-  const confirmRemoveHabit = (id: string) => {
-    Alert.alert("Delete habit?", "Do you want to delete this habit?", [
+  const cancelHabitForm = () => {
+    setShowHabitForm(false);
+    clearHabitForm();
+  };
+
+  const addHabit = () => {
+    if (!habitTitle.trim() || habitDays.length === 0) return;
+
+    const newHabit: DailyHabit = {
+      id: String(Date.now()),
+      title: habitTitle.trim(),
+      days: habitDays,
+      completedOn: null,
+    };
+
+    setHabits((prev) => [newHabit, ...prev]);
+    setShowHabitForm(false);
+    clearHabitForm();
+  };
+
+  const startEditHabit = (habit: DailyHabit) => {
+    setEditingHabitId(habit.id);
+    setHabitTitle(habit.title);
+    setHabitDays(habit.days);
+    setShowHabitForm(true);
+  };
+
+  const saveEditedHabit = () => {
+    if (!editingHabitId || !habitTitle.trim() || habitDays.length === 0) return;
+
+    setHabits((prev) =>
+      prev.map((habit) =>
+        habit.id === editingHabitId
+          ? {
+              ...habit,
+              title: habitTitle.trim(),
+              days: habitDays,
+            }
+          : habit,
+      ),
+    );
+
+    setShowHabitForm(false);
+    clearHabitForm();
+  };
+
+  const removeHabit = (id: string) => {
+    const linkedGoal = goals.find((goal) => goal.linkedHabitId === id);
+
+    Alert.alert("Delete daily habit?", "Do you want to delete this daily habit?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
         style: "destructive",
         onPress: () => {
-          setHabits((prev) => prev.filter((x) => x.id !== id));
+          setHabits((prev) => prev.filter((habit) => habit.id !== id));
+          if (linkedGoal) {
+            setGoals((prev) =>
+              prev.map((goal) =>
+                goal.id === linkedGoal.id
+                  ? { ...goal, linkedHabitId: undefined }
+                  : goal,
+              ),
+            );
+          }
         },
       },
     ]);
+  };
+
+  const toggleHabitCompletion = (id: string) => {
+    setHabits((prev) =>
+      prev.map((habit) => {
+        if (habit.id !== id) return habit;
+        const isDoneToday = habit.completedOn === todayKey;
+        return {
+          ...habit,
+          completedOn: isDoneToday ? null : todayKey,
+        };
+      }),
+    );
+  };
+
+  const toggleDay = (
+    day: DayKey,
+    selected: DayKey[],
+    setSelected: (days: DayKey[]) => void,
+  ) => {
+    if (selected.includes(day)) {
+      setSelected(selected.filter((d) => d !== day));
+    } else {
+      setSelected([...selected, day]);
+    }
   };
 
   const clearGoalForm = () => {
@@ -114,6 +258,8 @@ export default function Journey() {
     setGoalAchievable("");
     setGoalRelevant("");
     setGoalTimeBound("");
+    setGoalHabitTitle("");
+    setGoalHabitDays([]);
     setEditingGoalId(null);
   };
 
@@ -133,8 +279,25 @@ export default function Journey() {
       return;
     }
 
+    const newGoalId = String(Date.now());
+    let linkedHabitId: string | undefined;
+
+    if (goalHabitTitle.trim() && goalHabitDays.length > 0) {
+      linkedHabitId = `${newGoalId}-habit`;
+
+      const linkedHabit: DailyHabit = {
+        id: linkedHabitId,
+        title: goalHabitTitle.trim(),
+        days: goalHabitDays,
+        completedOn: null,
+        linkedGoalId: newGoalId,
+      };
+
+      setHabits((prev) => [linkedHabit, ...prev]);
+    }
+
     const newGoal: SmartGoal = {
-      id: String(Date.now()),
+      id: newGoalId,
       title: goalTitle.trim(),
       time: goalTime.trim(),
       specific: goalSpecific.trim(),
@@ -143,6 +306,7 @@ export default function Journey() {
       relevant: goalRelevant.trim() || undefined,
       timeBound: goalTimeBound.trim(),
       completed: false,
+      linkedHabitId,
     };
 
     setGoals((prev) => [newGoal, ...prev]);
@@ -161,6 +325,11 @@ export default function Journey() {
     setGoalAchievable(goal.achievable ?? "");
     setGoalRelevant(goal.relevant ?? "");
     setGoalTimeBound(goal.timeBound);
+
+    const linkedHabit = habits.find((habit) => habit.id === goal.linkedHabitId);
+    setGoalHabitTitle(linkedHabit?.title ?? "");
+    setGoalHabitDays(linkedHabit?.days ?? []);
+
     setExpandedGoalId(goal.id);
     setSelectedGoalId(null);
     setShowGoalForm(true);
@@ -178,6 +347,48 @@ export default function Journey() {
       return;
     }
 
+    const existingGoal = goals.find((goal) => goal.id === editingGoalId);
+    const existingLinkedHabit = habits.find(
+      (habit) => habit.id === existingGoal?.linkedHabitId,
+    );
+
+    let nextLinkedHabitId = existingGoal?.linkedHabitId;
+
+    if (goalHabitTitle.trim() && goalHabitDays.length > 0) {
+      if (existingLinkedHabit) {
+        setHabits((prev) =>
+          prev.map((habit) =>
+            habit.id === existingLinkedHabit.id
+              ? {
+                  ...habit,
+                  title: goalHabitTitle.trim(),
+                  days: goalHabitDays,
+                }
+              : habit,
+          ),
+        );
+      } else {
+        const newLinkedHabitId = `${editingGoalId}-habit`;
+        nextLinkedHabitId = newLinkedHabitId;
+
+        setHabits((prev) => [
+          {
+            id: newLinkedHabitId,
+            title: goalHabitTitle.trim(),
+            days: goalHabitDays,
+            completedOn: null,
+            linkedGoalId: editingGoalId,
+          },
+          ...prev,
+        ]);
+      }
+    } else if (existingLinkedHabit) {
+      setHabits((prev) =>
+        prev.filter((habit) => habit.id !== existingLinkedHabit.id),
+      );
+      nextLinkedHabitId = undefined;
+    }
+
     setGoals((prev) =>
       prev.map((goal) =>
         goal.id === editingGoalId
@@ -190,6 +401,7 @@ export default function Journey() {
               achievable: goalAchievable.trim() || undefined,
               relevant: goalRelevant.trim() || undefined,
               timeBound: goalTimeBound.trim(),
+              linkedHabitId: nextLinkedHabitId,
             }
           : goal,
       ),
@@ -200,7 +412,13 @@ export default function Journey() {
   };
 
   const removeGoal = (id: string) => {
-    setGoals((prev) => prev.filter((goal) => goal.id !== id));
+    const goal = goals.find((item) => item.id === id);
+
+    if (goal?.linkedHabitId) {
+      setHabits((prev) => prev.filter((habit) => habit.id !== goal.linkedHabitId));
+    }
+
+    setGoals((prev) => prev.filter((goalItem) => goalItem.id !== id));
     if (expandedGoalId === id) setExpandedGoalId(null);
     if (selectedGoalId === id) setSelectedGoalId(null);
     if (editingGoalId === id) cancelGoalForm();
@@ -245,9 +463,7 @@ export default function Journey() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            removeGoal(selectedGoalId);
-          },
+          onPress: () => removeGoal(selectedGoalId),
         },
       ],
     );
@@ -263,14 +479,25 @@ export default function Journey() {
           onSkip={() => setIntroDone(true)}
         />
       ) : (
-        <MyJourneyScreen
+        <AccountabilityScreen
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          habitInput={habitInput}
-          setHabitInput={setHabitInput}
+          todayDayKey={todayDayKey}
+          todayKey={todayKey}
           habits={habits}
+          showHabitForm={showHabitForm}
+          setShowHabitForm={setShowHabitForm}
+          habitTitle={habitTitle}
+          setHabitTitle={setHabitTitle}
+          habitDays={habitDays}
+          setHabitDays={setHabitDays}
+          editingHabitId={editingHabitId}
           addHabit={addHabit}
-          removeHabit={confirmRemoveHabit}
+          saveEditedHabit={saveEditedHabit}
+          cancelHabitForm={cancelHabitForm}
+          startEditHabit={startEditHabit}
+          removeHabit={removeHabit}
+          toggleHabitCompletion={toggleHabitCompletion}
           goals={goals}
           expandedGoalId={expandedGoalId}
           selectedGoalId={selectedGoalId}
@@ -293,6 +520,10 @@ export default function Journey() {
           setGoalRelevant={setGoalRelevant}
           goalTimeBound={goalTimeBound}
           setGoalTimeBound={setGoalTimeBound}
+          goalHabitTitle={goalHabitTitle}
+          setGoalHabitTitle={setGoalHabitTitle}
+          goalHabitDays={goalHabitDays}
+          setGoalHabitDays={setGoalHabitDays}
           addGoal={addGoal}
           editingGoalId={editingGoalId}
           startEditGoal={startEditGoal}
@@ -302,10 +533,7 @@ export default function Journey() {
           markSelectedGoalCompleted={markSelectedGoalCompleted}
           showGoalsHelp={showGoalsHelp}
           setShowGoalsHelp={setShowGoalsHelp}
-          character={character}
-          setCharacter={setCharacter}
-          personality={personality}
-          setPersonality={setPersonality}
+          toggleDay={toggleDay}
         />
       )}
     </SafeAreaView>
@@ -327,22 +555,23 @@ function WelcomeScreen(props: {
     >
       <View style={styles.welcomeCard}>
         <View style={styles.heartCircle}>
-          <Text style={styles.heart}>♡</Text>
+          <Text style={styles.heart}>✓</Text>
         </View>
 
-        <Text style={styles.welcomeTitle}>Welcome to Your Journey</Text>
+        <Text style={styles.welcomeTitle}>Welcome to Accountability</Text>
         <Text style={styles.welcomeSub}>
-          Before we begin, take a moment to reflect on your transformation
+          Before you begin, take a second to think about what you want to stay
+          consistent with.
         </Text>
 
         <Text style={styles.promptTitle}>
-          Who you are now,{"\n"}and who you want to become?
+          What are you trying{"\n"}to hold yourself to?
         </Text>
 
         <TextInput
           value={reflection}
           onChangeText={setReflection}
-          placeholder="Share your thoughts... Where are you now, and where do you see yourself going?"
+          placeholder="Write a quick note to yourself..."
           placeholderTextColor="#9CA3AF"
           multiline
           style={styles.textArea}
@@ -350,7 +579,7 @@ function WelcomeScreen(props: {
         />
 
         <Pressable style={styles.primaryBtn} onPress={onBegin}>
-          <Text style={styles.primaryBtnText}>Begin Your Journey</Text>
+          <Text style={styles.primaryBtnText}>Open Accountability</Text>
           <Text style={styles.primaryBtnArrow}>→</Text>
         </Pressable>
 
@@ -362,15 +591,26 @@ function WelcomeScreen(props: {
   );
 }
 
-function MyJourneyScreen(props: {
+function AccountabilityScreen(props: {
   activeTab: TabKey;
   setActiveTab: (t: TabKey) => void;
+  todayDayKey: DayKey;
+  todayKey: string;
 
-  habitInput: string;
-  setHabitInput: (v: string) => void;
-  habits: Item[];
+  habits: DailyHabit[];
+  showHabitForm: boolean;
+  setShowHabitForm: (v: boolean) => void;
+  habitTitle: string;
+  setHabitTitle: (v: string) => void;
+  habitDays: DayKey[];
+  setHabitDays: (v: DayKey[]) => void;
+  editingHabitId: string | null;
   addHabit: () => void;
+  saveEditedHabit: () => void;
+  cancelHabitForm: () => void;
+  startEditHabit: (habit: DailyHabit) => void;
   removeHabit: (id: string) => void;
+  toggleHabitCompletion: (id: string) => void;
 
   goals: SmartGoal[];
   expandedGoalId: string | null;
@@ -394,6 +634,10 @@ function MyJourneyScreen(props: {
   setGoalRelevant: (v: string) => void;
   goalTimeBound: string;
   setGoalTimeBound: (v: string) => void;
+  goalHabitTitle: string;
+  setGoalHabitTitle: (v: string) => void;
+  goalHabitDays: DayKey[];
+  setGoalHabitDays: (v: DayKey[]) => void;
   addGoal: () => void;
   editingGoalId: string | null;
   startEditGoal: (goal: SmartGoal) => void;
@@ -403,21 +647,32 @@ function MyJourneyScreen(props: {
   markSelectedGoalCompleted: () => void;
   showGoalsHelp: boolean;
   setShowGoalsHelp: (v: boolean) => void;
-
-  character: string;
-  setCharacter: (v: string) => void;
-  personality: string;
-  setPersonality: (v: string) => void;
+  toggleDay: (
+    day: DayKey,
+    selected: DayKey[],
+    setSelected: (days: DayKey[]) => void,
+  ) => void;
 }) {
   const {
     activeTab,
     setActiveTab,
+    todayDayKey,
+    todayKey,
 
-    habitInput,
-    setHabitInput,
     habits,
+    showHabitForm,
+    setShowHabitForm,
+    habitTitle,
+    setHabitTitle,
+    habitDays,
+    setHabitDays,
+    editingHabitId,
     addHabit,
+    saveEditedHabit,
+    cancelHabitForm,
+    startEditHabit,
     removeHabit,
+    toggleHabitCompletion,
 
     goals,
     expandedGoalId,
@@ -441,6 +696,10 @@ function MyJourneyScreen(props: {
     setGoalRelevant,
     goalTimeBound,
     setGoalTimeBound,
+    goalHabitTitle,
+    setGoalHabitTitle,
+    goalHabitDays,
+    setGoalHabitDays,
     addGoal,
     editingGoalId,
     startEditGoal,
@@ -450,14 +709,21 @@ function MyJourneyScreen(props: {
     markSelectedGoalCompleted,
     showGoalsHelp,
     setShowGoalsHelp,
-
-    character,
-    setCharacter,
-    personality,
-    setPersonality,
+    toggleDay,
   } = props;
 
   const selectedGoal = goals.find((goal) => goal.id === selectedGoalId);
+
+  const linkedHabitMap = useMemo(() => {
+    const map: Record<string, DailyHabit | undefined> = {};
+    goals.forEach((goal) => {
+      map[goal.id] = habits.find((habit) => habit.id === goal.linkedHabitId);
+    });
+    return map;
+  }, [goals, habits]);
+
+  const todaysHabits = habits.filter((habit) => habit.days.includes(todayDayKey));
+  const otherHabits = habits.filter((habit) => !habit.days.includes(todayDayKey));
 
   return (
     <View style={{ flex: 1 }}>
@@ -471,69 +737,244 @@ function MyJourneyScreen(props: {
           style={styles.scrollBg}
           contentContainerStyle={styles.pagePad}
         >
-          <Text style={styles.pageTitle}>My Journey</Text>
-          <Text style={styles.pageSub}>Track your personal growth</Text>
+          <Text style={styles.pageTitle}>Accountability</Text>
+          <Text style={styles.pageSub}>
+            Stay consistent with daily habits and bigger weekly goals
+          </Text>
 
           <View style={styles.tabRow}>
             <TabButton
-              label="Habits"
-              icon="♡"
+              label="Daily Habits"
+              icon="✓"
               active={activeTab === "habits"}
               onPress={() => setActiveTab("habits")}
             />
             <TabButton
-              label="Goals"
+              label="SMART Goals"
               icon="◎"
               active={activeTab === "goals"}
               onPress={() => setActiveTab("goals")}
-            />
-            <TabButton
-              label="Discipline"
-              icon="🏆"
-              active={activeTab === "discipline"}
-              onPress={() => setActiveTab("discipline")}
             />
           </View>
 
           <View style={{ height: 16 }} />
 
           {activeTab === "habits" ? (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Daily Habits</Text>
-              <Text style={styles.cardSub}>
-                Positive habits you maintain daily. Press and hold a habit to
-                delete it.
-              </Text>
+            <View style={{ gap: 14, paddingBottom: 110 }}>
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Daily Habits</Text>
+                <Text style={styles.cardSub}>
+                  These reset automatically each new day at 12:00 AM. Hold to
+                  delete.
+                </Text>
 
-              <View style={styles.addRow}>
-                <TextInput
-                  value={habitInput}
-                  onChangeText={setHabitInput}
-                  placeholder="Add a new habit..."
-                  placeholderTextColor="#9CA3AF"
-                  style={styles.input}
-                  returnKeyType="done"
-                  onSubmitEditing={addHabit}
-                />
-                <Pressable style={styles.addBtnPurple} onPress={addHabit}>
-                  <Text style={styles.addBtnText}>＋</Text>
-                </Pressable>
+                <View style={styles.addRow}>
+                  <TextInput
+                    value={habitTitle}
+                    onChangeText={setHabitTitle}
+                    placeholder="Add a daily habit..."
+                    placeholderTextColor="#9CA3AF"
+                    style={styles.input}
+                    returnKeyType="done"
+                    onSubmitEditing={() =>
+                      showHabitForm
+                        ? editingHabitId
+                          ? saveEditedHabit()
+                          : addHabit()
+                        : setShowHabitForm(true)
+                    }
+                  />
+                  <Pressable
+                    style={styles.addBtnPurple}
+                    onPress={() => setShowHabitForm(!showHabitForm)}
+                  >
+                    <Text style={styles.addBtnText}>{showHabitForm ? "×" : "＋"}</Text>
+                  </Pressable>
+                </View>
+
+                {showHabitForm && (
+                  <View style={styles.goalFormCard}>
+                    <Text style={styles.goalFormTitle}>
+                      {editingHabitId ? "Edit Daily Habit" : "Create Daily Habit"}
+                    </Text>
+
+                    <TextInput
+                      value={habitTitle}
+                      onChangeText={setHabitTitle}
+                      placeholder="Habit title"
+                      placeholderTextColor="#9CA3AF"
+                      style={styles.input}
+                    />
+
+                    <View style={{ height: 12 }} />
+
+                    <Text style={styles.formLabel}>Select days</Text>
+                    <DaysSelector
+                      selected={habitDays}
+                      onToggle={(day) => toggleDay(day, habitDays, setHabitDays)}
+                    />
+
+                    <View style={styles.goalFormActions}>
+                      <Pressable
+                        style={styles.secondaryBtn}
+                        onPress={cancelHabitForm}
+                      >
+                        <Text style={styles.secondaryBtnText}>Cancel</Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={styles.primarySmallBtn}
+                        onPress={editingHabitId ? saveEditedHabit : addHabit}
+                      >
+                        <Text style={styles.primarySmallBtnText}>
+                          {editingHabitId ? "Save Changes" : "Save Habit"}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                )}
+
+                <View style={{ height: 12 }} />
+
+                {todaysHabits.length > 0 ? (
+                  <View>
+                    <Text style={styles.sectionMiniTitle}>For Today</Text>
+                    {todaysHabits.map((habit) => {
+                      const doneToday = habit.completedOn === todayKey;
+
+                      return (
+                        <Pressable
+                          key={habit.id}
+                          style={[
+                            styles.dailyHabitCard,
+                            doneToday && styles.dailyHabitCardCompleted,
+                          ]}
+                          onLongPress={() => removeHabit(habit.id)}
+                          delayLongPress={250}
+                        >
+                          <View style={styles.dailyHabitLeft}>
+                            <View style={styles.dailyHabitTitleRow}>
+                              <Text
+                                style={[
+                                  styles.dailyHabitTitle,
+                                  doneToday && styles.completedTitle,
+                                ]}
+                              >
+                                {habit.title}
+                              </Text>
+
+                              {habit.linkedGoalId ? (
+                                <View style={styles.linkedBadge}>
+                                  <Text style={styles.linkedBadgeText}>
+                                    Goal habit
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </View>
+
+                            <DayDots days={habit.days} />
+                          </View>
+
+                          <View style={styles.dailyHabitRight}>
+                            <Pressable
+                              style={styles.goalEditBtn}
+                              onPress={() => startEditHabit(habit)}
+                            >
+                              <Text style={styles.goalEditBtnText}>Edit</Text>
+                            </Pressable>
+
+                            <Pressable
+                              style={[
+                                styles.taskCheckBtn,
+                                doneToday && styles.taskCheckBtnDone,
+                              ]}
+                              onPress={() => toggleHabitCompletion(habit.id)}
+                            >
+                              <Text
+                                style={[
+                                  styles.taskCheckBtnText,
+                                  doneToday && styles.taskCheckBtnTextDone,
+                                ]}
+                              >
+                                ✓
+                              </Text>
+                            </Pressable>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+
+                {otherHabits.length > 0 ? (
+                  <View style={{ marginTop: todaysHabits.length > 0 ? 16 : 0 }}>
+                    <Text style={styles.sectionMiniTitle}>Other Days</Text>
+                    {otherHabits.map((habit) => {
+                      const doneToday = habit.completedOn === todayKey;
+
+                      return (
+                        <Pressable
+                          key={habit.id}
+                          style={styles.dailyHabitCard}
+                          onLongPress={() => removeHabit(habit.id)}
+                          delayLongPress={250}
+                        >
+                          <View style={styles.dailyHabitLeft}>
+                            <View style={styles.dailyHabitTitleRow}>
+                              <Text style={styles.dailyHabitTitle}>
+                                {habit.title}
+                              </Text>
+
+                              {habit.linkedGoalId ? (
+                                <View style={styles.linkedBadge}>
+                                  <Text style={styles.linkedBadgeText}>
+                                    Goal habit
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </View>
+
+                            <DayDots days={habit.days} />
+                          </View>
+
+                          <View style={styles.dailyHabitRight}>
+                            <Pressable
+                              style={styles.goalEditBtn}
+                              onPress={() => startEditHabit(habit)}
+                            >
+                              <Text style={styles.goalEditBtnText}>Edit</Text>
+                            </Pressable>
+
+                            <Pressable
+                              style={[
+                                styles.taskCheckBtn,
+                                !habit.days.includes(todayDayKey) &&
+                                  styles.taskCheckBtnDisabled,
+                                doneToday && styles.taskCheckBtnDone,
+                              ]}
+                              disabled={!habit.days.includes(todayDayKey)}
+                              onPress={() => toggleHabitCompletion(habit.id)}
+                            >
+                              <Text
+                                style={[
+                                  styles.taskCheckBtnText,
+                                  !habit.days.includes(todayDayKey) &&
+                                    styles.taskCheckBtnTextDisabled,
+                                  doneToday && styles.taskCheckBtnTextDone,
+                                ]}
+                              >
+                                ✓
+                              </Text>
+                            </Pressable>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
               </View>
-
-              <View style={{ height: 10 }} />
-
-              {habits.map((h) => (
-                <Pressable
-                  key={h.id}
-                  style={styles.rowPurple}
-                  onLongPress={() => removeHabit(h.id)}
-                  delayLongPress={250}
-                >
-                  <Text style={styles.rowText}>{h.title}</Text>
-                </Pressable>
-              ))}
             </View>
-          ) : activeTab === "goals" ? (
+          ) : (
             <View style={{ gap: 14, paddingBottom: 110 }}>
               <View style={styles.card}>
                 <View style={styles.goalHeaderTopRow}>
@@ -635,6 +1076,30 @@ function MyJourneyScreen(props: {
                       textAlignVertical="top"
                     />
 
+                    <View style={styles.optionalDivider}>
+                      <Text style={styles.optionalDividerText}>
+                        Optional linked daily habit
+                      </Text>
+                    </View>
+
+                    <TextInput
+                      value={goalHabitTitle}
+                      onChangeText={setGoalHabitTitle}
+                      placeholder="Daily habit title (optional)"
+                      placeholderTextColor="#9CA3AF"
+                      style={styles.input}
+                    />
+
+                    <View style={{ height: 12 }} />
+
+                    <Text style={styles.formLabel}>Habit days (optional)</Text>
+                    <DaysSelector
+                      selected={goalHabitDays}
+                      onToggle={(day) =>
+                        toggleDay(day, goalHabitDays, setGoalHabitDays)
+                      }
+                    />
+
                     <View style={styles.goalFormActions}>
                       <Pressable
                         style={styles.secondaryBtn}
@@ -659,6 +1124,7 @@ function MyJourneyScreen(props: {
                   {goals.map((goal) => {
                     const expanded = expandedGoalId === goal.id;
                     const selected = selectedGoalId === goal.id;
+                    const linkedHabit = linkedHabitMap[goal.id];
 
                     return (
                       <Pressable
@@ -692,9 +1158,16 @@ function MyJourneyScreen(props: {
                               ) : null}
                             </View>
 
-                            <Text style={styles.smartGoalTime}>
-                              {goal.time}
-                            </Text>
+                            <Text style={styles.smartGoalTime}>{goal.time}</Text>
+
+                            {linkedHabit ? (
+                              <View style={styles.linkedTaskPreview}>
+                                <Text style={styles.linkedTaskPreviewText}>
+                                  Linked habit: {linkedHabit.title}
+                                </Text>
+                                <DayDots days={linkedHabit.days} compact />
+                              </View>
+                            ) : null}
                           </View>
 
                           <View style={styles.goalHeaderRight}>
@@ -719,6 +1192,18 @@ function MyJourneyScreen(props: {
                             ) : null}
                             <SmartGoalField label="T" text={goal.timeBound} />
 
+                            {linkedHabit ? (
+                              <View style={styles.linkedTaskExpandedBox}>
+                                <Text style={styles.linkedTaskExpandedTitle}>
+                                  Linked Daily Habit
+                                </Text>
+                                <Text style={styles.linkedTaskExpandedText}>
+                                  {linkedHabit.title}
+                                </Text>
+                                <DayDots days={linkedHabit.days} />
+                              </View>
+                            ) : null}
+
                             <View style={styles.goalEditRow}>
                               <Pressable
                                 style={styles.goalEditBtn}
@@ -733,43 +1218,6 @@ function MyJourneyScreen(props: {
                     );
                   })}
                 </View>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Personal Development</Text>
-
-              <Text style={styles.subHeader}>Character</Text>
-              <Text style={styles.sectionSub}>
-                Your core values and character traits
-              </Text>
-              <TextInput
-                value={character}
-                onChangeText={setCharacter}
-                multiline
-                style={styles.bigInput}
-                textAlignVertical="top"
-              />
-
-              <Text style={[styles.subHeader, { marginTop: 16 }]}>
-                Personality
-              </Text>
-              <Text style={styles.sectionSub}>
-                Your personality strengths and style
-              </Text>
-              <TextInput
-                value={personality}
-                onChangeText={setPersonality}
-                multiline
-                style={styles.bigInput}
-                textAlignVertical="top"
-              />
-
-              <View style={styles.tipBox}>
-                <Text style={styles.tipText}>
-                  💡 Regular reflection helps you stay aligned with your goals
-                  and maintain discipline.
-                </Text>
               </View>
             </View>
           )}
@@ -804,6 +1252,66 @@ function MyJourneyScreen(props: {
           </Text>
         </Pressable>
       ) : null}
+    </View>
+  );
+}
+
+function DaysSelector(props: {
+  selected: DayKey[];
+  onToggle: (day: DayKey) => void;
+}) {
+  const { selected, onToggle } = props;
+
+  return (
+    <View style={styles.daysRow}>
+      {DAY_OPTIONS.map((day) => {
+        const active = selected.includes(day.key);
+
+        return (
+          <Pressable
+            key={day.key}
+            onPress={() => onToggle(day.key)}
+            style={[styles.dayCircle, active && styles.dayCircleActive]}
+          >
+            <Text style={[styles.dayCircleText, active && styles.dayCircleTextActive]}>
+              {day.short}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function DayDots(props: { days: DayKey[]; compact?: boolean }) {
+  const { days, compact = false } = props;
+
+  return (
+    <View style={[styles.dayDotsRow, compact && styles.dayDotsRowCompact]}>
+      {DAY_OPTIONS.map((day) => {
+        const active = days.includes(day.key);
+
+        return (
+          <View
+            key={day.key}
+            style={[
+              styles.dayDot,
+              compact && styles.dayDotCompact,
+              active && styles.dayDotActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.dayDotText,
+                compact && styles.dayDotTextCompact,
+                active && styles.dayDotTextActive,
+              ]}
+            >
+              {day.short}
+            </Text>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -845,8 +1353,8 @@ function GoalsHelpModal(props: { visible: boolean; onClose: () => void }) {
               text="Use the plus button to add a new SMART goal"
             />
             <HelpRow
-              emoji="?"
-              text="Tap the question mark anytime to open this again"
+              emoji="◎"
+              text="You can optionally link a daily habit to any SMART goal"
             />
           </View>
 
@@ -932,7 +1440,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#A855F7",
   },
-  heart: { fontSize: 30, color: "#FFFFFF", marginTop: 2 },
+  heart: {
+    fontSize: 30,
+    color: "#FFFFFF",
+    marginTop: 1,
+    fontWeight: "900",
+  },
   welcomeTitle: {
     marginTop: 16,
     fontSize: 24,
@@ -999,7 +1512,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 8,
     paddingHorizontal: 10,
-    minWidth: 90,
+    minWidth: 110,
   },
   tabIcon: { fontSize: 18, color: "#9CA3AF" },
   tabIconActive: { color: "#7C3AED" },
@@ -1013,7 +1526,7 @@ const styles = StyleSheet.create({
   simpleUnderline: {
     marginTop: 8,
     height: 3,
-    width: 60,
+    width: 70,
     borderRadius: 999,
     backgroundColor: "#7C3AED",
   },
@@ -1033,12 +1546,17 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 14, fontWeight: "900", color: "#111827" },
   cardSub: { marginTop: 4, fontSize: 12, color: "#6B7280" },
   sectionTitle: { fontSize: 14, fontWeight: "900", color: "#111827" },
-  sectionSub: { marginTop: 4, fontSize: 12, color: "#6B7280" },
-  subHeader: {
-    marginTop: 14,
-    fontSize: 13,
+  sectionMiniTitle: {
+    fontSize: 12,
     fontWeight: "900",
-    color: "#111827",
+    color: "#6B7280",
+    marginBottom: 2,
+  },
+  formLabel: {
+    marginBottom: 6,
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#374151",
   },
 
   addRow: {
@@ -1050,18 +1568,6 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     minHeight: 42,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    color: "#111827",
-    backgroundColor: "#FFFFFF",
-  },
-  bigInput: {
-    marginTop: 10,
-    minHeight: 90,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#E5E7EB",
@@ -1085,41 +1591,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "900",
     marginTop: -1,
-  },
-
-  rowText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#111827",
-    flex: 1,
-    paddingRight: 10,
-  },
-  rowPurple: {
-    minHeight: 46,
-    borderRadius: 12,
-    backgroundColor: "#F5F3FF",
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginTop: 10,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  tipBox: {
-    marginTop: 16,
-    borderRadius: 12,
-    backgroundColor: "#F5F3FF",
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-    padding: 12,
-  },
-  tipText: {
-    color: "#7C3AED",
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 16,
   },
 
   goalHeaderTopRow: {
@@ -1197,6 +1668,139 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 12,
     fontWeight: "800",
+  },
+
+  daysRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  dayCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dayCircleActive: {
+    borderColor: "#7C3AED",
+    backgroundColor: "#7C3AED",
+  },
+  dayCircleText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#6B7280",
+  },
+  dayCircleTextActive: {
+    color: "#FFFFFF",
+  },
+
+  dailyHabitCard: {
+    marginTop: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  dailyHabitCardCompleted: {
+    backgroundColor: "#FCFCFC",
+  },
+  dailyHabitLeft: {
+    flex: 1,
+    gap: 8,
+  },
+  dailyHabitRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  dailyHabitTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  dailyHabitTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#111827",
+  },
+
+  taskCheckBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1.5,
+    borderColor: "#7C3AED",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  taskCheckBtnDone: {
+    backgroundColor: "#7C3AED",
+  },
+  taskCheckBtnDisabled: {
+    borderColor: "#E5E7EB",
+    backgroundColor: "#F9FAFB",
+  },
+  taskCheckBtnText: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#7C3AED",
+    marginTop: -1,
+  },
+  taskCheckBtnTextDone: {
+    color: "#FFFFFF",
+  },
+  taskCheckBtnTextDisabled: {
+    color: "#D1D5DB",
+  },
+
+  dayDotsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  dayDotsRowCompact: {
+    marginTop: 6,
+  },
+  dayDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dayDotCompact: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  dayDotActive: {
+    borderColor: "#7C3AED",
+    backgroundColor: "#F5F3FF",
+  },
+  dayDotText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#9CA3AF",
+  },
+  dayDotTextCompact: {
+    fontSize: 9,
+  },
+  dayDotTextActive: {
+    color: "#7C3AED",
   },
 
   smartGoalCard: {
@@ -1282,7 +1886,6 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     color: "#374151",
   },
-
   goalPill: {
     alignSelf: "flex-start",
     paddingHorizontal: 10,
@@ -1297,7 +1900,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: "#7C3AED",
   },
-
   goalEditRow: {
     marginTop: 4,
     alignItems: "flex-end",
@@ -1313,6 +1915,63 @@ const styles = StyleSheet.create({
   goalEditBtnText: {
     fontSize: 12,
     fontWeight: "800",
+    color: "#7C3AED",
+  },
+
+  linkedBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "#F5F3FF",
+    borderWidth: 1,
+    borderColor: "#DDD6FE",
+  },
+  linkedBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#7C3AED",
+  },
+  linkedTaskPreview: {
+    marginTop: 8,
+  },
+  linkedTaskPreviewText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#6B7280",
+    marginBottom: 6,
+  },
+  linkedTaskExpandedBox: {
+    marginTop: 6,
+    marginBottom: 12,
+    borderRadius: 12,
+    padding: 12,
+    backgroundColor: "#FAF5FF",
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+  },
+  linkedTaskExpandedTitle: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#7C3AED",
+    marginBottom: 6,
+  },
+  linkedTaskExpandedText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#374151",
+    marginBottom: 8,
+  },
+
+  optionalDivider: {
+    marginTop: 14,
+    marginBottom: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#E9D5FF",
+  },
+  optionalDividerText: {
+    fontSize: 12,
+    fontWeight: "900",
     color: "#7C3AED",
   },
 
