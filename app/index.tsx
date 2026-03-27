@@ -1,20 +1,16 @@
+import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Modal,
-  Platform,
-  TextInput,
   Alert,
-  TouchableOpacity,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { Picker } from "@react-native-picker/picker";
-import * as DocumentPicker from "expo-document-picker";
-import { useApp, Phase, Task } from "./context/AppContext";
+import { Phase, Task, useApp } from "./context/AppContext";
 import Constants from "expo-constants";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
@@ -93,6 +89,7 @@ export default function Home() {
   const [draftDesc, setDraftDesc] = useState("");
   const [draftResponse, setDraftResponse] = useState("");
   const [draftFeedback, setDraftFeedback] = useState("");
+  const [draftReflection, setDraftReflection] = useState("");
   const [menuTask, setMenuTask] = useState<{
     task: Task;
     phaseId: string;
@@ -101,15 +98,6 @@ export default function Home() {
   useEffect(() => {
     if (currentPhase) setExpanded(new Set([currentPhase.id]));
   }, [currentPhase?.id]);
-
-  const completedPhases = phases.filter((p) => p.status === "completed").length;
-  const totalPhases = phases.length;
-
-  const pendingTasksCount = useMemo(() => {
-    return phases
-      .flatMap((p) => p.tasks)
-      .filter((t) => t.status === "pending" || t.status === "submitted").length;
-  }, [phases]);
 
   const activePhase = useMemo(() => {
     if (!activePhaseId) return null;
@@ -127,12 +115,18 @@ export default function Home() {
   >(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // When opening a task, seed drafts from state
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerTarget, setDatePickerTarget] = useState<
+    "task" | "phase" | "start" | "end" | null
+  >(null);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+
   useEffect(() => {
     if (!activeTask) return;
     setDraftDesc(activeTask.description ?? "");
     setDraftResponse(activeTask.submittedResponse ?? "");
     setDraftFeedback(activeTask.mentorFeedback ?? "");
+    setDraftReflection("");
   }, [activeTask?.id]);
 
   function togglePhase(phase: Phase) {
@@ -156,6 +150,62 @@ export default function Home() {
     setDraftDesc("");
     setDraftResponse("");
     setDraftFeedback("");
+    setDraftReflection("");
+  }
+
+  function getTasksNeedingAttention(phase: Phase) {
+    if (userRole === "mentor") {
+      return phase.tasks.filter((t) => t.status === "submitted");
+    }
+
+    return phase.tasks.filter(
+      (t) => t.status === "pending" || t.status === "rejected",
+    );
+  }
+
+  function handleSubmitTask() {
+    if (!activePhase || !activeTask) return;
+
+    const trimmedResponse = draftResponse.trim();
+    const trimmedReflection = draftReflection.trim();
+
+    if (activeTask.status === "rejected") {
+      if (!trimmedResponse) {
+        Alert.alert(
+          "Response required",
+          "Please update your response before resubmitting.",
+        );
+        return;
+      }
+
+      if (!trimmedReflection) {
+        Alert.alert(
+          "Reflection required",
+          "Please answer the reflection question before resubmitting.",
+        );
+        return;
+      }
+
+      const combinedSubmission = `${trimmedResponse}
+
+--- Revision Reflection ---
+Based on mentor feedback, what problems did you run into, and how can you fix them?
+
+${trimmedReflection}`;
+
+      submitTask(activePhase.id, activeTask.id, combinedSubmission);
+      return;
+    }
+
+    if (!trimmedResponse) {
+      Alert.alert(
+        "Response required",
+        "Please write your response before submitting.",
+      );
+      return;
+    }
+
+    submitTask(activePhase.id, activeTask.id, trimmedResponse);
   }
 
   return (
@@ -1727,6 +1777,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#7C3AED",
     fontWeight: "600",
+  pendingSection: {
+    marginTop: 14,
+    gap: 8,
+  },
+  pendingSectionTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  pendingList: {
+    gap: 10,
+  },
+  pendingTaskRow: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "white",
+  },
+
+  phaseBody: {
+    marginTop: 14,
+    gap: 10,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
   },
 
   taskRow: {
@@ -1769,6 +1849,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.4)",
+  modalContent: {
+    paddingBottom: 24,
   },
 
   modalCenterContainer: {
@@ -1793,6 +1875,15 @@ const styles = StyleSheet.create({
   modalContent: {
     paddingBottom: 24, // lets you scroll past the last button
   },
+  modalGrabber: {
+    alignSelf: "center",
+    width: 48,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#E5E7EB",
+    marginBottom: 10,
+  },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)" },
   modalGrabber: {
     alignSelf: "center",
     width: 48,
@@ -1888,6 +1979,37 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   primaryBtnText: { color: "white", fontWeight: "900", fontSize: 12 },
+  reflectionCard: {
+    marginTop: 2,
+    gap: 8,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  reflectionPrompt: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111827",
+    lineHeight: 19,
+  },
+
+  rowGap: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  primaryBtn: {
+    backgroundColor: "#7C3AED",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    flex: 1,
+  },
+  primaryBtnText: { color: "white", fontWeight: "900" },
 
   secondaryBtn: {
     borderWidth: 1,
