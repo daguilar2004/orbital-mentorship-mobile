@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
 import {
   BackHandler,
@@ -10,14 +9,17 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useApp } from "./context/AppContext"; // App context with userRole
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
+import { MOCK_AUTH_TOKEN, MOCK_USER_ID, API_BASE_URL } from "./config/mockAuth";
 
-
-/* STORAGE */
-const NOTES_KEY = "NOTES_STORAGE";
+/* API CONFIG */
+const AUTH_TOKEN_KEY = "AUTH_TOKEN";
 
 /* CATEGORY COLORS */
 const categoryColors: Record<string, string> = {
@@ -98,17 +100,31 @@ function noteTextStyle(f?: Formatting) {
   };
 }
 
+async function getHeadersWithAuth() {
+  // TODO: Replace with real token from AsyncStorage when login is implemented
+  const token = MOCK_AUTH_TOKEN;
+  return {
+    "Content-Type": "application/json",
+    ...(token && { Authorization: `Bearer ${token}` }),
+  };
+}
+
 type Note = {
-  id: string;
+  _id?: string;
+  id?: string;
+  userId?: string;
   type: string;
   title: string;
   text: string | string[];
   formatting?: Formatting;
-  createdAt?: number;
+  createdAt?: string | number;
+  updatedAt?: string | number;
 };
 
 export default function Notes() {
-  const { userRole } = useApp(); // mentor or mentee
+  const { userRole, user } = useApp(); // mentor or mentee and user object
+  // TODO: Replace MOCK_USER_ID with real user._id when login is implemented
+  const userId = user?._id || user?.id || MOCK_USER_ID;
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -129,10 +145,30 @@ export default function Notes() {
   const [folderFilter, setFolderFilter] = useState<string | null>(null);
 
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleDeleteOne = (id: string) => {
-    const updated = notes.filter((n) => n.id !== id);
-    saveNotes(updated);
+  const handleDeleteOne = async (id: string) => {
+    if (!userId) return;
+    setLoading(true);
+    try {
+      const headers = await getHeadersWithAuth();
+      const response = await fetch(`${API_BASE_URL}/notes/${id}`, {
+        method: "DELETE",
+        headers,
+      });
+      
+      if (!response.ok) throw new Error("Failed to delete note");
+      
+      const updated = notes.filter((n) => getNoteId(n) !== id);
+      setNotes(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete note");
+      Alert.alert("Error", "Failed to delete note");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleSelectNote = (id: string) => {
@@ -147,17 +183,38 @@ export default function Notes() {
     });
   };
 
-  const handleDeleteSelected = () => {
-    const updated = notes.filter((n) => !selectedIds.has(n.id));
-    saveNotes(updated);
-    setSelectedIds(new Set());
-    setSelectMode(false);
+  const handleDeleteSelected = async () => {
+    if (!userId) return;
+    setLoading(true);
+    try {
+      const headers = await getHeadersWithAuth();
+      const deletePromises = Array.from(selectedIds).map((id) =>
+        fetch(`${API_BASE_URL}/notes/${id}`, { 
+          method: "DELETE",
+          headers,
+        })
+      );
+      
+      await Promise.all(deletePromises);
+      
+      const updated = notes.filter((n) => !selectedIds.has(getNoteId(n)));
+      setNotes(updated);
+      setSelectedIds(new Set());
+      setSelectMode(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete notes");
+      Alert.alert("Error", "Failed to delete selected notes");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const exitSelectMode = () => {
     setSelectMode(false);
     setSelectedIds(new Set());
   };
+
+  const getNoteId = (note: Note) => note._id || note.id || "";
 
   const openEditNote = (note: Note) => {
     setEditingNote(note);
@@ -184,30 +241,97 @@ export default function Notes() {
     setFmt(defaultFormatting);
   };
 
-  const formatDateKey = (createdAt?: number, id?: string) => {
-    const ts = createdAt ?? (Number(id) ? Number(id) : undefined);
-    if (!ts) return "Unknown";
+  const formatDateKey = (createdAt?: string | number, id?: string) => {
+    let ts: number | undefined;
+    if (typeof createdAt === "string") {
+      ts = new Date(createdAt).getTime();
+    } else if (typeof createdAt === "number") {
+      ts = createdAt;
+    } else if (id && Number(id)) {
+      ts = Number(id);
+    }
+    if (!ts || isNaN(ts)) return "Unknown";
     return new Date(ts).toLocaleDateString();
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (userId) {
+      loadData();
+    }
+  }, [userId]);
 
   const loadData = async () => {
-    const savedNotes = await AsyncStorage.getItem(NOTES_KEY);
-    if (savedNotes) {
-      const parsed = JSON.parse(savedNotes).map((note: any) => ({
+    if (!userId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const headers = await getHeadersWithAuth();
+      const response = await fetch(`${API_BASE_URL}/notes/${userId}`, {
+        method: "GET",
+        headers,
+      });
+      
+      if (!response.ok) throw new Error("Failed to load notes");
+      
+      const data = await response.json();
+      const parsed = data.map((note: any) => ({
         ...note,
+        id: note._id,
         formatting: note.formatting ?? defaultFormatting,
       }));
       setNotes(parsed);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to load notes";
+      setError(errorMsg);
+      console.error("Failed to load notes:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const saveNotes = async (updated: Note[]) => {
-    setNotes(updated);
-    await AsyncStorage.setItem(NOTES_KEY, JSON.stringify(updated));
+  const saveNotes = async (noteData: Note, action: "create" | "update") => {
+    if (!userId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const headers = await getHeadersWithAuth();
+      const payload = {
+        type: noteData.type,
+        title: noteData.title,
+        text: noteData.text,
+        formatting: noteData.formatting,
+      };
+
+      let response;
+      if (action === "create") {
+        response = await fetch(`${API_BASE_URL}/notes/${userId}`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+        });
+      } else {
+        const noteId = getNoteId(noteData);
+        response = await fetch(`${API_BASE_URL}/notes/${noteId}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify(payload),
+        });
+      }
+
+      if (!response.ok) throw new Error(`Failed to ${action} note`);
+
+      const savedNote = await response.json();
+      await loadData();
+      
+      return savedNote;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : `Failed to ${action} note`;
+      setError(errorMsg);
+      Alert.alert("Error", errorMsg);
+      console.error(`Failed to ${action} note:`, err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const escapeHtml = (text: string) => {
@@ -256,7 +380,7 @@ export default function Notes() {
   };
 
   const exportSelectedNotesToPDF = async () => {
-    const selectedNotes = notes.filter((n) => selectedIds.has(n.id));
+    const selectedNotes = notes.filter((n) => selectedIds.has(getNoteId(n)));
     if (selectedNotes.length === 0) return;
 
     const htmlContent = generateMultiPageNoteHTML(selectedNotes);
@@ -275,7 +399,14 @@ export default function Notes() {
   };
 
   const generateNoteHTML = (note: Note) => {
-    const date = note.createdAt ? new Date(note.createdAt).toLocaleDateString() : '';
+    let dateStr = "";
+    if (note.createdAt) {
+      if (typeof note.createdAt === "string") {
+        dateStr = new Date(note.createdAt).toLocaleDateString();
+      } else if (typeof note.createdAt === "number") {
+        dateStr = new Date(note.createdAt).toLocaleDateString();
+      }
+    }
     let html = `
       <html>
         <head>
@@ -343,8 +474,8 @@ export default function Notes() {
       `;
     }
 
-    if (date) {
-      html += `<div class="date">Created: ${escapeHtml(date)}</div>`;
+    if (dateStr) {
+      html += `<div class="date">Created: ${escapeHtml(dateStr)}</div>`;
     }
 
     html += `
@@ -460,7 +591,7 @@ export default function Notes() {
   };
 
   /* SAVE NOTE */
-  const handleSave = () => {
+  const handleSave = async () => {
     // If title is empty, use current date
     const finalTitle = noteTitle.trim() || new Date().toLocaleDateString();
 
@@ -474,27 +605,25 @@ export default function Notes() {
       if (!text.trim()) return;
       noteContent = text;
     }
+    
     if (editingNote) {
       const updatedNote: Note = {
-        id: editingNote.id,
+        _id: getNoteId(editingNote),
         type: selectedType!,
         title: finalTitle,
         text: noteContent,
         formatting: fmt,
-        createdAt: editingNote.createdAt ?? Date.now(),
+        createdAt: editingNote.createdAt,
       };
-      const updated = notes.map((n) => (n.id === editingNote.id ? updatedNote : n));
-      saveNotes(updated);
+      await saveNotes(updatedNote, "update");
     } else {
       const newNote: Note = {
-        id: Date.now().toString(),
         type: selectedType!,
         title: finalTitle,
         text: noteContent,
         formatting: fmt,
-        createdAt: Date.now(),
       };
-      saveNotes([newNote, ...notes]);
+      await saveNotes(newNote, "create");
     }
 
     // Reset editor state
@@ -528,6 +657,15 @@ export default function Notes() {
     },
     {}
   );
+
+  if (loading && notes.length === 0) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color="#7C3AED" />
+        <Text style={{ marginTop: 10 }}>Loading notes...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -605,18 +743,18 @@ export default function Notes() {
 
                 {groupedNotes[category].map((item) => (
                   <TouchableOpacity
-                    key={item.id}
-                    onPress={() => (selectMode ? toggleSelectNote(item.id) : openEditNote(item))}
+                    key={getNoteId(item)}
+                    onPress={() => (selectMode ? toggleSelectNote(getNoteId(item)) : openEditNote(item))}
                     onLongPress={() => {
                       setSelectMode(true);
-                      toggleSelectNote(item.id);
+                      toggleSelectNote(getNoteId(item));
                     }}
                     style={[styles.noteCard, { borderLeftColor: categoryColors[category], flexDirection: "row", alignItems: "flex-start" }]}
                   >
                     {selectMode && (
                       <TouchableOpacity
-                        onPress={() => toggleSelectNote(item.id)}
-                        style={[styles.checkbox, selectedIds.has(item.id) && styles.checkboxSelected, { marginRight: 12 }]}
+                        onPress={() => toggleSelectNote(getNoteId(item))}
+                        style={[styles.checkbox, selectedIds.has(getNoteId(item)) && styles.checkboxSelected, { marginRight: 12 }]}
                       />
                     )}
 
@@ -650,7 +788,7 @@ export default function Notes() {
                             <Text style={{ color: "#1E88E5" }}>Edit</Text>
                           </TouchableOpacity>
 
-                          <TouchableOpacity onPress={() => handleDeleteOne(item.id)}>
+                          <TouchableOpacity onPress={() => handleDeleteOne(getNoteId(item))}>
                             <Text style={{ color: "#E53935" }}>Delete</Text>
                           </TouchableOpacity>
                         </View>
@@ -724,11 +862,11 @@ export default function Notes() {
 
               {folderNotes.map((item) => (
                 <TouchableOpacity
-                  key={item.id}
-                  onPress={() => (selectMode ? toggleSelectNote(item.id) : openEditNote(item))}
+                  key={getNoteId(item)}
+                  onPress={() => (selectMode ? toggleSelectNote(getNoteId(item)) : openEditNote(item))}
                   onLongPress={() => {
                     setSelectMode(true);
-                    toggleSelectNote(item.id);
+                    toggleSelectNote(getNoteId(item));
                   }}
                   style={[
                     styles.noteCard,
@@ -741,10 +879,10 @@ export default function Notes() {
                 >
                   {selectMode && (
                     <TouchableOpacity
-                      onPress={() => toggleSelectNote(item.id)}
+                      onPress={() => toggleSelectNote(getNoteId(item))}
                       style={[
                         styles.checkbox,
-                        selectedIds.has(item.id) && styles.checkboxSelected,
+                        selectedIds.has(getNoteId(item)) && styles.checkboxSelected,
                         { marginRight: 12 },
                       ]}
                     />
@@ -795,7 +933,7 @@ export default function Notes() {
                           <Text style={{ color: "#1E88E5" }}>Edit</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity onPress={() => handleDeleteOne(item.id)}>
+                        <TouchableOpacity onPress={() => handleDeleteOne(getNoteId(item))}>
                           <Text style={{ color: "#E53935" }}>Delete</Text>
                         </TouchableOpacity>
                       </View>
