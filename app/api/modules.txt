@@ -1,5 +1,5 @@
 import axois from 'axios';
-const API_URL = import.meta.env.VITE_APP_SERVER_URL;
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export const fetchModules = async (role) => {
     try{
