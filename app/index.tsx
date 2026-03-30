@@ -1,24 +1,21 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
+import * as DocumentPicker from "expo-document-picker";
+import { useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
+  Alert,
+  KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
-  Alert,
   TouchableOpacity,
+  View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { Picker } from "@react-native-picker/picker";
-import * as DocumentPicker from "expo-document-picker";
-import { useApp, Phase, Task } from "./context/AppContext";
-import Constants from "expo-constants";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import DateTimePickerModal from "react-native-modal-datetime-picker";
-import { KeyboardAvoidingView } from "react-native";
+import { Phase, Task, useApp } from "./context/AppContext";
 
 export default function Home() {
   const {
@@ -93,6 +90,7 @@ export default function Home() {
   const [draftDesc, setDraftDesc] = useState("");
   const [draftResponse, setDraftResponse] = useState("");
   const [draftFeedback, setDraftFeedback] = useState("");
+  const [draftReflection, setDraftReflection] = useState("");
   const [menuTask, setMenuTask] = useState<{
     task: Task;
     phaseId: string;
@@ -127,12 +125,12 @@ export default function Home() {
   >(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // When opening a task, seed drafts from state
   useEffect(() => {
     if (!activeTask) return;
     setDraftDesc(activeTask.description ?? "");
     setDraftResponse(activeTask.submittedResponse ?? "");
     setDraftFeedback(activeTask.mentorFeedback ?? "");
+    setDraftReflection("");
   }, [activeTask?.id]);
 
   function togglePhase(phase: Phase) {
@@ -156,6 +154,57 @@ export default function Home() {
     setDraftDesc("");
     setDraftResponse("");
     setDraftFeedback("");
+    setDraftReflection("");
+  }
+
+  function getTasksNeedingAttention(phase: Phase) {
+    if (userRole === "mentor") {
+      return phase.tasks.filter((t) => t.status === "submitted");
+    }
+
+    return phase.tasks.filter(
+      (t) => t.status === "pending" || t.status === "rejected",
+    );
+  }
+
+  function handleSubmitTask() {
+    if (!activePhase || !activeTask) return;
+
+    const trimmedResponse = draftResponse.trim();
+    const trimmedReflection = draftReflection.trim();
+
+    if (activeTask.status === "rejected") {
+      if (!trimmedResponse) {
+        Alert.alert(
+          "Response required",
+          "Please update your response before resubmitting.",
+        );
+        return;
+      }
+
+      if (!trimmedReflection) {
+        Alert.alert(
+          "Reflection required",
+          "Please answer the reflection question before resubmitting.",
+        );
+        return;
+      }
+
+      const combinedSubmission = `${trimmedResponse}\n\n--- Revision Reflection ---\nBased on mentor feedback, what problems did you run into, and how can you fix them?\n\n${trimmedReflection}`;
+
+      submitTask(activePhase.id, activeTask.id, combinedSubmission);
+      return;
+    }
+
+    if (!trimmedResponse) {
+      Alert.alert(
+        "Response required",
+        "Please write your response before submitting.",
+      );
+      return;
+    }
+
+    submitTask(activePhase.id, activeTask.id, trimmedResponse);
   }
 
   return (
@@ -231,6 +280,8 @@ export default function Home() {
                 ? Math.round((approvedCount / totalTasks) * 100)
                 : 0;
 
+            const tasksNeedingAttention = getTasksNeedingAttention(phase);
+
             const cardStyle =
               phase.status === "current"
                 ? styles.phaseCardCurrent
@@ -262,12 +313,14 @@ export default function Home() {
                       </View>
 
                       <View style={{ flex: 1 }}>
-                        {phase.status === "current" ? (
-                          <View style={styles.badgeActive}>
-                            <Text style={styles.badgeActiveText}>Active</Text>
-                          </View>
-                        ) : null}
-                        <Text style={styles.phaseTitle}>{phase.name}</Text>
+                        <View style={styles.phaseTitleRow}>
+                          <Text style={styles.phaseTitle}>{phase.name}</Text>
+                          {phase.status === "current" ? (
+                            <View style={styles.badgeActive}>
+                              <Text style={styles.badgeActiveText}>Active</Text>
+                            </View>
+                          ) : null}
+                        </View>
 
                         <Text style={styles.phaseDates}>
                           {phase.startDate} - {phase.endDate}
@@ -368,6 +421,69 @@ export default function Home() {
                     />
                   </View>
                 </View>
+
+                {/* Pending tasks under progress bar */}
+                {!isLocked ? (
+                  <View style={styles.pendingSection}>
+                    <View style={styles.rowBetween}>
+                      <Text style={styles.pendingSectionTitle}>
+                        {userRole === "mentor"
+                          ? "Tasks to Review"
+                          : "Pending Tasks"}
+                      </Text>
+                      <Text style={[styles.small, styles.bold]}>
+                        {tasksNeedingAttention.length}
+                      </Text>
+                    </View>
+
+                    {tasksNeedingAttention.length > 0 ? (
+                      <View style={styles.pendingList}>
+                        {tasksNeedingAttention.map((task) => (
+                          <Pressable
+                            key={task.id}
+                            onPress={() => openTask(phase, task)}
+                            style={({ pressed }) => [
+                              styles.pendingTaskRow,
+                              pressed && styles.taskPressed,
+                            ]}
+                          >
+                            <View style={styles.taskLeft}>
+                              <Ionicons
+                                name={taskStatusIcon(task.status)}
+                                size={18}
+                                color={taskStatusColor(task.status)}
+                              />
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.taskTitle}>
+                                  {task.title}
+                                </Text>
+                                <Text style={styles.taskMeta}>
+                                  <Text style={styles.xpText}>
+                                    {task.xp} XP
+                                  </Text>
+                                  {"  •  "}
+                                  Due {task.dueDate}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <Ionicons
+                              name="chevron-forward"
+                              size={18}
+                              color="#9CA3AF"
+                            />
+                          </Pressable>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={styles.smallMuted}>
+                        {userRole === "mentor"
+                          ? "No tasks need review right now."
+                          : "No pending tasks right now."}
+                      </Text>
+                    )}
+                  </View>
+                ) : null}
 
                 {isExpanded && !isLocked ? (
                   <View style={styles.phaseBody}>
@@ -485,424 +601,413 @@ export default function Home() {
         <Modal
           visible={!!activeTask}
           transparent
-          animationType="fade"
+          animationType="slide"
           onRequestClose={closeTask}
         >
           <View style={styles.modalOverlay}>
             <Pressable style={StyleSheet.absoluteFill} onPress={closeTask} />
-            <View style={styles.modalCenterContainer}>
-              <View
-                style={[
-                  styles.modalPopupContent,
-                  {
-                    maxHeight: "90%",
-                    paddingHorizontal: 28,
-                    paddingVertical: 32,
-                  },
-                ]}
+
+            <View style={styles.modalSheet}>
+              <View style={styles.modalGrabber} />
+
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={styles.modalContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
               >
-                <ScrollView
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                  contentContainerStyle={{ paddingBottom: 20 }}
-                >
-                  {/* Status chip */}
-                  <View style={{ alignItems: "center", marginBottom: 10 }}>
-                    <View
+                <View style={{ alignItems: "center", marginBottom: 10 }}>
+                  <View
+                    style={[
+                      styles.statusChip,
+                      {
+                        borderColor: taskStatusColor(
+                          activeTask?.status ?? "pending",
+                        ),
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={taskStatusIcon(activeTask?.status ?? "pending")}
+                      size={16}
+                      color={taskStatusColor(activeTask?.status ?? "pending")}
+                    />
+                    <Text
                       style={[
-                        styles.statusChip,
+                        styles.statusChipText,
                         {
-                          borderColor: taskStatusColor(
+                          color: taskStatusColor(
                             activeTask?.status ?? "pending",
                           ),
                         },
                       ]}
                     >
-                      <Ionicons
-                        name={taskStatusIcon(activeTask?.status ?? "pending")}
-                        size={16}
-                        color={taskStatusColor(activeTask?.status ?? "pending")}
+                      {statusLabel(activeTask?.status ?? "pending")}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.modalTitle}>{activeTask?.title}</Text>
+
+                <View style={styles.modalCard}>
+                  <Text style={styles.cardHeading}>Task Description</Text>
+
+                  {userRole === "mentor" ? (
+                    <>
+                      <TextInput
+                        value={draftDesc}
+                        onChangeText={setDraftDesc}
+                        multiline
+                        style={styles.textArea}
+                        placeholder="Write the task description…"
+                        placeholderTextColor="#6B7280"
                       />
-                      <Text
-                        style={[
-                          styles.statusChipText,
-                          {
-                            color: taskStatusColor(
-                              activeTask?.status ?? "pending",
-                            ),
-                          },
-                        ]}
+                      <Pressable
+                        style={styles.primaryBtn}
+                        onPress={() => {
+                          if (!activePhase || !activeTask) return;
+                          updateTaskDescription(
+                            activePhase.id,
+                            activeTask.id,
+                            draftDesc.trim(),
+                          );
+                        }}
                       >
-                        {statusLabel(activeTask?.status ?? "pending")}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Title */}
-                  <Text style={styles.modalTitle}>{activeTask?.title}</Text>
-
-                  {/* Description (mentor can edit, mentee view-only) */}
-                  <View style={styles.modalCard}>
-                    <Text style={styles.cardHeading}>Task Description</Text>
-
-                    {userRole === "mentor" ? (
-                      <>
-                        <TextInput
-                          value={draftDesc}
-                          onChangeText={setDraftDesc}
-                          multiline
-                          style={styles.textArea}
-                          placeholder="Write the task description…"
-                          placeholderTextColor="#6B7280"
-                        />
-                        <Pressable
-                          style={styles.primaryBtn}
-                          onPress={() => {
-                            if (!activePhase || !activeTask) return;
-                            updateTaskDescription(
-                              activePhase.id,
-                              activeTask.id,
-                              draftDesc.trim(),
-                            );
-                          }}
-                        >
-                          <Text style={styles.primaryBtnText}>
-                            Save Description
-                          </Text>
-                        </Pressable>
-                      </>
-                    ) : (
-                      <Text style={styles.bodyText}>
-                        {activeTask?.description || "No description."}
-                      </Text>
-                    )}
-
-                    {/* Skills Required */}
-                    {activeTask?.skills && activeTask.skills.length > 0 && (
-                      <View style={{ marginTop: 16 }}>
-                        <Text style={[styles.cardHeading, { marginBottom: 8 }]}>
-                          Skills Required
+                        <Text style={styles.primaryBtnText}>
+                          Save Description
                         </Text>
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            flexWrap: "wrap",
-                            gap: 8,
-                          }}
-                        >
-                          {activeTask.skills.map((skill, index) => (
-                            <View key={index} style={styles.skillBubble}>
-                              <Text style={styles.skillBubbleText}>
-                                {skill}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-                    )}
+                      </Pressable>
+                    </>
+                  ) : (
+                    <Text style={styles.bodyText}>
+                      {activeTask?.description || "No description."}
+                    </Text>
+                  )}
 
-                    {/* Expected Time */}
-                    {activeTask?.expectedTime && (
-                      <View style={{ marginTop: 16 }}>
-                        <Text style={[styles.cardHeading, { marginBottom: 4 }]}>
-                          Expected Time
-                        </Text>
-                        <Text style={styles.bodyText}>
-                          {activeTask.expectedTime.value}{" "}
-                          {activeTask.expectedTime.unit}
-                        </Text>
-                      </View>
-                    )}
-
-                    {/* Resources */}
-                    {activeTask?.resources &&
-                      activeTask.resources.length > 0 && (
-                        <View style={{ marginTop: 16 }}>
-                          <Text
-                            style={[styles.cardHeading, { marginBottom: 8 }]}
-                          >
-                            Resources
-                          </Text>
-                          <View style={{ gap: 8 }}>
-                            {activeTask.resources.map((resource, index) => (
-                              <TouchableOpacity
-                                key={index}
-                                onPress={() => {
-                                  if (resource.type === "link") {
-                                    // Open link (would need Linking from react-native)
-                                    Alert.alert(
-                                      "Open Link",
-                                      `Open ${resource.value}?`,
-                                    );
-                                  } else {
-                                    // Handle file download/view
-                                    Alert.alert(
-                                      "File",
-                                      `File: ${resource.fileInfo?.name || resource.label}\nSize: ${(resource.fileInfo?.size || 0) / 1024} KB`,
-                                    );
-                                  }
-                                }}
-                                style={styles.resourceItem}
-                              >
-                                <Ionicons
-                                  name={
-                                    resource.type === "link"
-                                      ? "link"
-                                      : "document"
-                                  }
-                                  size={16}
-                                  color="#7C3AED"
-                                />
-                                <View style={{ flex: 1 }}>
-                                  <Text style={styles.resourceText}>
-                                    {resource.fileInfo?.name ||
-                                      resource.label ||
-                                      (resource.type === "link"
-                                        ? "Link"
-                                        : "File")}
-                                  </Text>
-                                  {resource.fileInfo?.size && (
-                                    <Text
-                                      style={{ fontSize: 12, color: "#6B7280" }}
-                                    >
-                                      {(resource.fileInfo.size / 1024).toFixed(
-                                        1,
-                                      )}{" "}
-                                      KB
-                                    </Text>
-                                  )}
-                                </View>
-                                <Ionicons
-                                  name="chevron-forward"
-                                  size={16}
-                                  color="#6B7280"
-                                />
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        </View>
-                      )}
-
-                    <View style={styles.metaRow}>
-                      <Ionicons
-                        name="calendar-outline"
-                        size={16}
-                        color="#6B7280"
-                      />
-                      <Text style={styles.metaText}>
-                        Due: {activeTask?.dueDate}
+                  {activeTask?.skills && activeTask.skills.length > 0 && (
+                    <View style={{ marginTop: 16 }}>
+                      <Text style={[styles.cardHeading, { marginBottom: 8 }]}>
+                        Skills Required
                       </Text>
-
-                      <Ionicons
-                        name="ribbon-outline"
-                        size={16}
-                        color="#6B7280"
-                      />
-                      <Text
-                        style={[
-                          styles.metaText,
-                          { color: "#7C3AED", fontWeight: "800" },
-                        ]}
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          flexWrap: "wrap",
+                          gap: 8,
+                        }}
                       >
-                        {activeTask?.xp} XP
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Submitted Response (mentee can edit/submit, mentor read-only) */}
-                  <View style={styles.modalCard}>
-                    <Text style={styles.cardHeading}>Submitted Response</Text>
-
-                    {userRole === "mentee" ? (
-                      <>
-                        <TextInput
-                          value={draftResponse}
-                          onChangeText={setDraftResponse}
-                          multiline
-                          style={styles.textArea}
-                          placeholder="Write your response…"
-                          placeholderTextColor="#6B7280"
-                        />
-                        <View style={styles.rowGap}>
-                          <Pressable
-                            style={styles.secondaryBtn}
-                            onPress={() => {
-                              if (!activePhase || !activeTask) return;
-                              addMockAttachment(activePhase.id, activeTask.id);
-                            }}
-                          >
-                            <Ionicons name="attach" size={16} color="#111827" />
-                            <Text style={styles.secondaryBtnText}>
-                              Add Attachment
-                            </Text>
-                          </Pressable>
-
-                          <Pressable
-                            style={styles.primaryBtn}
-                            onPress={() => {
-                              if (!activePhase || !activeTask) return;
-                              submitTask(
-                                activePhase.id,
-                                activeTask.id,
-                                draftResponse.trim(),
-                              );
-                            }}
-                          >
-                            <Text style={styles.primaryBtnText}>
-                              {activeTask?.status === "submitted"
-                                ? "Resubmit"
-                                : "Submit"}
-                            </Text>
-                          </Pressable>
-                        </View>
-
-                        {activeTask?.submittedAt ? (
-                          <Text style={styles.smallMuted}>
-                            Submitted on {activeTask.submittedAt}
-                          </Text>
-                        ) : null}
-                      </>
-                    ) : (
-                      <>
-                        <Text style={styles.bodyText}>
-                          {activeTask?.submittedResponse
-                            ? activeTask.submittedResponse
-                            : "No response submitted yet."}
-                        </Text>
-                        {activeTask?.submittedAt ? (
-                          <Text style={styles.smallMuted}>
-                            Submitted on {activeTask.submittedAt}
-                          </Text>
-                        ) : null}
-                      </>
-                    )}
-                  </View>
-
-                  {/* Attachments */}
-                  <View style={styles.modalCard}>
-                    <Text style={styles.cardHeading}>Attached Files</Text>
-
-                    {activeTask?.attachments &&
-                    activeTask.attachments.length > 0 ? (
-                      <View style={{ gap: 10, marginTop: 8 }}>
-                        {activeTask.attachments.map((a) => (
-                          <View key={a.id} style={styles.fileRow}>
-                            <View
-                              style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                                gap: 10,
-                                flex: 1,
-                              }}
-                            >
-                              <Ionicons
-                                name="document-outline"
-                                size={18}
-                                color="#6B7280"
-                              />
-                              <View style={{ flex: 1 }}>
-                                <Text style={styles.fileName}>{a.name}</Text>
-                                <Text style={styles.fileSize}>
-                                  {a.sizeLabel}
-                                </Text>
-                              </View>
-                            </View>
-
-                            {/* download icon placeholder */}
-                            <Pressable onPress={() => {}}>
-                              <Ionicons
-                                name="download-outline"
-                                size={18}
-                                color="#2563EB"
-                              />
-                            </Pressable>
+                        {activeTask.skills.map((skill, index) => (
+                          <View key={index} style={styles.skillBubble}>
+                            <Text style={styles.skillBubbleText}>{skill}</Text>
                           </View>
                         ))}
                       </View>
-                    ) : (
-                      <Text style={styles.smallMuted}>No files attached.</Text>
-                    )}
+                    </View>
+                  )}
+
+                  {activeTask?.expectedTime && (
+                    <View style={{ marginTop: 16 }}>
+                      <Text style={[styles.cardHeading, { marginBottom: 4 }]}>
+                        Expected Time
+                      </Text>
+                      <Text style={styles.bodyText}>
+                        {activeTask.expectedTime.value}{" "}
+                        {activeTask.expectedTime.unit}
+                      </Text>
+                    </View>
+                  )}
+
+                  {activeTask?.resources && activeTask.resources.length > 0 && (
+                    <View style={{ marginTop: 16 }}>
+                      <Text style={[styles.cardHeading, { marginBottom: 8 }]}>
+                        Resources
+                      </Text>
+                      <View style={{ gap: 8 }}>
+                        {activeTask.resources.map((resource, index) => (
+                          <TouchableOpacity
+                            key={index}
+                            onPress={() => {
+                              if (resource.type === "link") {
+                                Alert.alert(
+                                  "Open Link",
+                                  `Open ${resource.value}?`,
+                                );
+                              } else {
+                                Alert.alert(
+                                  "File",
+                                  `File: ${
+                                    resource.fileInfo?.name || resource.label
+                                  }\nSize: ${(
+                                    (resource.fileInfo?.size || 0) / 1024
+                                  ).toFixed(1)} KB`,
+                                );
+                              }
+                            }}
+                            style={styles.resourceItem}
+                          >
+                            <Ionicons
+                              name={
+                                resource.type === "link" ? "link" : "document"
+                              }
+                              size={16}
+                              color="#7C3AED"
+                            />
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.resourceText}>
+                                {resource.fileInfo?.name ||
+                                  resource.label ||
+                                  (resource.type === "link" ? "Link" : "File")}
+                              </Text>
+                              {resource.fileInfo?.size && (
+                                <Text
+                                  style={{
+                                    fontSize: 12,
+                                    color: "#6B7280",
+                                  }}
+                                >
+                                  {(resource.fileInfo.size / 1024).toFixed(1)}{" "}
+                                  KB
+                                </Text>
+                              )}
+                            </View>
+                            <Ionicons
+                              name="chevron-forward"
+                              size={16}
+                              color="#6B7280"
+                            />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  <View style={styles.metaRow}>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={16}
+                      color="#6B7280"
+                    />
+                    <Text style={styles.metaText}>
+                      Due: {activeTask?.dueDate}
+                    </Text>
+
+                    <Ionicons name="ribbon-outline" size={16} color="#6B7280" />
+                    <Text
+                      style={[
+                        styles.metaText,
+                        { color: "#7C3AED", fontWeight: "800" },
+                      ]}
+                    >
+                      {activeTask?.xp} XP
+                    </Text>
                   </View>
+                </View>
 
-                  {/* Mentor Review Section */}
-                  {userRole === "mentor" ? (
-                    <View style={styles.modalCard}>
-                      <Text style={styles.cardHeading}>Task Review</Text>
+                <View style={styles.modalCard}>
+                  <Text style={styles.cardHeading}>
+                    {activeTask?.status === "rejected"
+                      ? "Updated Response"
+                      : "Submitted Response"}
+                  </Text>
 
+                  {userRole === "mentee" ? (
+                    <>
                       <TextInput
-                        value={draftFeedback}
-                        onChangeText={setDraftFeedback}
+                        value={draftResponse}
+                        onChangeText={setDraftResponse}
                         multiline
                         style={styles.textArea}
-                        placeholder="Leave feedback for the mentee…"
+                        placeholder={
+                          activeTask?.status === "rejected"
+                            ? "Update your response based on the mentor feedback…"
+                            : "Write your response…"
+                        }
                         placeholderTextColor="#6B7280"
                       />
 
-                      <View style={styles.reviewBtnRow}>
+                      {activeTask?.status === "rejected" ? (
+                        <View style={styles.reflectionCard}>
+                          <Text style={styles.reflectionPrompt}>
+                            Based on mentor feedback, what problems did you run
+                            into, and how can you fix them?
+                          </Text>
+                          <TextInput
+                            value={draftReflection}
+                            onChangeText={setDraftReflection}
+                            multiline
+                            style={styles.textArea}
+                            placeholder="Describe the issues you ran into and how you plan to address them…"
+                            placeholderTextColor="#6B7280"
+                          />
+                        </View>
+                      ) : null}
+
+                      <View style={styles.rowGap}>
                         <Pressable
-                          style={styles.rejectBtn}
+                          style={styles.secondaryBtn}
                           onPress={() => {
                             if (!activePhase || !activeTask) return;
-                            reviewTask(
-                              activePhase.id,
-                              activeTask.id,
-                              "rejected",
-                              draftFeedback.trim(),
-                            );
+                            addMockAttachment(activePhase.id, activeTask.id);
                           }}
                         >
-                          <Text style={styles.rejectBtnText}>Reject</Text>
+                          <Ionicons name="attach" size={16} color="#111827" />
+                          <Text style={styles.secondaryBtnText}>
+                            Add Attachment
+                          </Text>
                         </Pressable>
 
                         <Pressable
-                          style={styles.approveBtn}
-                          onPress={() => {
-                            if (!activePhase || !activeTask) return;
-                            reviewTask(
-                              activePhase.id,
-                              activeTask.id,
-                              "approved",
-                              draftFeedback.trim(),
-                            );
-                          }}
+                          style={styles.primaryBtn}
+                          onPress={handleSubmitTask}
                         >
-                          <Text style={styles.approveBtnText}>Accept</Text>
+                          <Text style={styles.primaryBtnText}>
+                            {activeTask?.status === "submitted" ||
+                            activeTask?.status === "rejected"
+                              ? "Resubmit"
+                              : "Submit"}
+                          </Text>
                         </Pressable>
                       </View>
 
-                      {activeTask?.reviewedAt ? (
+                      {activeTask?.submittedAt ? (
                         <Text style={styles.smallMuted}>
-                          Reviewed on {activeTask.reviewedAt}
+                          Submitted on {activeTask.submittedAt}
                         </Text>
                       ) : null}
-                    </View>
-                  ) : // Mentee sees feedback if exists
-                  activeTask?.mentorFeedback ? (
-                    <View style={styles.modalCard}>
-                      <Text style={styles.cardHeading}>Mentor Feedback</Text>
+                    </>
+                  ) : (
+                    <>
                       <Text style={styles.bodyText}>
-                        {activeTask.mentorFeedback}
+                        {activeTask?.submittedResponse
+                          ? activeTask.submittedResponse
+                          : "No response submitted yet."}
                       </Text>
-                      {activeTask.reviewedAt ? (
+                      {activeTask?.submittedAt ? (
                         <Text style={styles.smallMuted}>
-                          Reviewed on {activeTask.reviewedAt}
+                          Submitted on {activeTask.submittedAt}
                         </Text>
                       ) : null}
-                    </View>
-                  ) : null}
+                    </>
+                  )}
+                </View>
 
-                  {/* Close */}
-                  <Pressable
-                    onPress={closeTask}
-                    style={[
-                      styles.secondaryBtn,
-                      { marginTop: 10, justifyContent: "center" },
-                    ]}
-                  >
-                    <Text style={styles.secondaryBtnText}>Close</Text>
-                  </Pressable>
-                </ScrollView>
-              </View>
+                <View style={styles.modalCard}>
+                  <Text style={styles.cardHeading}>Attached Files</Text>
+
+                  {activeTask?.attachments &&
+                  activeTask.attachments.length > 0 ? (
+                    <View style={{ gap: 10, marginTop: 8 }}>
+                      {activeTask.attachments.map((a) => (
+                        <View key={a.id} style={styles.fileRow}>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 10,
+                              flex: 1,
+                            }}
+                          >
+                            <Ionicons
+                              name="document-outline"
+                              size={18}
+                              color="#6B7280"
+                            />
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.fileName}>{a.name}</Text>
+                              <Text style={styles.fileSize}>{a.sizeLabel}</Text>
+                            </View>
+                          </View>
+
+                          <Pressable onPress={() => {}}>
+                            <Ionicons
+                              name="download-outline"
+                              size={18}
+                              color="#2563EB"
+                            />
+                          </Pressable>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.smallMuted}>No files attached.</Text>
+                  )}
+                </View>
+
+                {userRole === "mentor" ? (
+                  <View style={styles.modalCard}>
+                    <Text style={styles.cardHeading}>Task Review</Text>
+
+                    <TextInput
+                      value={draftFeedback}
+                      onChangeText={setDraftFeedback}
+                      multiline
+                      style={styles.textArea}
+                      placeholder="Leave feedback for the mentee…"
+                      placeholderTextColor="#6B7280"
+                    />
+
+                    <View style={styles.reviewBtnRow}>
+                      <Pressable
+                        style={styles.rejectBtn}
+                        onPress={() => {
+                          if (!activePhase || !activeTask) return;
+                          reviewTask(
+                            activePhase.id,
+                            activeTask.id,
+                            "rejected",
+                            draftFeedback.trim(),
+                          );
+                        }}
+                      >
+                        <Text style={styles.rejectBtnText}>Reject</Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={styles.approveBtn}
+                        onPress={() => {
+                          if (!activePhase || !activeTask) return;
+                          reviewTask(
+                            activePhase.id,
+                            activeTask.id,
+                            "approved",
+                            draftFeedback.trim(),
+                          );
+                        }}
+                      >
+                        <Text style={styles.approveBtnText}>Accept</Text>
+                      </Pressable>
+                    </View>
+
+                    {activeTask?.reviewedAt ? (
+                      <Text style={styles.smallMuted}>
+                        Reviewed on {activeTask.reviewedAt}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : activeTask?.mentorFeedback ? (
+                  <View style={styles.modalCard}>
+                    <Text style={styles.cardHeading}>Mentor Feedback</Text>
+                    <Text style={styles.bodyText}>
+                      {activeTask.mentorFeedback}
+                    </Text>
+                    {activeTask.reviewedAt ? (
+                      <Text style={styles.smallMuted}>
+                        Reviewed on {activeTask.reviewedAt}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                <Pressable
+                  onPress={closeTask}
+                  style={[
+                    styles.secondaryBtn,
+                    { marginTop: 10, justifyContent: "center" },
+                  ]}
+                >
+                  <Text style={styles.secondaryBtnText}>Close</Text>
+                </Pressable>
+              </ScrollView>
             </View>
           </View>
         </Modal>
@@ -1059,7 +1164,6 @@ export default function Home() {
                         keyboardType="numeric"
                         placeholderTextColor="#6B7280"
                       />{" "}
-                      {/* was styles.input */}
                       <View>
                         <Pressable
                           style={styles.input}
@@ -1085,36 +1189,6 @@ export default function Home() {
                       onChangeText={setNewTaskSkills}
                       multiline
                     />
-                    {/* 
-              <View style={styles.skillsContainer}>
-                <View style={styles.skillsWrapper}>
-                  {skills.map((skill, index) => (
-                    <View key={index} style={styles.skillChip}>
-                      <Text style={styles.skillText}>{skill}</Text>
-                      <Pressable
-                        onPress={() => {
-                          setSkills(skills.filter((_, i) => i !== index));
-                        }}
-                      >
-                        <Text style={styles.removeSkill}>×</Text>
-                      </Pressable>
-                    </View>
-                  ))}
-
-                  <TextInput
-                    value={skillInput}
-                    onChangeText={setSkillInput}
-                    placeholder="Add skill..."
-                    style={styles.skillInput}
-                    onSubmitEditing={() => {
-                      if (skillInput.trim()) {
-                        setSkills([...skills, skillInput.trim()]);
-                        setSkillInput("");
-                      }
-                    }}
-                  />
-                </View>
-              </View> */}
                     <Modal
                       visible={showUnitPicker}
                       transparent
@@ -1239,15 +1313,7 @@ export default function Home() {
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={async () => {
-                            console.log("Upload File button pressed");
-                            console.log("Platform.OS:", Platform.OS);
-                            console.log(
-                              "Constants.appOwnership:",
-                              Constants.appOwnership,
-                            );
-
                             if (Platform.OS === "web") {
-                              // Web-compatible file upload using HTML5 file input
                               if (typeof document === "undefined") {
                                 Alert.alert(
                                   "Error",
@@ -1265,12 +1331,6 @@ export default function Home() {
                                 const file = (e.target as HTMLInputElement)
                                   .files?.[0];
                                 if (file) {
-                                  console.log(
-                                    "File selected on web:",
-                                    file.name,
-                                  );
-
-                                  // Create a data URL for the file
                                   const reader = new FileReader();
                                   reader.onload = (event) => {
                                     const dataUrl = event.target
@@ -1287,14 +1347,10 @@ export default function Home() {
                                       },
                                     };
 
-                                    setNewTaskResources((prev) => {
-                                      const updated = [...prev, newResource];
-                                      console.log(
-                                        "Updated resources array length:",
-                                        updated.length,
-                                      );
-                                      return updated;
-                                    });
+                                    setNewTaskResources((prev) => [
+                                      ...prev,
+                                      newResource,
+                                    ]);
 
                                     Alert.alert(
                                       "File Added",
@@ -1310,11 +1366,9 @@ export default function Home() {
                               return;
                             }
 
-                            // Check if running on Expo Go (limited native module support)
                             const isExpoGo =
                               !Constants.appOwnership ||
                               Constants.appOwnership === "expo";
-                            console.log("isExpoGo:", isExpoGo);
 
                             if (isExpoGo) {
                               Alert.alert(
@@ -1335,24 +1389,12 @@ export default function Home() {
 
                             async function pickDocument() {
                               try {
-                                console.log("Opening document picker...");
-                                Alert.alert(
-                                  "Opening",
-                                  "File picker should open now...",
-                                );
-
                                 const result =
                                   await DocumentPicker.getDocumentAsync({
                                     type: "*/*",
                                   });
 
-                                console.log("Document picker result:", result);
-
                                 if (result.type === "success") {
-                                  console.log(
-                                    "File selected successfully:",
-                                    result.name,
-                                  );
                                   const newResource = {
                                     type: "file" as const,
                                     value: result.uri,
@@ -1364,33 +1406,23 @@ export default function Home() {
                                       mimeType: result.mimeType,
                                     },
                                   };
-                                  console.log("Adding resource:", newResource);
-                                  setNewTaskResources((prev) => {
-                                    const updated = [...prev, newResource];
-                                    console.log(
-                                      "Updated resources array length:",
-                                      updated.length,
-                                    );
-                                    return updated;
-                                  });
+                                  setNewTaskResources((prev) => [
+                                    ...prev,
+                                    newResource,
+                                  ]);
                                   Alert.alert(
                                     "File Added",
                                     `Successfully added: ${result.name}`,
                                   );
                                 } else if (result.type === "cancel") {
-                                  console.log(
-                                    "Document picker cancelled by user",
-                                  );
                                   Alert.alert(
                                     "Cancelled",
                                     "File selection was cancelled",
                                   );
                                 } else {
-                                  console.log("Document picker failed");
                                   Alert.alert("Error", "Failed to select file");
                                 }
-                              } catch (err) {
-                                console.error("Document picker error:", err);
+                              } catch (err: any) {
                                 Alert.alert(
                                   "Error",
                                   `Failed to pick document: ${err?.message || "Unknown error"}`,
@@ -1425,8 +1457,6 @@ export default function Home() {
                                   .map((s) => s.trim())
                                   .filter((s) => s.length > 0)
                               : undefined;
-
-                            //      const skillsData = skills.length > 0 ? skills : undefined;
 
                             if (editingTaskId) {
                               editTask(
@@ -1708,8 +1738,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     overflow: "hidden",
   },
-  progressFill: { height: "100%", borderRadius: 999 },
-
   phaseBody: { marginTop: 12, gap: 10 },
   addTaskButton: {
     flexDirection: "row",
