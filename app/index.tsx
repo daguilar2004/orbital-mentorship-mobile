@@ -232,20 +232,6 @@ export default function Home() {
             progress={xpPercent}
             progressMax={xpGoal}
           />
-          <StatCard
-            icon="trending-up"
-            iconBg="#DBEAFE"
-            iconColor="#2563EB"
-            label="Progress"
-            value={`${completedPhases}/${totalPhases}`}
-          />
-          <StatCard
-            icon="flag"
-            iconBg="#DCFCE7"
-            iconColor="#16A34A"
-            label={userRole === "mentee" ? "Pending Tasks" : "Tasks to Review"}
-            value={`${pendingTasksCount}`}
-          />
         </View>
 
         {/* Phases on Home */}
