@@ -15,7 +15,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { API_BASE_URL, MOCK_AUTH_TOKEN, MOCK_USER_ID } from "./config/mockAuth";
+import { API_BASE_URL } from "./api/index";
+import { MOCK_AUTH_TOKEN, MOCK_USER_ID } from "./config/mockAuth";
 import { useApp } from "./context/AppContext"; // App context with userRole
 
 /* API CONFIG */
@@ -730,7 +731,12 @@ export default function Notes() {
         headers,
       });
       
-      if (!response.ok) throw new Error("Failed to delete note");
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        throw new Error(
+          `Failed to delete note (${response.status} ${response.statusText})${errorText ? `: ${errorText}` : ""}`
+        );
+      }
       
       const updated = notes.filter((n) => getNoteId(n) !== id);
       setNotes(updated);
@@ -890,7 +896,12 @@ export default function Notes() {
         });
       }
 
-      if (!response.ok) throw new Error(`Failed to ${action} note`);
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        throw new Error(
+          `Failed to ${action} note (${response.status} ${response.statusText})${errorText ? `: ${errorText}` : ""}`
+        );
+      }
 
       const savedNote = await response.json();
       await loadData();
@@ -1689,7 +1700,7 @@ export default function Notes() {
                           <Text style={styles.noteTitle}>{item.title}</Text>
                           {!selectMode && (
                             <TouchableOpacity
-                              onPress={() => toggleFavorite(item.id)}
+                              onPress={() => toggleFavorite(getNoteId(item))}
                               hitSlop={{
                                 top: 8,
                                 bottom: 8,

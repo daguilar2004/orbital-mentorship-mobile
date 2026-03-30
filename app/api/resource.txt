@@ -1,4 +1,4 @@
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+import { API_BASE_URL } from "./index";
 
 export const getAllResources = async (mentorshipId, token) => {
     try {
@@ -6,7 +6,7 @@ export const getAllResources = async (mentorshipId, token) => {
             throw new Error("Mentorship ID and token are required");
         }
 
-        const response = await fetch(`${API_URL}/api/mentorships/${mentorshipId}/resources`, {
+        const response = await fetch(`${API_BASE_URL}/api/mentorships/${mentorshipId}/resources`, {
             method: "GET",
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -32,7 +32,7 @@ export const createResource = async (mentorshipId, token, body) => {
             throw new Error("Mentorship ID, token, and body are required");
         }
 
-        const response = await fetch(`${API_URL}/api/mentorships/${mentorshipId}/resources`, {
+        const response = await fetch(`${API_BASE_URL}/api/mentorships/${mentorshipId}/resources`, {
             method: "POST",
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -59,7 +59,7 @@ export const updateResource = async (resourceId, resourceData, token) => {
             throw new Error("Resource ID, token, and resource data are required");
         }
 
-        const response = await fetch(`${API_URL}/api/mentorships/resources/${resourceId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/mentorships/resources/${resourceId}`, {
             method: "PUT",
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -86,7 +86,7 @@ export const deleteResource = async (resourceId, token) => {
             throw new Error("Resource ID and token are required");
         }
 
-        const response = await fetch(`${API_URL}/api/mentorships/resources/${resourceId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/mentorships/resources/${resourceId}`, {
             method: "DELETE",
             headers: {
                 'Authorization': `Bearer ${token}`,
