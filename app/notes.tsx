@@ -1,22 +1,22 @@
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   BackHandler,
   Modal,
   Pressable,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  ActivityIndicator,
-  Alert,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { API_BASE_URL, MOCK_AUTH_TOKEN, MOCK_USER_ID } from "./config/mockAuth";
 import { useApp } from "./context/AppContext"; // App context with userRole
-import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
-import { MOCK_AUTH_TOKEN, MOCK_USER_ID, API_BASE_URL } from "./config/mockAuth";
 
 /* API CONFIG */
 const AUTH_TOKEN_KEY = "AUTH_TOKEN";
@@ -121,6 +121,7 @@ type Note = {
   formatting?: Formatting;
   createdAt?: string | number;
   updatedAt?: string | number;
+  favorite?: boolean;
 };
 
 /* VIEW MODES */
@@ -383,9 +384,9 @@ function TimelineView({
   getLabels: (type: string | null) => any;
 }) {
   const sorted = [...notes].sort((a, b) => {
-    const ta = a.createdAt ?? Number(a.id) ?? 0;
-    const tb = b.createdAt ?? Number(b.id) ?? 0;
-    return tb - ta;
+    const ta = typeof a.createdAt === "string" ? new Date(a.createdAt).getTime() : (a.createdAt ?? Number(a.id) ?? 0);
+    const tb = typeof b.createdAt === "string" ? new Date(b.createdAt).getTime() : (b.createdAt ?? Number(b.id) ?? 0);
+    return (tb as number) - (ta as number);
   });
 
   const groups: { dateKey: string; notes: Note[] }[] = [];
@@ -567,9 +568,9 @@ function FavoritesView({
   const favNotes = notes
     .filter((n) => n.favorite)
     .sort((a, b) => {
-      const ta = a.createdAt ?? Number(a.id) ?? 0;
-      const tb = b.createdAt ?? Number(b.id) ?? 0;
-      return tb - ta;
+      const ta = typeof a.createdAt === "string" ? new Date(a.createdAt).getTime() : (a.createdAt ?? Number(a.id) ?? 0);
+      const tb = typeof b.createdAt === "string" ? new Date(b.createdAt).getTime() : (b.createdAt ?? Number(b.id) ?? 0);
+      return (tb as number) - (ta as number);
     });
 
   if (favNotes.length === 0) {
@@ -609,8 +610,8 @@ function FavoritesView({
                 {displayLabels[item.type] ?? item.type}
               </Text>
             </View>
-            <TouchableOpacity
-              onPress={() => onToggleFavorite(item.id)}
+    <TouchableOpacity
+              onPress={() => onToggleFavorite(item._id || item.id || "")}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Text style={{ color: "#FB8C00", fontSize: 20 }}>★</Text>
@@ -631,7 +632,7 @@ function FavoritesView({
             <TouchableOpacity onPress={() => onOpenNote(item)}>
               <Text style={{ color: "#1E88E5", fontSize: 13 }}>Edit</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => onDelete(item.id)}>
+            <TouchableOpacity onPress={() => onDelete(item._id || item.id || "")}>
               <Text style={{ color: "#E53935", fontSize: 13 }}>Delete</Text>
             </TouchableOpacity>
           </View>
@@ -689,9 +690,9 @@ const favStyles = StyleSheet.create({
    MAIN NOTES SCREEN
 ═══════════════════════════════════════════════════════════ */
 export default function Notes() {
-  const { userRole, user } = useApp(); // mentor or mentee and user object
+  const { userRole } = useApp(); // mentor or mentee
   // TODO: Replace MOCK_USER_ID with real user._id when login is implemented
-  const userId = user?._id || user?.id || MOCK_USER_ID;
+  const userId = MOCK_USER_ID;
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -1234,6 +1235,32 @@ export default function Notes() {
     {}
   );
 
+  /* ── SORT AND FILTER LOGIC ──────────────────────────── */
+  let visibleNotes = [...filteredNotes];
+  if (sortMode === "az") {
+    visibleNotes.sort((a, b) => (a.title ?? "").localeCompare(b.title ?? ""));
+  } else if (sortMode === "za") {
+    visibleNotes.sort((a, b) => (b.title ?? "").localeCompare(a.title ?? ""));
+  } else if (sortMode === "favorites") {
+    visibleNotes = visibleNotes.filter((n) => n.favorite);
+  }
+
+  const toggleSortMode = (mode: Exclude<SortMode, "default">) => {
+    setSortMode(mode);
+  };
+
+  const setActiveView = (mode: ViewMode) => {
+    setViewMode(mode);
+  };
+
+  const toggleFavorite = (id: string) => {
+    setNotes((prevNotes) =>
+      prevNotes.map((n) =>
+        getNoteId(n) === id ? { ...n, favorite: !n.favorite } : n
+      )
+    );
+  };
+  
   if (loading && notes.length === 0) {
     return (
       <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
@@ -1420,7 +1447,7 @@ export default function Notes() {
       </View>
 
       <View style={styles.contentShell}>
-        {viewMode === "list" && (
+        {viewMode === "list" ? (
           <ScrollView contentContainerStyle={styles.scrollContent}>
             {visibleNotes.length === 0 ? (
               <View style={styles.emptyState}>
@@ -1482,7 +1509,7 @@ export default function Notes() {
                             <Text style={styles.noteTitle}>{item.title}</Text>
                             {!selectMode && (
                               <TouchableOpacity
-                                onPress={() => toggleFavorite(item.id)}
+                                onPress={() => toggleFavorite(getNoteId(item))}
                                 hitSlop={{
                                   top: 8,
                                   bottom: 8,
@@ -1545,10 +1572,11 @@ export default function Notes() {
                 ))}
               </View>
             ) : null
+            )
           )}
         </ScrollView>
-      ) : (
-        // Folder view
+        ) : (
+          // Folder view IIFE
         (() => {
           const folders: Record<string, Note[]> = {};
           notes.forEach((n) => {
@@ -1734,9 +1762,8 @@ export default function Notes() {
             </ScrollView>
           );
         })()
-      )}
-
-      {/* ── BULK DELETE BAR ──────────────────────────────── */}
+        )}
+      </View>
       {selectMode && (
         <View style={styles.bulkBar}>
           <Text style={{ color: "white", fontSize: 14 }}>
