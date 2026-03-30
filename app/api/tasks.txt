@@ -1,5 +1,5 @@
 import axios from 'axios';
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+import { API_BASE_URL } from "./index";
 
 export const getAllTasks = async (moduleId, levelId, role, token) => {
     try{
@@ -7,7 +7,7 @@ export const getAllTasks = async (moduleId, levelId, role, token) => {
             throw new Error("Module ID, Level ID, role, and token are required");
         }
 
-        const response = await fetch(`${API_URL}/api/mentorships/${id}/tasks`, {
+        const response = await fetch(`${API_BASE_URL}/api/mentorships/${id}/tasks`, {
             method: "GET",
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -32,11 +32,11 @@ export const getAllTasks = async (moduleId, levelId, role, token) => {
 export const createTask = async (id, token, body) => {
     try{
 
-        if(!moduleId || !token || !body) {
-            throw new Error("Module ID, token, and body are required");
+        if(!id || !token || !body) {
+            throw new Error("Mentorship ID, token, and body are required");
         }
 
-        const response = await fetch(`${API_URL}/api/mentorships/${id}/tasks`, {
+        const response = await fetch(`${API_BASE_URL}/api/mentorships/${id}/tasks`, {
             method: "POST",
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -69,7 +69,7 @@ export const updateTask = async (taskId, taskData, token) => {
             throw new Error("Token is required");
         }
         
-        const response = await fetch(`${API_URL}/api/mentorships/tasks/${taskId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/mentorships/tasks/${taskId}`, {
             method: "PUT",
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -98,7 +98,7 @@ export const deleteTask = async (taskId, token) => {
             throw new Error("Task ID and token are required");
         }
 
-        const response = await fetch(`${API_URL}/api/mentorships/tasks/${taskId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/mentorships/tasks/${taskId}`, {
             method: "DELETE",
             headers: {
                 'Authorization': `Bearer ${token}`,
