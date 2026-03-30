@@ -92,6 +92,11 @@ type AppContextValue = {
   totalXP: number;
   xpGoal: number; // for progress bar
   phases: Phase[];
+  profileData: ProfileData;
+  setProfileData: (data: ProfileData) => void;
+
+  questionnaireAnswers: QuestionnaireAnswers;
+  setQuestionnaireAnswers: (data: QuestionnaireAnswers) => void;
 
   // mentee/editor actions
   addPhase: (name: string, startDate: string, endDate: string) => void;
@@ -174,6 +179,28 @@ function recomputePhaseStatuses(phases: Phase[]): Phase[] {
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [userRole, setUserRole] = useState<UserRole>("mentee");
   const xpGoal = 2000; // goal for progress bar
+  const [profileData, setProfileData] = useState<ProfileData>({
+    firstName: "",
+    lastName: "",
+    profilePicture: null,
+    resume: null,
+    headline: "",
+    bio: "",
+    goals: "",
+    industries: [],
+    skills: [],
+    links: [],
+  });
+
+  const [questionnaireAnswers, setQuestionnaireAnswers] =
+    useState<QuestionnaireAnswers>({
+      mentoringComfort: 5,
+      industry: "",
+      mentorIndustry: "",
+      mentorSkillset: "",
+      developmentGoal: "",
+      holdingBack: "",
+    });
 
   // Mock data (replace later with API)
   const [phases, setPhases] = useState<Phase[]>([
@@ -476,9 +503,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       userRole,
       toggleRole: () =>
         setUserRole((r) => (r === "mentee" ? "mentor" : "mentee")),
+
       totalXP,
       xpGoal,
       phases: recomputePhaseStatuses(phases),
+
+      // ✅ ADD THESE
+      profileData,
+      setProfileData,
+      questionnaireAnswers,
+      setQuestionnaireAnswers,
+
       addPhase,
       editPhase,
       deletePhase,
@@ -490,7 +525,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateTaskDescription,
       reviewTask,
     };
-  }, [userRole, totalXP, xpGoal, phases]);
+  }, [userRole, totalXP, xpGoal, phases, profileData, questionnaireAnswers]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
