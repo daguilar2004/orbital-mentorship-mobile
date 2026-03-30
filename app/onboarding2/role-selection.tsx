@@ -12,6 +12,14 @@ export default function RoleSelection() {
   const [address, setAddress] = React.useState("");
   const [zip, setZip] = React.useState("");
 
+  const handleContinue = () => {
+    if (step === 1) {
+      setStep(2);
+    } else {
+      // Final step → navigate somewhere
+      router.push("/onboarding2"); // or wherever you want
+    }
+  };
   return (
     <View style={styles.screen}>
       {step === 1 ? (
@@ -166,7 +174,7 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     fontWeight: "700",
   },
-  subtitle: { color: "#6B7280", marginBottom: 24 },
+
   formGroup: { width: "100%", marginBottom: 16 },
   label: { fontSize: 14, fontWeight: "500", color: "#374151", marginBottom: 8 },
   input: {
