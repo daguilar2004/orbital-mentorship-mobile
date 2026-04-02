@@ -24,11 +24,11 @@ const AUTH_TOKEN_KEY = "AUTH_TOKEN";
 
 /* CATEGORY COLORS */
 const categoryColors: Record<string, string> = {
-  Pre: "#4CAF50",
-  During: "#2196F3",
-  Post: "#FF9800",
-  Daily: "#9C27B0",
-  New: "#607D8B",
+  Pre: "#0b0c67",
+  During: "#ff3b89",
+  Post: "#0b0c67",
+  Daily: "#e373bd",
+  New: "#0b0c67",
 };
 
 const options = ["Pre", "During", "Post", "Daily", "New"];
@@ -1293,7 +1293,7 @@ export default function Notes() {
                   <Text style={styles.searchGlyph}>⌕</Text>
                   <TextInput
                     placeholder="Search notes"
-                    placeholderTextColor="#98A2B3"
+                    placeholderTextColor="#ffffff"
                     value={search}
                     onChangeText={setSearch}
                     style={styles.searchInput}
@@ -1532,7 +1532,7 @@ export default function Notes() {
                                         style={{
                                           fontSize: 18,
                                           color: item.favorite
-                                            ? "#FB8C00"
+                                            ? "#ff3b89"
                                             : "#D0D5DD",
                                         }}
                                       >
@@ -2030,19 +2030,19 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#0b0c67",
     paddingHorizontal: 14,
     paddingVertical: 2,
   },
   searchGlyph: {
     fontSize: 16,
-    color: "#98A2B3",
+    color: "#ffffff",
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: "#101828",
+    color: "#ffffff",
     paddingVertical: 11,
   },
   headerButton: {
@@ -2051,7 +2051,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "#D0D5DD",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#0b0c67",
     justifyContent: "center",
   },
   sortButton: {
@@ -2066,7 +2066,7 @@ const styles = StyleSheet.create({
   headerButtonText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#344054",
+    color: "#ffffff",
   },
   headerButtonTextOnDark: {
     color: "#FFFFFF",
@@ -2074,7 +2074,7 @@ const styles = StyleSheet.create({
   sortIcon: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#344054",
+    color: "#ffffff",
   },
   dropdownWrap: {
     position: "relative",
