@@ -6,7 +6,6 @@ import {
   Alert,
   BackHandler,
   Modal,
-  PanResponder,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -1198,7 +1197,7 @@ export default function Notes() {
       if (!text.trim()) return;
       noteContent = text;
     }
-    
+
     if (editingNote) {
       const updatedNote: Note = {
         _id: getNoteId(editingNote),
@@ -1272,15 +1271,6 @@ export default function Notes() {
       )
     );
   };
-  
-  if (loading && notes.length === 0) {
-    return (
-      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
-        <ActivityIndicator size="large" color="#7C3AED" />
-        <Text style={{ marginTop: 10 }}>Loading notes...</Text>
-      </View>
-    );
-  }
 
   if (loading && notes.length === 0) {
     return (
@@ -2282,95 +2272,6 @@ const styles = StyleSheet.create({
     color: "#DC2626",
     fontSize: 13,
     fontWeight: "600",
-  },
-  exitOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 28,
-  },
-  exitSheet: {
-    width: "100%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 24,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 10,
-  },
-  exitTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 8,
-  },
-  exitSubtitle: {
-    fontSize: 14,
-    color: "#667085",
-    textAlign: "center",
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  exitBtnSave: {
-    width: "100%",
-    backgroundColor: "#111827",
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  exitBtnSaveText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  exitBtnDiscard: {
-    width: "100%",
-    backgroundColor: "#FEE2E2",
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  exitBtnDiscardText: {
-    color: "#DC2626",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  exitBtnCancel: {
-    width: "100%",
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  exitBtnCancelText: {
-    color: "#667085",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  contextMenu: {
-    marginTop: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#0F172A",
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-    overflow: "hidden",
-  },
-  contextMenuItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  contextMenuDivider: {
-    height: 1,
-    backgroundColor: "#F2F4F7",
   },
   folderCard: {
     flexDirection: "row",
