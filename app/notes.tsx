@@ -24,11 +24,11 @@ const AUTH_TOKEN_KEY = "AUTH_TOKEN";
 
 /* CATEGORY COLORS */
 const categoryColors: Record<string, string> = {
-  Pre: "#0b0c67",
-  During: "#ff3b89",
-  Post: "#0b0c67",
-  Daily: "#e373bd",
-  New: "#0b0c67",
+  Pre: "#ff3b89",
+  During: "#0b0c67",
+  Post: "#e373bd",
+  Daily: "#0b0c67",
+  New: "#cfc2eb",
 };
 
 const options = ["Pre", "During", "Post", "Daily", "New"];
