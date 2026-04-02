@@ -1,11 +1,12 @@
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   BackHandler,
   Modal,
+  PanResponder,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -626,17 +627,9 @@ function FavoritesView({
               : item.text}
           </Text>
 
-          <View style={favStyles.actions}>
-            <TouchableOpacity onPress={() => onExport(item)}>
-              <Text style={styles.noteActionExport}>Export</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => onOpenNote(item)}>
-              <Text style={{ color: "#1E88E5", fontSize: 13 }}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => onDelete(item._id || item.id || "")}>
-              <Text style={{ color: "#E53935", fontSize: 13 }}>Delete</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={{ fontSize: 11, color: "#98A2B3", marginTop: 8, textAlign: "right" }}>
+            Hold to edit · export · delete
+          </Text>
         </TouchableOpacity>
       ))}
     </ScrollView>
@@ -717,6 +710,20 @@ export default function Notes() {
   const [insightsMenuOpen, setInsightsMenuOpen] = useState(false);
 
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [contextMenuNote, setContextMenuNote] = useState<string | null>(null);
+  const [exitConfirmVisible, setExitConfirmVisible] = useState(false);
+
+  const editorPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) =>
+        gs.dx > 40 && Math.abs(gs.dy) < 60,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dx > 80) {
+          setExitConfirmVisible(true);
+        }
+      },
+    })
+  ).current;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1283,22 +1290,86 @@ export default function Notes() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {!selectedType && (
-          <>
-            {/* ── TOP BAR ──────────────────────────────────────── */}
-            <View style={styles.topBar}>
-              <View style={styles.toolbarRow}>
-                <View style={styles.searchField}>
-                  <Text style={styles.searchGlyph}>⌕</Text>
-                  <TextInput
-                    placeholder="Search notes"
-                    placeholderTextColor="#ffffff"
-                    value={search}
-                    onChangeText={setSearch}
-                    style={styles.searchInput}
-                  />
-                </View>
+      <Pressable style={styles.container} onPress={() => { setSortMenuOpen(false); setInsightsMenuOpen(false); }}>
+      {!selectedType && (
+        <>
+      {/* ── TOP BAR ──────────────────────────────────────── */}
+      <View style={styles.topBar}>
+        <View style={styles.toolbarRow}>
+          <View style={styles.searchField}>
+            <Text style={styles.searchGlyph}>⌕</Text>
+            <TextInput
+              placeholder="Search notes"
+              placeholderTextColor="#98A2B3"
+              value={search}
+              onChangeText={setSearch}
+              style={styles.searchInput}
+            />
+          </View>
+
+          <TouchableOpacity
+            onPress={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+            style={[styles.headerButton, selectMode && styles.headerButtonActive]}
+          >
+            <Text
+              style={[
+                styles.headerButtonText,
+                selectMode && styles.headerButtonTextOnDark,
+              ]}
+            >
+              {selectMode ? "Done" : "Select"}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.dropdownWrap}>
+            <TouchableOpacity
+              onPress={() => {
+                setSortMenuOpen((open) => !open);
+                setInsightsMenuOpen(false);
+              }}
+              style={[
+                styles.headerButton,
+                styles.sortButton,
+                sortMenuOpen && styles.headerButtonActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.sortIcon,
+                  sortMenuOpen && styles.headerButtonTextOnDark,
+                ]}
+              >
+                ⇅
+              </Text>
+            </TouchableOpacity>
+
+            {sortMenuOpen && (
+              <View style={styles.dropdownMenu} onStartShouldSetResponder={() => true}>
+                {sortMenuModes.map((mode) => {
+                  const isActive = sortMode === mode.key;
+                  return (
+                    <TouchableOpacity
+                      key={mode.key}
+                      onPress={() => { toggleSortMode(mode.key); setSortMenuOpen(false); }}
+                      style={[
+                        styles.dropdownItem,
+                        isActive && styles.dropdownItemActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownItemTitle,
+                          isActive && styles.dropdownItemTitleActive,
+                        ]}
+                      >
+                        {mode.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </View>
 
                 <TouchableOpacity
                   onPress={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
@@ -1314,19 +1385,14 @@ export default function Notes() {
                   </Text>
                 </TouchableOpacity>
 
-                <View style={styles.dropdownWrap}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSortMenuOpen((open) => !open);
-                      setInsightsMenuOpen(false);
-                    }}
-                    style={[
-                      styles.headerButton,
-                      styles.sortButton,
-                      sortMenuOpen && styles.headerButtonActive,
-                    ]}
-                  >
-                    <Text
+            {insightsMenuOpen && (
+              <View style={styles.dropdownMenu} onStartShouldSetResponder={() => true}>
+                {viewMenuModes.map((mode) => {
+                  const isActive = viewMode === mode.key;
+                  return (
+                    <TouchableOpacity
+                      key={mode.key}
+                      onPress={() => { setActiveView(mode.key); setInsightsMenuOpen(false); }}
                       style={[
                         styles.sortIcon,
                         sortMenuOpen && styles.headerButtonTextOnDark,
@@ -1366,9 +1432,17 @@ export default function Notes() {
 
                 <View style={styles.dropdownWrap}>
                   <TouchableOpacity
+                    key={getNoteId(item)}
                     onPress={() => {
-                      setInsightsMenuOpen((open) => !open);
-                      setSortMenuOpen(false);
+                      if (contextMenuNote === getNoteId(item)) { setContextMenuNote(null); return; }
+                      selectMode ? toggleSelectNote(getNoteId(item)) : openEditNote(item);
+                    }}
+                    onLongPress={() => {
+                      if (selectMode) {
+                        toggleSelectNote(getNoteId(item));
+                      } else {
+                        setContextMenuNote(getNoteId(item));
+                      }
                     }}
                     style={[
                       styles.headerButton,
@@ -1376,45 +1450,83 @@ export default function Notes() {
                       insightsMenuOpen && styles.headerButtonActive,
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.headerButtonText,
-                        insightsMenuOpen && styles.headerButtonTextOnDark,
-                      ]}
-                    >
-                      Views
-                    </Text>
-                    <Text
-                      style={[
-                        styles.dropdownCaret,
-                        insightsMenuOpen && styles.headerButtonTextOnDark,
-                      ]}
-                    >
-                      ▾
-                    </Text>
-                  </TouchableOpacity>
+                    {selectMode && (
+                      <TouchableOpacity
+                        onPress={() => toggleSelectNote(getNoteId(item))}
+                        style={[styles.checkbox, selectedIds.has(getNoteId(item)) && styles.checkboxSelected, { marginRight: 12 }]}
+                      />
+                    )}
 
-                  {insightsMenuOpen && (
-                    <View style={styles.dropdownMenu}>
-                      {viewMenuModes.map((mode) => {
-                        const isActive = viewMode === mode.key;
-                        return (
+                        <View style={{ flex: 1 }}>
+                          <View style={styles.noteHeader}>
+                            <Text style={styles.noteTitle}>{item.title}</Text>
+                            {!selectMode && (
+                              <TouchableOpacity
+                                onPress={() => toggleFavorite(getNoteId(item))}
+                                hitSlop={{
+                                  top: 16,
+                                  bottom: 16,
+                                  left: 16,
+                                  right: 16,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 24,
+                                    color: item.favorite
+                                      ? "#FB8C00"
+                                      : "#D0D5DD",
+                                  }}
+                                >
+                                  ★
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+
+                          {Array.isArray(item.text) ? (
+                            item.text.map((section, index) => (
+                              <View key={index} style={styles.noteSection}>
+                                <Text style={styles.sectionLabel}>
+                                  {getLabels(category)[index]}
+                                </Text>
+                                <Text style={noteTextStyle(item.formatting)}>
+                                  {section}
+                                </Text>
+                              </View>
+                            ))
+                          ) : (
+                            <>
+                              <Text style={styles.sectionLabel}>
+                                {getLabels(category)}
+                              </Text>
+                              <Text style={noteTextStyle(item.formatting)}>
+                                {item.text}
+                              </Text>
+                            </>
+                          )}
+
+                      {contextMenuNote === getNoteId(item) && (
+                        <View style={styles.contextMenu}>
                           <TouchableOpacity
-                            key={mode.key}
-                            onPress={() => setActiveView(mode.key)}
-                            style={[
-                              styles.dropdownItem,
-                              isActive && styles.dropdownItemActive,
-                            ]}
+                            onPress={() => { exportNoteToPDF(item); setContextMenuNote(null); }}
+                            style={styles.contextMenuItem}
                           >
-                            <Text
-                              style={[
-                                styles.dropdownItemTitle,
-                                isActive && styles.dropdownItemTitleActive,
-                              ]}
-                            >
-                              {mode.label}
-                            </Text>
+                            <Text style={styles.noteActionExport}>Export</Text>
+                          </TouchableOpacity>
+                          <View style={styles.contextMenuDivider} />
+                          <TouchableOpacity
+                            onPress={() => { openEditNote(item); setContextMenuNote(null); }}
+                            style={styles.contextMenuItem}
+                          >
+                            <Text style={styles.noteActionEdit}>Edit</Text>
+                          </TouchableOpacity>
+                          <View style={styles.contextMenuDivider} />
+                          <TouchableOpacity
+                            onPress={() => { handleDeleteOne(getNoteId(item)); setContextMenuNote(null); }}
+                            style={styles.contextMenuItem}
+                          >
+                            <Text style={styles.noteActionDelete}>Delete</Text>
                           </TouchableOpacity>
                         );
                       })}
@@ -1812,33 +1924,102 @@ export default function Notes() {
                 <Text style={{ color: "white", fontSize: 14 }}>
                   {selectedIds.size} selected
                 </Text>
-                <View style={{ flexDirection: "row", gap: 12 }}>
-                  <TouchableOpacity
-                    onPress={exportSelectedNotesToPDF}
-                    disabled={selectedIds.size === 0}
-                    style={[
-                      styles.bulkExportBtn,
-                      selectedIds.size === 0 && { opacity: 0.4 },
-                    ]}
-                  >
-                    <Text style={{ color: "white", fontWeight: "bold" }}>Export</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleDeleteSelected}
-                    disabled={selectedIds.size === 0}
-                    style={[
-                      styles.bulkDeleteBtn,
-                      selectedIds.size === 0 && { opacity: 0.4 },
-                    ]}
-                  >
-                    <Text style={{ color: "white", fontWeight: "bold" }}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
 
-            {/* ── FAB ──────────────────────────────────────────── */}
-            {!selectMode && (
+      {/* ── FULL SCREEN EDITOR ───────────────────────────── */}
+      {selectedType && (
+        <View style={styles.fullScreenEditor} {...editorPanResponder.panHandlers}>
+
+          {/* ── SWIPE-TO-EXIT CONFIRMATION ─────────────────── */}
+          <Modal
+            transparent
+            visible={exitConfirmVisible}
+            animationType="fade"
+            onRequestClose={() => setExitConfirmVisible(false)}
+          >
+            <View style={styles.exitOverlay}>
+              <View style={styles.exitSheet}>
+                <Text style={styles.exitTitle}>Exit note?</Text>
+                <Text style={styles.exitSubtitle}>
+                  Do you want to save your changes before leaving?
+                </Text>
+                <TouchableOpacity
+                  style={styles.exitBtnSave}
+                  onPress={async () => {
+                    setExitConfirmVisible(false);
+                    await handleSave();
+                  }}
+                >
+                  <Text style={styles.exitBtnSaveText}>Save and exit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.exitBtnDiscard}
+                  onPress={() => {
+                    setExitConfirmVisible(false);
+                    closeEditor();
+                  }}
+                >
+                  <Text style={styles.exitBtnDiscardText}>Don't save and exit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.exitBtnCancel}
+                  onPress={() => setExitConfirmVisible(false)}
+                >
+                  <Text style={styles.exitBtnCancelText}>Keep editing</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
+            <TextInput
+              style={styles.titleInput}
+              placeholder="Enter Title..."
+              value={noteTitle}
+              onChangeText={setNoteTitle}
+            />
+
+            {/* TOOLBAR */}
+            <View style={styles.toolbar}>
+              <TouchableOpacity
+                style={[styles.toolbarBtn, fmt.bold && styles.toolbarBtnActive]}
+                onPress={() => setFmt((f) => ({ ...f, bold: !f.bold }))}
+              >
+                <Text style={{ fontWeight: "bold" }}>B</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.toolbarBtn,
+                  fmt.italic && styles.toolbarBtnActive,
+                ]}
+                onPress={() => setFmt((f) => ({ ...f, italic: !f.italic }))}
+              >
+                <Text style={{ fontStyle: "italic" }}>I</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.toolbarBtn,
+                  fmt.underline && styles.toolbarBtnActive,
+                ]}
+                onPress={() =>
+                  setFmt((f) => ({ ...f, underline: !f.underline }))
+                }
+              >
+                <Text style={{ textDecorationLine: "underline" }}>U</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.toolbarBtn}
+                onPress={() =>
+                  setFmt((f) => ({ ...f, fontSize: Math.max(10, f.fontSize - 2) }))
+                }
+              >
+                <Text>A-</Text>
+              </TouchableOpacity>
+              <Text>{fmt.fontSize}</Text>
               <TouchableOpacity
                 style={styles.fab}
                 onPress={() => setModalVisible(true)}
@@ -1998,13 +2179,13 @@ export default function Notes() {
                 <Text style={{ color: "white" }}>Save</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.cancelButton} onPress={closeEditor}>
-                <Text>Cancel</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        )}
-      </View>
+            <TouchableOpacity style={styles.cancelButton} onPress={closeEditor}>
+              <Text>Cancel</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      )}
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -2272,6 +2453,95 @@ const styles = StyleSheet.create({
     color: "#DC2626",
     fontSize: 13,
     fontWeight: "600",
+  },
+  exitOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 28,
+  },
+  exitSheet: {
+    width: "100%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  },
+  exitTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 8,
+  },
+  exitSubtitle: {
+    fontSize: 14,
+    color: "#667085",
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  exitBtnSave: {
+    width: "100%",
+    backgroundColor: "#111827",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  exitBtnSaveText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  exitBtnDiscard: {
+    width: "100%",
+    backgroundColor: "#FEE2E2",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  exitBtnDiscardText: {
+    color: "#DC2626",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  exitBtnCancel: {
+    width: "100%",
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  exitBtnCancelText: {
+    color: "#667085",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  contextMenu: {
+    marginTop: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    overflow: "hidden",
+  },
+  contextMenuItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  contextMenuDivider: {
+    height: 1,
+    backgroundColor: "#F2F4F7",
   },
   folderCard: {
     flexDirection: "row",
