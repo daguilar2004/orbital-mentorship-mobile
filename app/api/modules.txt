@@ -1,9 +1,9 @@
-import axois from 'axios';
-const API_URL = import.meta.env.VITE_APP_SERVER_URL;
+import axios from 'axios';
+import { API_BASE_URL } from "./index";
 
 export const fetchModules = async (role) => {
     try{
-        const response = await axois.get(`${API_URL}/api/modules?targetAudience=${role}`);
+        const response = await axois.get(`${API_BASE_URL}/api/modules?targetAudience=${role}`);
         return response.data;
 
     }catch(error){
