@@ -178,8 +178,8 @@ export default function Home() {
         <View style={styles.statsGrid}>
           <StatCard
             icon="trophy"
-            iconBg="#F3E8FF"
-            iconColor="#FF3B89"
+            iconBg="#0b0c67"
+            iconColor="#F3E8FF"
             label="Total XP"
             value={`${totalXP}`}
             progress={xpPercent}
@@ -187,15 +187,15 @@ export default function Home() {
           />
           <StatCard
             icon="trending-up"
-            iconBg="#F3E8FF"
-            iconColor="#2563EB"
+            iconBg="#0b0c67"
+            iconColor="#F3E8FF"
             label="Progress"
             value={`${completedPhases}/${totalPhases}`}
           />
           <StatCard
             icon="flag"
-            iconBg="#F3E8FF"
-            iconColor="#47f888"
+            iconBg="#0b0c67"
+            iconColor="#F3E8FF"
             label={userRole === "mentee" ? "Pending Tasks" : "Tasks to Review"}
             value={`${pendingTasksCount}`}
           />
@@ -280,7 +280,7 @@ export default function Home() {
                         <Ionicons
                           name="checkmark-circle"
                           size={20}
-                          color="#47f888"
+                          color="#0b0c67"
                         />
                       ) : null}
 
@@ -361,7 +361,7 @@ export default function Home() {
                       style={[
                         styles.progressFill,
                         phase.status === "completed"
-                          ? { backgroundColor: "#47f888" }
+                          ? { backgroundColor: "#0b0c67" }
                           : { backgroundColor: "#7C3AED" },
                         { width: `${progressPct}%` },
                       ]}
@@ -470,7 +470,7 @@ export default function Home() {
                           pressed && styles.pressed,
                         ]}
                       >
-                        <Ionicons name="add" size={18} color="#FF3B89" />
+                        <Ionicons name="add" size={18} color="#0B0C67" />
                         <Text style={styles.addTaskButtonText}>Add Task</Text>
                       </Pressable>
                     )}
@@ -1533,9 +1533,9 @@ function taskStatusIcon(
 function taskStatusColor(status: Task["status"]) {
   switch (status) {
     case "approved":
-      return "#47f888";
+      return "#0b0c67";
     case "submitted":
-      return "#FF3B89";
+      return "#ff3b89";
     case "rejected":
       return "#DC2626";
     case "pending":
@@ -1557,7 +1557,7 @@ function StatCard(props: {
     <View style={styles.statCard}>
       <View style={styles.statRow}>
         <View style={[styles.iconWrap, { backgroundColor: props.iconBg }]}>
-          <Ionicons name={props.icon} size={22} color="#FF3B89" />
+          <Ionicons name={props.icon} size={22} color={props.iconColor} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.statLabel}>{props.label}</Text>
@@ -1572,7 +1572,7 @@ function StatCard(props: {
                 styles.progressFill,
                 {
                   width: `${props.progress}%`,
-                  backgroundColor: props.iconColor,
+                  backgroundColor: "#0B0C67",
                 },
               ]}
             />
@@ -1628,7 +1628,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   statLabel: { fontSize: 12, color: "#6B7280" },
-  statValue: { fontSize: 22, fontWeight: "800", marginTop: 2 },
+  statValue: {
+    fontSize: 22,
+    fontWeight: "800",
+    marginTop: 2,
+    color: "#111827",
+  },
   progressBar: {
     height: 8,
     backgroundColor: "#E5E7EB",
@@ -1636,16 +1641,16 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   progressFill: { height: "100%" },
-  progressLabel: { fontSize: 11, color: "#6B7280" },
+  progressLabel: { fontSize: 11, color: "#374151" },
 
   phaseCardBase: {
-    backgroundColor: "#0B0C67",
+    backgroundColor: "white",
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
   },
-  phaseCardCompleted: { borderColor: "#47f888" },
-  phaseCardCurrent: { borderColor: "#C4B5FD" },
+  phaseCardCompleted: { borderColor: "#c4c5ef" },
+  phaseCardCurrent: { borderColor: "#f5e8f2" },
   phaseCardUpcoming: { borderColor: "#E5E7EB", opacity: 0.75 },
 
   phaseHeaderRow: {
@@ -1674,25 +1679,25 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#E5E7EB",
+    backgroundColor: "#dbd4f2",
   },
-  bubbleCompleted: { backgroundColor: "#DCFCE7" },
-  bubbleCurrent: { backgroundColor: "#EDE9FE" },
+  bubbleCompleted: { backgroundColor: "#c4c5ef" },
+  bubbleCurrent: { backgroundColor: "#f7e6f3" },
   bubbleUpcoming: { backgroundColor: "#F3F4F6" },
   phaseIndexText: { fontWeight: "800", color: "#111827" },
 
   phaseTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  phaseTitle: { fontSize: 16, fontWeight: "800", color: "white" },
-  phaseDates: { fontSize: 12, color: "#E5E7EB", marginTop: 2 },
+  phaseTitle: { fontSize: 16, fontWeight: "800", color: "#111827" },
+  phaseDates: { fontSize: 12, color: "#6B7280", marginTop: 2 },
 
   badgeActive: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "#FFE4EF",
+    backgroundColor: "#f7e6f3",
     alignSelf: "flex-start",
   },
-  badgeActiveText: { fontSize: 12, fontWeight: "800", color: "#FF3B89" },
+  badgeActiveText: { fontSize: 12, fontWeight: "800", color: "#ff3b89" },
 
   rowBetween: {
     flexDirection: "row",
@@ -1700,8 +1705,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  small: { fontSize: 13, color: "white" },
-  smallMuted: { fontSize: 13, color: "#E5E7EB" },
+  small: { fontSize: 13, color: "#374151" },
+  smallMuted: { fontSize: 13, color: "#6B7280" },
   bold: { fontWeight: "800" },
 
   progressTrack: {
@@ -1722,12 +1727,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#FF3B89",
-    backgroundColor: "#fefdfe",
+    borderColor: "#0B0C67",
+    backgroundColor: "#0B0C67",
   },
   addTaskButtonText: {
     fontSize: 13,
-    color: "#FF3B89",
+    color: "white",
     fontWeight: "600",
   },
 
@@ -1756,7 +1761,7 @@ const styles = StyleSheet.create({
   taskLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
   taskTitle: { fontSize: 14, fontWeight: "800", color: "#111827" },
   taskMeta: { fontSize: 12, color: "#6B7280", marginTop: 2 },
-  xpText: { color: "#FF3B89", fontWeight: "800" },
+  xpText: { color: "#ff3b89", fontWeight: "800" },
 
   pressed: { opacity: 0.9 },
 
