@@ -727,7 +727,7 @@ function AccountabilityScreen(props: {
 
   return (
     <View style={{ flex: 1 }}>
-      <GoalHelpModel
+      <GoalHelpModal
         visible={showGoalsHelp}
         onClose={() => setShowGoalsHelp(false)}
       />
