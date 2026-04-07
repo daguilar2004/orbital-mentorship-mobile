@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,17 +9,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import GoalHelpModal from "../app/GoalHelpModel";
 
 type TabKey = "habits" | "goals";
 type DayKey = "S" | "M" | "T" | "W" | "T2" | "F" | "S2";
-
-type HabitAnswers = {
-  trigger: string;
-  motivation: string;
-  action: string;
-  reinforcement: string;
-  reflection: string;
-};
 
 type DailyHabit = {
   id: string;
@@ -28,7 +20,6 @@ type DailyHabit = {
   days: DayKey[];
   completedOn?: string | null;
   linkedGoalId?: string;
-  answers: HabitAnswers;
 };
 
 type SmartGoal = {
@@ -68,14 +59,6 @@ function getTodayDayKey(): DayKey {
   return map[day];
 }
 
-const EMPTY_HABIT_ANSWERS: HabitAnswers = {
-  trigger: "",
-  motivation: "",
-  action: "",
-  reinforcement: "",
-  reflection: "",
-};
-
 export default function Journey() {
   const [introDone, setIntroDone] = useState(false);
   const [reflection, setReflection] = useState("");
@@ -90,26 +73,12 @@ export default function Journey() {
       title: "Morning meditation",
       days: ["S", "M", "T", "W", "T2", "F", "S2"],
       completedOn: null,
-      answers: {
-        trigger: "After I wake up and brush my teeth.",
-        motivation: "I want to start my day feeling calm and focused.",
-        action: "Sit quietly and meditate for 10 minutes.",
-        reinforcement: "Enjoy my coffee after I finish.",
-        reflection: "I felt more relaxed and less distracted.",
-      },
     },
     {
       id: "h2",
       title: "Daily coding practice",
       days: ["S", "M", "T", "W", "T2", "F", "S2"],
       completedOn: null,
-      answers: {
-        trigger: "After I finish dinner.",
-        motivation: "I want to improve my programming skills.",
-        action: "Practice coding for 30 minutes.",
-        reinforcement: "Watch a short video after finishing.",
-        reflection: "I stayed consistent and learned something useful.",
-      },
     },
   ]);
 
@@ -117,11 +86,6 @@ export default function Journey() {
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
   const [habitTitle, setHabitTitle] = useState("");
   const [habitDays, setHabitDays] = useState<DayKey[]>([]);
-  const [habitTrigger, setHabitTrigger] = useState("");
-  const [habitMotivation, setHabitMotivation] = useState("");
-  const [habitAction, setHabitAction] = useState("");
-  const [habitReinforcement, setHabitReinforcement] = useState("");
-  const [habitReflection, setHabitReflection] = useState("");
 
   const [goals, setGoals] = useState<SmartGoal[]>([
     {
@@ -146,7 +110,6 @@ export default function Journey() {
     setHabits((prev) => {
       const exists = prev.some((habit) => habit.id === "g1-habit");
       if (exists) return prev;
-
       return [
         ...prev,
         {
@@ -155,13 +118,6 @@ export default function Journey() {
           days: ["M", "W", "F"],
           completedOn: null,
           linkedGoalId: "g1",
-          answers: {
-            trigger: "When I finish one class or study session.",
-            motivation: "I want to communicate ideas more clearly.",
-            action: "Explain one concept out loud in simple words.",
-            reinforcement: "Take a short break after doing it.",
-            reflection: "I explained it more clearly than before.",
-          },
         },
       ];
     });
@@ -196,11 +152,6 @@ export default function Journey() {
   const clearHabitForm = () => {
     setHabitTitle("");
     setHabitDays([]);
-    setHabitTrigger("");
-    setHabitMotivation("");
-    setHabitAction("");
-    setHabitReinforcement("");
-    setHabitReflection("");
     setEditingHabitId(null);
   };
 
@@ -217,13 +168,6 @@ export default function Journey() {
       title: habitTitle.trim(),
       days: habitDays,
       completedOn: null,
-      answers: {
-        trigger: habitTrigger.trim(),
-        motivation: habitMotivation.trim(),
-        action: habitAction.trim(),
-        reinforcement: habitReinforcement.trim(),
-        reflection: habitReflection.trim(),
-      },
     };
 
     setHabits((prev) => [newHabit, ...prev]);
@@ -235,11 +179,6 @@ export default function Journey() {
     setEditingHabitId(habit.id);
     setHabitTitle(habit.title);
     setHabitDays(habit.days);
-    setHabitTrigger(habit.answers?.trigger ?? "");
-    setHabitMotivation(habit.answers?.motivation ?? "");
-    setHabitAction(habit.answers?.action ?? "");
-    setHabitReinforcement(habit.answers?.reinforcement ?? "");
-    setHabitReflection(habit.answers?.reflection ?? "");
     setShowHabitForm(true);
   };
 
@@ -253,13 +192,6 @@ export default function Journey() {
               ...habit,
               title: habitTitle.trim(),
               days: habitDays,
-              answers: {
-                trigger: habitTrigger.trim(),
-                motivation: habitMotivation.trim(),
-                action: habitAction.trim(),
-                reinforcement: habitReinforcement.trim(),
-                reflection: habitReflection.trim(),
-              },
             }
           : habit,
       ),
@@ -359,7 +291,6 @@ export default function Journey() {
         days: goalHabitDays,
         completedOn: null,
         linkedGoalId: newGoalId,
-        answers: { ...EMPTY_HABIT_ANSWERS },
       };
 
       setHabits((prev) => [linkedHabit, ...prev]);
@@ -447,7 +378,6 @@ export default function Journey() {
             days: goalHabitDays,
             completedOn: null,
             linkedGoalId: editingGoalId,
-            answers: { ...EMPTY_HABIT_ANSWERS },
           },
           ...prev,
         ]);
@@ -561,16 +491,6 @@ export default function Journey() {
           setHabitTitle={setHabitTitle}
           habitDays={habitDays}
           setHabitDays={setHabitDays}
-          habitTrigger={habitTrigger}
-          setHabitTrigger={setHabitTrigger}
-          habitMotivation={habitMotivation}
-          setHabitMotivation={setHabitMotivation}
-          habitAction={habitAction}
-          setHabitAction={setHabitAction}
-          habitReinforcement={habitReinforcement}
-          setHabitReinforcement={setHabitReinforcement}
-          habitReflection={habitReflection}
-          setHabitReflection={setHabitReflection}
           editingHabitId={editingHabitId}
           addHabit={addHabit}
           saveEditedHabit={saveEditedHabit}
@@ -684,16 +604,6 @@ function AccountabilityScreen(props: {
   setHabitTitle: (v: string) => void;
   habitDays: DayKey[];
   setHabitDays: (v: DayKey[]) => void;
-  habitTrigger: string;
-  setHabitTrigger: (v: string) => void;
-  habitMotivation: string;
-  setHabitMotivation: (v: string) => void;
-  habitAction: string;
-  setHabitAction: (v: string) => void;
-  habitReinforcement: string;
-  setHabitReinforcement: (v: string) => void;
-  habitReflection: string;
-  setHabitReflection: (v: string) => void;
   editingHabitId: string | null;
   addHabit: () => void;
   saveEditedHabit: () => void;
@@ -756,16 +666,6 @@ function AccountabilityScreen(props: {
     setHabitTitle,
     habitDays,
     setHabitDays,
-    habitTrigger,
-    setHabitTrigger,
-    habitMotivation,
-    setHabitMotivation,
-    habitAction,
-    setHabitAction,
-    habitReinforcement,
-    setHabitReinforcement,
-    habitReflection,
-    setHabitReflection,
     editingHabitId,
     addHabit,
     saveEditedHabit,
@@ -827,7 +727,7 @@ function AccountabilityScreen(props: {
 
   return (
     <View style={{ flex: 1 }}>
-      <GoalsHelpModal
+      <GoalHelpModel
         visible={showGoalsHelp}
         onClose={() => setShowGoalsHelp(false)}
       />
@@ -914,81 +814,6 @@ function AccountabilityScreen(props: {
                       onToggle={(day) => toggleDay(day, habitDays, setHabitDays)}
                     />
 
-                    <View style={{ height: 12 }} />
-
-                    <Text style={styles.formQuestionLabel}>
-                      Trigger — What will trigger this habit?
-                    </Text>
-                    <TextInput
-                      value={habitTrigger}
-                      onChangeText={setHabitTrigger}
-                      placeholder="For example: After I wake up and brush my teeth."
-                      placeholderTextColor="#9CA3AF"
-                      multiline
-                      style={styles.formTextArea}
-                      textAlignVertical="top"
-                    />
-
-                    <View style={{ height: 10 }} />
-
-                    <Text style={styles.formQuestionLabel}>
-                      Motivation — Why do you want to do this?
-                    </Text>
-                    <TextInput
-                      value={habitMotivation}
-                      onChangeText={setHabitMotivation}
-                      placeholder="For example: I want to feel more focused and consistent."
-                      placeholderTextColor="#9CA3AF"
-                      multiline
-                      style={styles.formTextArea}
-                      textAlignVertical="top"
-                    />
-
-                    <View style={{ height: 10 }} />
-
-                    <Text style={styles.formQuestionLabel}>
-                      Action — What exactly will you do?
-                    </Text>
-                    <TextInput
-                      value={habitAction}
-                      onChangeText={setHabitAction}
-                      placeholder="For example: Study calculus for 30 minutes."
-                      placeholderTextColor="#9CA3AF"
-                      multiline
-                      style={styles.formTextArea}
-                      textAlignVertical="top"
-                    />
-
-                    <View style={{ height: 10 }} />
-
-                    <Text style={styles.formQuestionLabel}>
-                      Reinforcement — How will you reward yourself?
-                    </Text>
-                    <TextInput
-                      value={habitReinforcement}
-                      onChangeText={setHabitReinforcement}
-                      placeholder="For example: Watch one episode after finishing."
-                      placeholderTextColor="#9CA3AF"
-                      multiline
-                      style={styles.formTextArea}
-                      textAlignVertical="top"
-                    />
-
-                    <View style={{ height: 10 }} />
-
-                    <Text style={styles.formQuestionLabel}>
-                      Reflection — How did it go today?
-                    </Text>
-                    <TextInput
-                      value={habitReflection}
-                      onChangeText={setHabitReflection}
-                      placeholder="For example: I stayed focused and completed everything."
-                      placeholderTextColor="#9CA3AF"
-                      multiline
-                      style={styles.formTextArea}
-                      textAlignVertical="top"
-                    />
-
                     <View style={styles.goalFormActions}>
                       <Pressable
                         style={styles.secondaryBtn}
@@ -1048,15 +873,6 @@ function AccountabilityScreen(props: {
                             </View>
 
                             <DayDots days={habit.days} />
-
-                            <View style={styles.habitAnswerPreview}>
-                              <Text style={styles.habitAnswerPreviewLabel}>
-                                Trigger:
-                              </Text>
-                              <Text style={styles.habitAnswerPreviewText}>
-                                {habit.answers.trigger || "—"}
-                              </Text>
-                            </View>
                           </View>
 
                           <View style={styles.dailyHabitRight}>
@@ -1119,15 +935,6 @@ function AccountabilityScreen(props: {
                             </View>
 
                             <DayDots days={habit.days} />
-
-                            <View style={styles.habitAnswerPreview}>
-                              <Text style={styles.habitAnswerPreviewLabel}>
-                                Trigger:
-                              </Text>
-                              <Text style={styles.habitAnswerPreviewText}>
-                                {habit.answers.trigger || "—"}
-                              </Text>
-                            </View>
                           </View>
 
                           <View style={styles.dailyHabitRight}>
@@ -1466,7 +1273,9 @@ function DaysSelector(props: {
             onPress={() => onToggle(day.key)}
             style={[styles.dayCircle, active && styles.dayCircleActive]}
           >
-            <Text style={[styles.dayCircleText, active && styles.dayCircleTextActive]}>
+            <Text
+              style={[styles.dayCircleText, active && styles.dayCircleTextActive]}
+            >
               {day.short}
             </Text>
           </Pressable>
@@ -1505,70 +1314,6 @@ function DayDots(props: { days: DayKey[]; compact?: boolean }) {
           </View>
         );
       })}
-    </View>
-  );
-}
-
-function GoalsHelpModal(props: { visible: boolean; onClose: () => void }) {
-  const { visible, onClose } = props;
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.helpModalCard}>
-          <View style={styles.helpIconWrap}>
-            <Text style={styles.helpIconText}>?</Text>
-          </View>
-
-          <Text style={styles.helpModalTitle}>How to Use Goals</Text>
-          <Text style={styles.helpModalSub}>
-            A quick guide to your SMART goals tab
-          </Text>
-
-          <View style={styles.helpList}>
-            <HelpRow emoji="👆" text="Tap a goal to expand or collapse it" />
-            <HelpRow emoji="✋" text="Hold a goal to select it" />
-            <HelpRow
-              emoji="🗑"
-              text="Use the trash button to delete a selected goal"
-            />
-            <HelpRow
-              emoji="✓"
-              text="Use the check button to mark a selected goal complete"
-            />
-            <HelpRow
-              emoji="＋"
-              text="Use the plus button to add a new SMART goal"
-            />
-            <HelpRow
-              emoji="◎"
-              text="You can optionally link a daily habit to any SMART goal"
-            />
-          </View>
-
-          <Pressable style={styles.helpGotItBtn} onPress={onClose}>
-            <Text style={styles.helpGotItBtnText}>Got it</Text>
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-function HelpRow(props: { emoji: string; text: string }) {
-  const { emoji, text } = props;
-
-  return (
-    <View style={styles.helpRow}>
-      <View style={styles.helpEmojiCircle}>
-        <Text style={styles.helpEmoji}>{emoji}</Text>
-      </View>
-      <Text style={styles.helpRowText}>{text}</Text>
     </View>
   );
 }
@@ -1751,12 +1496,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#374151",
   },
-  formQuestionLabel: {
-    marginBottom: 6,
-    fontSize: 12,
-    fontWeight: "900",
-    color: "#374151",
-  },
 
   addRow: {
     marginTop: 12,
@@ -1931,20 +1670,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "900",
     color: "#111827",
-  },
-  habitAnswerPreview: {
-    marginTop: 2,
-  },
-  habitAnswerPreviewLabel: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#7C3AED",
-  },
-  habitAnswerPreviewText: {
-    marginTop: 2,
-    fontSize: 11,
-    lineHeight: 16,
-    color: "#6B7280",
   },
 
   taskCheckBtn: {
@@ -2231,100 +1956,5 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "900",
     marginTop: -1,
-  },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(17,24,39,0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 22,
-  },
-  helpModalCard: {
-    width: "100%",
-    maxWidth: 360,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#F3E8FF",
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 6,
-  },
-  helpIconWrap: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    alignSelf: "center",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F5F3FF",
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-  },
-  helpIconText: {
-    fontSize: 26,
-    fontWeight: "900",
-    color: "#7C3AED",
-  },
-  helpModalTitle: {
-    marginTop: 14,
-    fontSize: 20,
-    fontWeight: "900",
-    color: "#111827",
-    textAlign: "center",
-  },
-  helpModalSub: {
-    marginTop: 6,
-    fontSize: 13,
-    lineHeight: 18,
-    color: "#6B7280",
-    textAlign: "center",
-  },
-  helpList: {
-    marginTop: 18,
-    gap: 12,
-  },
-  helpRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  helpEmojiCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#FAF5FF",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-  },
-  helpEmoji: {
-    fontSize: 15,
-  },
-  helpRowText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
-    color: "#374151",
-    fontWeight: "600",
-    paddingTop: 6,
-  },
-  helpGotItBtn: {
-    marginTop: 18,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: "#7C3AED",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  helpGotItBtnText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "800",
   },
 });
