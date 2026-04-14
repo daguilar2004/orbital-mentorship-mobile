@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -735,6 +735,20 @@ export default function Notes() {
   const [insightsMenuOpen, setInsightsMenuOpen] = useState(false);
 
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [contextMenuNote, setContextMenuNote] = useState<string | null>(null);
+  const [exitConfirmVisible, setExitConfirmVisible] = useState(false);
+
+  const editorPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) =>
+        gs.dx > 40 && Math.abs(gs.dy) < 60,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dx > 80) {
+          setExitConfirmVisible(true);
+        }
+      },
+    })
+  ).current;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1216,6 +1230,7 @@ export default function Notes() {
       noteContent = text;
     }
 
+
     if (editingNote) {
       const updatedNote: Note = {
         _id: getNoteId(editingNote),
@@ -1333,22 +1348,22 @@ export default function Notes() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {!selectedType && (
-          <>
-            {/* ── TOP BAR ──────────────────────────────────────── */}
-            <View style={styles.topBar}>
-              <View style={styles.toolbarRow}>
-                <View style={styles.searchField}>
-                  <Text style={styles.searchGlyph}>⌕</Text>
-                  <TextInput
-                    placeholder="Search notes"
-                    placeholderTextColor="#ffffff"
-                    value={search}
-                    onChangeText={setSearch}
-                    style={styles.searchInput}
-                  />
-                </View>
+      <Pressable style={styles.container} onPress={() => { setSortMenuOpen(false); setInsightsMenuOpen(false); }}>
+      {!selectedType && (
+        <>
+      {/* ── TOP BAR ──────────────────────────────────────── */}
+      <View style={styles.topBar}>
+        <View style={styles.toolbarRow}>
+          <View style={styles.searchField}>
+            <Text style={styles.searchGlyph}>⌕</Text>
+            <TextInput
+              placeholder="Search notes"
+              placeholderTextColor="#98A2B3"
+              value={search}
+              onChangeText={setSearch}
+              style={styles.searchInput}
+            />
+          </View>
 
                 <TouchableOpacity
                   onPress={() => {
@@ -1375,33 +1390,34 @@ export default function Notes() {
                   </Text>
                 </TouchableOpacity>
 
-                <View style={styles.dropdownWrap}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setInsightsMenuOpen((open) => !open);
-                      setSortMenuOpen(false);
-                    }}
+                <TouchableOpacity
+                  onPress={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+                  style={[styles.headerButton, selectMode && styles.headerButtonActive]}
+                >
+                  <Text
                     style={[
-                      styles.headerButton,
-                      styles.dropdownButton,
-                      insightsMenuOpen && styles.headerButtonActive,
+                      styles.headerButtonText,
+                      selectMode && styles.headerButtonTextOnDark,
                     ]}
                   >
-                    <Text
+                    {selectMode ? "Done" : "Select"}
+                  </Text>
+                </TouchableOpacity>
+
+            {insightsMenuOpen && (
+              <View style={styles.dropdownMenu} onStartShouldSetResponder={() => true}>
+                {viewMenuModes.map((mode) => {
+                  const isActive = viewMode === mode.key;
+                  return (
+                    <TouchableOpacity
+                      key={mode.key}
+                      onPress={() => { setActiveView(mode.key); setInsightsMenuOpen(false); }}
                       style={[
-                        styles.headerButtonText,
-                        insightsMenuOpen && styles.headerButtonTextOnDark,
+                        styles.sortIcon,
+                        sortMenuOpen && styles.headerButtonTextOnDark,
                       ]}
                     >
-                      Views
-                    </Text>
-                    <Text
-                      style={[
-                        styles.dropdownCaret,
-                        insightsMenuOpen && styles.headerButtonTextOnDark,
-                      ]}
-                    >
-                      ▾
+                      ⇅
                     </Text>
                   </TouchableOpacity>
 
@@ -1439,6 +1455,110 @@ export default function Notes() {
                         })}
                       </View>
                     </>
+                  )}
+                </View>
+
+                <View style={styles.dropdownWrap}>
+                  <TouchableOpacity
+                    key={getNoteId(item)}
+                    onPress={() => {
+                      if (contextMenuNote === getNoteId(item)) { setContextMenuNote(null); return; }
+                      selectMode ? toggleSelectNote(getNoteId(item)) : openEditNote(item);
+                    }}
+                    onLongPress={() => {
+                      if (selectMode) {
+                        toggleSelectNote(getNoteId(item));
+                      } else {
+                        setContextMenuNote(getNoteId(item));
+                      }
+                    }}
+                    style={[
+                      styles.headerButton,
+                      styles.dropdownButton,
+                      insightsMenuOpen && styles.headerButtonActive,
+                    ]}
+                  >
+                    {selectMode && (
+                      <TouchableOpacity
+                        onPress={() => toggleSelectNote(getNoteId(item))}
+                        style={[styles.checkbox, selectedIds.has(getNoteId(item)) && styles.checkboxSelected, { marginRight: 12 }]}
+                      />
+                    )}
+
+                        <View style={{ flex: 1 }}>
+                          <View style={styles.noteHeader}>
+                            <Text style={styles.noteTitle}>{item.title}</Text>
+                            {!selectMode && (
+                              <TouchableOpacity
+                                onPress={() => toggleFavorite(getNoteId(item))}
+                                hitSlop={{
+                                  top: 16,
+                                  bottom: 16,
+                                  left: 16,
+                                  right: 16,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 24,
+                                    color: item.favorite
+                                      ? "#FB8C00"
+                                      : "#D0D5DD",
+                                  }}
+                                >
+                                  ★
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+
+                          {Array.isArray(item.text) ? (
+                            item.text.map((section, index) => (
+                              <View key={index} style={styles.noteSection}>
+                                <Text style={styles.sectionLabel}>
+                                  {getLabels(category)[index]}
+                                </Text>
+                                <Text style={noteTextStyle(item.formatting)}>
+                                  {section}
+                                </Text>
+                              </View>
+                            ))
+                          ) : (
+                            <>
+                              <Text style={styles.sectionLabel}>
+                                {getLabels(category)}
+                              </Text>
+                              <Text style={noteTextStyle(item.formatting)}>
+                                {item.text}
+                              </Text>
+                            </>
+                          )}
+
+                      {contextMenuNote === getNoteId(item) && (
+                        <View style={styles.contextMenu}>
+                          <TouchableOpacity
+                            onPress={() => { exportNoteToPDF(item); setContextMenuNote(null); }}
+                            style={styles.contextMenuItem}
+                          >
+                            <Text style={styles.noteActionExport}>Export</Text>
+                          </TouchableOpacity>
+                          <View style={styles.contextMenuDivider} />
+                          <TouchableOpacity
+                            onPress={() => { openEditNote(item); setContextMenuNote(null); }}
+                            style={styles.contextMenuItem}
+                          >
+                            <Text style={styles.noteActionEdit}>Edit</Text>
+                          </TouchableOpacity>
+                          <View style={styles.contextMenuDivider} />
+                          <TouchableOpacity
+                            onPress={() => { handleDeleteOne(getNoteId(item)); setContextMenuNote(null); }}
+                            style={styles.contextMenuItem}
+                          >
+                            <Text style={styles.noteActionDelete}>Delete</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
                   )}
                 </View>
               </View>
@@ -1991,13 +2111,13 @@ export default function Notes() {
                 <Text style={{ color: "white" }}>Save</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.cancelButton} onPress={closeEditor}>
-                <Text>Cancel</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        )}
-      </View>
+            <TouchableOpacity style={styles.cancelButton} onPress={closeEditor}>
+              <Text>Cancel</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      )}
+      </Pressable>
     </SafeAreaView>
   );
 }
