@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { useEffect, useState } from "react";
@@ -6,7 +7,6 @@ import {
   Alert,
   BackHandler,
   Modal,
-  PanResponder,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -84,9 +84,9 @@ const defaultFormatting: Formatting = {
 
 const fontColors = [
   "#000000",
-  "#E53935",
-  "#1E88E5",
-  "#43A047",
+  "#000000",
+  "#e373bd",
+  "#cfc2eb",
   "#FB8C00",
   "#8E24AA",
 ];
@@ -103,6 +103,24 @@ function noteTextStyle(f?: Formatting) {
     color: format.fontColor,
   };
 }
+
+const HeartButton = ({
+  selected,
+  onPress,
+}: {
+  selected: boolean;
+  onPress: () => void;
+}) => {
+  return (
+    <Pressable onPress={onPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <MaterialCommunityIcons
+        name={selected ? "heart" : "heart-outline"}
+        size={24}
+        color={selected ? "#ff3b89" : "#9ca3af"}
+      />
+    </Pressable>
+  );
+};
 
 async function getHeadersWithAuth() {
   // TODO: Replace with real token from AsyncStorage when login is implemented
@@ -379,10 +397,12 @@ const graphStyles = StyleSheet.create({
 function TimelineView({
   notes,
   onOpenNote,
+  onToggleFavorite,
   getLabels,
 }: {
   notes: Note[];
   onOpenNote: (note: Note) => void;
+  onToggleFavorite?: (id: string) => void;
   getLabels: (type: string | null) => any;
 }) {
   const sorted = [...notes].sort((a, b) => {
@@ -461,9 +481,20 @@ function TimelineView({
                       {displayLabels[item.type] ?? item.type}
                     </Text>
                   </View>
-                  {item.favorite && (
-                    <Text style={{ color: "#FB8C00", fontSize: 14 }}>★</Text>
-                  )}
+                  {item.favorite ? (
+                    onToggleFavorite ? (
+                      <HeartButton
+                        selected
+                        onPress={() => onToggleFavorite(item._id || item.id || "")}
+                      />
+                    ) : (
+                      <MaterialCommunityIcons
+                        name="star"
+                        size={18}
+                        color="#FB8C00"
+                      />
+                    )
+                  ) : null}
                 </View>
                 <Text style={tlStyles.noteTitle}>{item.title}</Text>
                 <Text style={tlStyles.notePreview} numberOfLines={2}>
@@ -612,12 +643,10 @@ function FavoritesView({
                 {displayLabels[item.type] ?? item.type}
               </Text>
             </View>
-            <TouchableOpacity
+            <HeartButton
+              selected={!!item.favorite}
               onPress={() => onToggleFavorite(item._id || item.id || "")}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Text style={{ color: "#FB8C00", fontSize: 20 }}>★</Text>
-            </TouchableOpacity>
+            />
           </View>
 
           <Text style={favStyles.title}>{item.title}</Text>
@@ -626,18 +655,6 @@ function FavoritesView({
               ? item.text.find((t) => t.trim())
               : item.text}
           </Text>
-
-          <View style={favStyles.actions}>
-            <TouchableOpacity onPress={() => onExport(item)}>
-              <Text style={styles.noteActionExport}>Export</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => onOpenNote(item)}>
-              <Text style={{ color: "#1E88E5", fontSize: 13 }}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => onDelete(item._id || item.id || "")}>
-              <Text style={{ color: "#E53935", fontSize: 13 }}>Delete</Text>
-            </TouchableOpacity>
-          </View>
         </TouchableOpacity>
       ))}
     </ScrollView>
@@ -1198,7 +1215,7 @@ export default function Notes() {
       if (!text.trim()) return;
       noteContent = text;
     }
-    
+
     if (editingNote) {
       const updatedNote: Note = {
         _id: getNoteId(editingNote),
@@ -1265,22 +1282,45 @@ export default function Notes() {
     setViewMode(mode);
   };
 
-  const toggleFavorite = (id: string) => {
+  const toggleFavorite = async (id: string) => {
+    const currentNote = notes.find((n) => getNoteId(n) === id);
+    if (!currentNote) return;
+
+    const newFavorite = !currentNote.favorite;
+
+    // Update local state immediately for better UX
     setNotes((prevNotes) =>
       prevNotes.map((n) =>
-        getNoteId(n) === id ? { ...n, favorite: !n.favorite } : n
+        getNoteId(n) === id ? { ...n, favorite: newFavorite } : n
       )
     );
+
+    // Send update to backend
+    try {
+      const headers = await getHeadersWithAuth();
+      const response = await fetch(`${API_BASE_URL}/notes/${id}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ favorite: newFavorite }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        throw new Error(
+          `Failed to update favorite (${response.status} ${response.statusText})${errorText ? `: ${errorText}` : ""}`
+        );
+      }
+    } catch (err) {
+      // Revert local state on error
+      setNotes((prevNotes) =>
+        prevNotes.map((n) =>
+          getNoteId(n) === id ? { ...n, favorite: !newFavorite } : n
+        )
+      );
+      Alert.alert("Error", "Failed to update favorite status");
+      console.error("Failed to update favorite:", err);
+    }
   };
-  
-  if (loading && notes.length === 0) {
-    return (
-      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
-        <ActivityIndicator size="large" color="#7C3AED" />
-        <Text style={{ marginTop: 10 }}>Loading notes...</Text>
-      </View>
-    );
-  }
 
   if (loading && notes.length === 0) {
     return (
@@ -1311,68 +1351,29 @@ export default function Notes() {
                 </View>
 
                 <TouchableOpacity
-                  onPress={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
-                  style={[styles.headerButton, selectMode && styles.headerButtonActive]}
+                  onPress={() => {
+                    if (sortMode === 'az') {
+                      toggleSortMode('za');
+                    } else if (sortMode === 'za') {
+                      setSortMode('default');
+                    } else {
+                      toggleSortMode('az');
+                    }
+                  }}
+                  style={[
+                    styles.headerButton,
+                    (sortMode === 'az' || sortMode === 'za') && styles.headerButtonActive,
+                  ]}
                 >
                   <Text
                     style={[
                       styles.headerButtonText,
-                      selectMode && styles.headerButtonTextOnDark,
+                      (sortMode === 'az' || sortMode === 'za') && styles.headerButtonTextOnDark,
                     ]}
                   >
-                    {selectMode ? "Done" : "Select"}
+                    {sortMode === 'az' ? 'A-Z' : sortMode === 'za' ? 'Z-A' : '⇅'}
                   </Text>
                 </TouchableOpacity>
-
-                <View style={styles.dropdownWrap}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSortMenuOpen((open) => !open);
-                      setInsightsMenuOpen(false);
-                    }}
-                    style={[
-                      styles.headerButton,
-                      styles.sortButton,
-                      sortMenuOpen && styles.headerButtonActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.sortIcon,
-                        sortMenuOpen && styles.headerButtonTextOnDark,
-                      ]}
-                    >
-                      ⇅
-                    </Text>
-                  </TouchableOpacity>
-
-                  {sortMenuOpen && (
-                    <View style={styles.dropdownMenu}>
-                      {sortMenuModes.map((mode) => {
-                        const isActive = sortMode === mode.key;
-                        return (
-                          <TouchableOpacity
-                            key={mode.key}
-                            onPress={() => toggleSortMode(mode.key)}
-                            style={[
-                              styles.dropdownItem,
-                              isActive && styles.dropdownItemActive,
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.dropdownItemTitle,
-                                isActive && styles.dropdownItemTitleActive,
-                              ]}
-                            >
-                              {mode.label}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  )}
-                </View>
 
                 <View style={styles.dropdownWrap}>
                   <TouchableOpacity
@@ -1405,30 +1406,39 @@ export default function Notes() {
                   </TouchableOpacity>
 
                   {insightsMenuOpen && (
-                    <View style={styles.dropdownMenu}>
-                      {viewMenuModes.map((mode) => {
-                        const isActive = viewMode === mode.key;
-                        return (
-                          <TouchableOpacity
-                            key={mode.key}
-                            onPress={() => setActiveView(mode.key)}
-                            style={[
-                              styles.dropdownItem,
-                              isActive && styles.dropdownItemActive,
-                            ]}
-                          >
-                            <Text
+                    <>
+                      <Pressable
+                        style={styles.dropdownOverlay}
+                        onPress={() => setInsightsMenuOpen(false)}
+                      />
+                      <View style={styles.dropdownMenu}>
+                        {viewMenuModes.map((mode) => {
+                          const isActive = viewMode === mode.key;
+                          return (
+                            <TouchableOpacity
+                              key={mode.key}
+                              onPress={() => {
+                                setActiveView(mode.key);
+                                setInsightsMenuOpen(false);
+                              }}
                               style={[
-                                styles.dropdownItemTitle,
-                                isActive && styles.dropdownItemTitleActive,
+                                styles.dropdownItem,
+                                isActive && styles.dropdownItemActive,
                               ]}
                             >
-                              {mode.label}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
+                              <Text
+                                style={[
+                                  styles.dropdownItemTitle,
+                                  isActive && styles.dropdownItemTitleActive,
+                                ]}
+                              >
+                                {mode.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </>
                   )}
                 </View>
               </View>
@@ -1529,26 +1539,10 @@ export default function Notes() {
                                 <View style={styles.noteHeader}>
                                   <Text style={styles.noteTitle}>{item.title}</Text>
                                   {!selectMode && (
-                                    <TouchableOpacity
+                                    <HeartButton
+                                      selected={!!item.favorite}
                                       onPress={() => toggleFavorite(getNoteId(item))}
-                                      hitSlop={{
-                                        top: 8,
-                                        bottom: 8,
-                                        left: 8,
-                                        right: 8,
-                                      }}
-                                    >
-                                      <Text
-                                        style={{
-                                          fontSize: 18,
-                                          color: item.favorite
-                                            ? "#ff3b89"
-                                            : "#D0D5DD",
-                                        }}
-                                      >
-                                        ★
-                                      </Text>
-                                    </TouchableOpacity>
+                                    />
                                   )}
                                 </View>
 
@@ -1574,29 +1568,6 @@ export default function Notes() {
                                   </>
                                 )}
 
-                                {!selectMode && (
-                                  <View style={styles.noteActions}>
-                                    <TouchableOpacity
-                                      onPress={() => exportNoteToPDF(item)}
-                                    >
-                                      <Text style={styles.noteActionExport}>
-                                        Export
-                                      </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                      onPress={() => openEditNote(item)}
-                                    >
-                                      <Text style={styles.noteActionEdit}>Edit</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                      onPress={() => handleDeleteOne(item.id)}
-                                    >
-                                      <Text style={styles.noteActionDelete}>
-                                        Delete
-                                      </Text>
-                                    </TouchableOpacity>
-                                  </View>
-                                )}
                               </View>
                             </TouchableOpacity>
                           ))}
@@ -1611,6 +1582,7 @@ export default function Notes() {
                 <TimelineView
                   notes={visibleNotes}
                   onOpenNote={openEditNote}
+                  onToggleFavorite={toggleFavorite}
                   getLabels={getLabels}
                 />
               )}
@@ -1787,29 +1759,7 @@ export default function Notes() {
                               </>
                             )}
 
-                            {!selectMode && (
-                              <View
-                                style={{
-                                  flexDirection: "row",
-                                  justifyContent: "flex-end",
-                                  marginTop: 8,
-                                }}
-                              >
-                                <TouchableOpacity onPress={() => exportNoteToPDF(item)} style={{ marginRight: 12 }}>
-                                  <Text style={{ color: "#4CAF50" }}>Export</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                  onPress={() => openEditNote(item)}
-                                  style={{ marginRight: 12 }}
-                                >
-                                  <Text style={{ color: "#1E88E5" }}>Edit</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity onPress={() => handleDeleteOne(getNoteId(item))}>
-                                  <Text style={{ color: "#E53935" }}>Delete</Text>
-                                </TouchableOpacity>
-                              </View>
-                            )}
+                            {/* Removed per-item action buttons per request: actions now in bulk bar while selecting */}
                           </View>
                         </TouchableOpacity>
                       ))}
@@ -1819,29 +1769,62 @@ export default function Notes() {
             </View>
             {selectMode && (
               <View style={styles.bulkBar}>
-                <Text style={{ color: "white", fontSize: 14 }}>
-                  {selectedIds.size} selected
-                </Text>
-                <View style={{ flexDirection: "row", gap: 12 }}>
+                <View style={{ flexDirection: "row", justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flexDirection: "row", gap: 12 }}>
+                    <TouchableOpacity
+                      onPress={handleDeleteSelected}
+                      disabled={selectedIds.size === 0}
+                      style={[
+                        styles.bulkDeleteBtn,
+                        selectedIds.size === 0 && { opacity: 0.4 },
+                      ]}
+                    >
+                      <MaterialCommunityIcons name="trash-can" size={24} color="white" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (selectedIds.size === 1) {
+                          const selectedId = Array.from(selectedIds)[0];
+                          const selectedNote = notes.find((n) => getNoteId(n) === selectedId);
+                          if (selectedNote) {
+                            openEditNote(selectedNote);
+                            setSelectMode(false);
+                            setSelectedIds(new Set());
+                          }
+                        } else {
+                          Alert.alert("Edit note", "Select exactly one note to edit.");
+                        }
+                      }}
+                      disabled={selectedIds.size !== 1}
+                      style={[
+                        styles.bulkEditBtn,
+                        selectedIds.size !== 1 && { opacity: 0.4 },
+                      ]}
+                    >
+                      <MaterialCommunityIcons name="pencil" size={24} color="white" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={exportSelectedNotesToPDF}
+                      disabled={selectedIds.size === 0}
+                      style={[
+                        styles.bulkExportBtn,
+                        selectedIds.size === 0 && { opacity: 0.4 },
+                      ]}
+                    >
+                      <MaterialCommunityIcons name="file-export" size={24} color="white" />
+                    </TouchableOpacity>
+                  </View>
+
                   <TouchableOpacity
-                    onPress={exportSelectedNotesToPDF}
-                    disabled={selectedIds.size === 0}
-                    style={[
-                      styles.bulkExportBtn,
-                      selectedIds.size === 0 && { opacity: 0.4 },
-                    ]}
+                    onPress={() => {
+                      setSelectMode(false);
+                      setSelectedIds(new Set());
+                    }}
+                    style={styles.bulkDoneBtn}
                   >
-                    <Text style={{ color: "white", fontWeight: "bold" }}>Export</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleDeleteSelected}
-                    disabled={selectedIds.size === 0}
-                    style={[
-                      styles.bulkDeleteBtn,
-                      selectedIds.size === 0 && { opacity: 0.4 },
-                    ]}
-                  >
-                    <Text style={{ color: "white", fontWeight: "bold" }}>Delete</Text>
+                    <MaterialCommunityIcons name="check" size={24} color="white" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -2100,6 +2083,14 @@ const styles = StyleSheet.create({
     color: "#344054",
     marginLeft: 8,
   },
+  dropdownOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 19,
+  },
   dropdownMenu: {
     position: "absolute",
     top: 50,
@@ -2283,95 +2274,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
   },
-  exitOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 28,
-  },
-  exitSheet: {
-    width: "100%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 24,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 10,
-  },
-  exitTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 8,
-  },
-  exitSubtitle: {
-    fontSize: 14,
-    color: "#667085",
-    textAlign: "center",
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  exitBtnSave: {
-    width: "100%",
-    backgroundColor: "#111827",
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  exitBtnSaveText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  exitBtnDiscard: {
-    width: "100%",
-    backgroundColor: "#FEE2E2",
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  exitBtnDiscardText: {
-    color: "#DC2626",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  exitBtnCancel: {
-    width: "100%",
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  exitBtnCancelText: {
-    color: "#667085",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  contextMenu: {
-    marginTop: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#0F172A",
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-    overflow: "hidden",
-  },
-  contextMenuItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  contextMenuDivider: {
-    height: 1,
-    backgroundColor: "#F2F4F7",
-  },
   folderCard: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -2519,24 +2421,46 @@ const styles = StyleSheet.create({
     bottom: 14,
     left: 16,
     right: 16,
-    backgroundColor: "#111827",
+    backgroundColor: 'transparent',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 24,
+    paddingHorizontal: 0,
     paddingVertical: 16,
     borderRadius: 20,
+    paddingRight: 8,
   },
   bulkExportBtn: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: "#4CAF50",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   bulkDeleteBtn: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: "#E53935",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bulkEditBtn: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#1E88E5",
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bulkDoneBtn: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#9CA3AF",
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 'auto',
   },
 });

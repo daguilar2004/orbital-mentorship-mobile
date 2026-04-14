@@ -10,7 +10,7 @@ import {
   TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useApp, Phase, Task } from "./context/AppContext";
+import { useApp, Phase, Task } from "../context/AppContext";
 
 export default function Home() {
   const {
