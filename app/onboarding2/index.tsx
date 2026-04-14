@@ -1,16 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Modal,
-  Platform,
-  TextInput,
-} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useApp, Phase, Task } from "../context/AppContext";
+import { router } from "expo-router";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function Home() {
   const {

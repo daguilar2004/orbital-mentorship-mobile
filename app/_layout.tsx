@@ -42,6 +42,19 @@ export default function Layout() {
         }}
       >
         <Drawer.Screen
+          name="onboarding2/profile-setup"
+          options={{
+            title: "Onboarding",
+          }}
+        />
+
+        <Drawer.Screen
+          name="onboarding"
+          options={{
+            drawerItemStyle: { display: "none" },
+          }}
+        />
+        <Drawer.Screen
           name="index"
           options={{
             title: "Home",
