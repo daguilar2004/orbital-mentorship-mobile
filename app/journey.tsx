@@ -199,34 +199,21 @@ export default function Journey() {
     }
   };
 
-  const removeHabit = (id: string) => {
+  const removeHabit = async (id: string) => {
     const linkedGoal = goals.find((goal) => goal.linkedHabitId === id);
 
-    Alert.alert(
-      "Delete daily habit?",
-      "Do you want to delete this daily habit?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              if (linkedGoal) {
-                await updateGoal(linkedGoal.id, { linkedHabitId: null });
-              }
+    try {
+      if (linkedGoal) {
+        await updateGoal(linkedGoal.id, { linkedHabitId: null });
+      }
 
-              await deleteHabit(id);
-              await loadJourney();
-              setSelectedHabitId((prev) => (prev === id ? null : prev));
-            } catch (error) {
-              console.error("Failed to delete habit:", error);
-              Alert.alert("Error", "Failed to delete daily habit.");
-            }
-          },
-        },
-      ],
-    );
+      await deleteHabit(id);
+      await loadJourney();
+      setSelectedHabitId((prev) => (prev === id ? null : prev));
+    } catch (error) {
+      console.error("Failed to delete habit:", error);
+      Alert.alert("Error", "Failed to delete daily habit.");
+    }
   };
 
   const toggleHabitCompletion = async (id: string) => {
@@ -276,7 +263,7 @@ export default function Journey() {
           onPress: async () => {
             const idToDelete = selectedHabitId;
             setSelectedHabitId(null);
-            removeHabit(idToDelete);
+            await removeHabit(idToDelete);
           },
         },
       ],
