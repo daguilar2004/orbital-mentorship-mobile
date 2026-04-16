@@ -12,6 +12,62 @@ import {
   TabKey,
 } from "../types/accountability";
 import { getTodayDayKey, getTodayKey } from "../utils/accountabilityDate";
+import {
+  getHabits,
+  createHabit,
+  updateHabit,
+  toggleHabit,
+  deleteHabit,
+  getGoals,
+  createGoal,
+  updateGoal,
+  toggleGoal as toggleGoalApi,
+  deleteGoal as deleteGoalApi,
+} from "./Services/journey";
+
+type ApiHabit = {
+  _id?: string;
+  id?: string;
+  title?: string;
+  days?: DayKey[];
+  completedOn?: string | null;
+  linkedGoalId?: string | null;
+};
+
+type ApiGoal = {
+  _id?: string;
+  id?: string;
+  title?: string;
+  time?: string;
+  specific?: string;
+  measurable?: string;
+  achievable?: string;
+  relevant?: string;
+  timeBound?: string;
+  completed?: boolean;
+  linkedHabitId?: string | null;
+};
+
+const mapHabitFromApi = (habit: ApiHabit): DailyHabit => ({
+  id: habit._id ?? habit.id ?? "",
+  title: habit.title ?? "",
+  days: (habit.days ?? []) as DayKey[],
+  completedOn: habit.completedOn ?? null,
+  linkedGoalId: habit.linkedGoalId ?? undefined,
+});
+
+const mapGoalFromApi = (goal: ApiGoal): SmartGoal => ({
+  id: goal._id ?? goal.id ?? "",
+  title: goal.title ?? "",
+  time: goal.time ?? "",
+  specific: goal.specific ?? "",
+  measurable: goal.measurable ?? "",
+  achievable: goal.achievable || undefined,
+  relevant: goal.relevant || undefined,
+  timeBound: goal.timeBound ?? "",
+  completed: Boolean(goal.completed),
+  linkedHabitId: goal.linkedHabitId ?? undefined,
+});
 
 export default function Journey() {
   const [introDone, setIntroDone] = useState(false);
@@ -21,63 +77,14 @@ export default function Journey() {
   const todayKey = getTodayKey();
   const todayDayKey = getTodayDayKey();
 
-  const [habits, setHabits] = useState<DailyHabit[]>([
-    {
-      id: "h1",
-      title: "Morning meditation",
-      days: ["S", "M", "T", "W", "T2", "F", "S2"],
-      completedOn: null,
-    },
-    {
-      id: "h2",
-      title: "Daily coding practice",
-      days: ["S", "M", "T", "W", "T2", "F", "S2"],
-      completedOn: null,
-    },
-  ]);
-
+  const [habits, setHabits] = useState<DailyHabit[]>([]);
   const [showHabitForm, setShowHabitForm] = useState(false);
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
   const [habitTitle, setHabitTitle] = useState("");
   const [habitDays, setHabitDays] = useState<DayKey[]>([]);
 
-  const [goals, setGoals] = useState<SmartGoal[]>([
-    {
-      id: "g1",
-      title: "Practice clear communication",
-      time: "This week",
-      specific:
-        "Explain one technical concept in simple language to someone outside my field.",
-      measurable:
-        "They can repeat the idea back accurately without extra clarification.",
-      achievable:
-        "I have at least one opportunity this week to explain a concept to someone.",
-      relevant:
-        "Clear communication supports the kind of professional and leader I want to become.",
-      timeBound: "Complete by Sunday evening.",
-      completed: false,
-      linkedHabitId: "g1-habit",
-    },
-  ]);
-
-  useEffect(() => {
-    setHabits((prev) => {
-      const exists = prev.some((habit) => habit.id === "g1-habit");
-      if (exists) return prev;
-      return [
-        ...prev,
-        {
-          id: "g1-habit",
-          title: "Practice explaining one idea clearly",
-          days: ["M", "W", "F"],
-          completedOn: null,
-          linkedGoalId: "g1",
-        },
-      ];
-    });
-  }, []);
-
-  const [expandedGoalId, setExpandedGoalId] = useState<string | null>("g1");
+  const [goals, setGoals] = useState<SmartGoal[]>([]);
+  const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
@@ -95,6 +102,36 @@ export default function Journey() {
 
   const [showGoalsHelp, setShowGoalsHelp] = useState(false);
   const [hasSeenGoalsHelp, setHasSeenGoalsHelp] = useState(false);
+
+  const loadJourney = async () => {
+    try {
+      const [habitData, goalData] = await Promise.all([getHabits(), getGoals()]);
+
+      const mappedHabits = (habitData ?? []).map(mapHabitFromApi);
+      const mappedGoals = (goalData ?? []).map(mapGoalFromApi);
+
+      setHabits(mappedHabits);
+      setGoals(mappedGoals);
+
+      setExpandedGoalId((prev) => {
+        if (!prev) return mappedGoals[0]?.id ?? null;
+        return mappedGoals.some((goal) => goal.id === prev)
+          ? prev
+          : mappedGoals[0]?.id ?? null;
+      });
+
+      setSelectedGoalId((prev) =>
+        prev && mappedGoals.some((goal) => goal.id === prev) ? prev : null
+      );
+    } catch (error) {
+      console.error("Failed to load journey data:", error);
+      Alert.alert("Error", "Failed to load journey data from the backend.");
+    }
+  };
+
+  useEffect(() => {
+    loadJourney();
+  }, []);
 
   useEffect(() => {
     if (activeTab === "goals" && !hasSeenGoalsHelp) {
@@ -114,19 +151,23 @@ export default function Journey() {
     clearHabitForm();
   };
 
-  const addHabit = () => {
+  const addHabit = async () => {
     if (!habitTitle.trim() || habitDays.length === 0) return;
 
-    const newHabit: DailyHabit = {
-      id: String(Date.now()),
-      title: habitTitle.trim(),
-      days: habitDays,
-      completedOn: null,
-    };
+    try {
+      await createHabit({
+        title: habitTitle.trim(),
+        days: habitDays,
+        completedOn: null,
+      });
 
-    setHabits((prev) => [newHabit, ...prev]);
-    setShowHabitForm(false);
-    clearHabitForm();
+      await loadJourney();
+      setShowHabitForm(false);
+      clearHabitForm();
+    } catch (error) {
+      console.error("Failed to create habit:", error);
+      Alert.alert("Error", "Failed to create daily habit.");
+    }
   };
 
   const startEditHabit = (habit: DailyHabit) => {
@@ -136,23 +177,22 @@ export default function Journey() {
     setShowHabitForm(true);
   };
 
-  const saveEditedHabit = () => {
+  const saveEditedHabit = async () => {
     if (!editingHabitId || !habitTitle.trim() || habitDays.length === 0) return;
 
-    setHabits((prev) =>
-      prev.map((habit) =>
-        habit.id === editingHabitId
-          ? {
-              ...habit,
-              title: habitTitle.trim(),
-              days: habitDays,
-            }
-          : habit
-      )
-    );
+    try {
+      await updateHabit(editingHabitId, {
+        title: habitTitle.trim(),
+        days: habitDays,
+      });
 
-    setShowHabitForm(false);
-    clearHabitForm();
+      await loadJourney();
+      setShowHabitForm(false);
+      clearHabitForm();
+    } catch (error) {
+      console.error("Failed to update habit:", error);
+      Alert.alert("Error", "Failed to update daily habit.");
+    }
   };
 
   const removeHabit = (id: string) => {
@@ -163,33 +203,31 @@ export default function Journey() {
       {
         text: "Delete",
         style: "destructive",
-        onPress: () => {
-          setHabits((prev) => prev.filter((habit) => habit.id !== id));
-          if (linkedGoal) {
-            setGoals((prev) =>
-              prev.map((goal) =>
-                goal.id === linkedGoal.id
-                  ? { ...goal, linkedHabitId: undefined }
-                  : goal
-              )
-            );
+        onPress: async () => {
+          try {
+            if (linkedGoal) {
+              await updateGoal(linkedGoal.id, { linkedHabitId: null });
+            }
+
+            await deleteHabit(id);
+            await loadJourney();
+          } catch (error) {
+            console.error("Failed to delete habit:", error);
+            Alert.alert("Error", "Failed to delete daily habit.");
           }
         },
       },
     ]);
   };
 
-  const toggleHabitCompletion = (id: string) => {
-    setHabits((prev) =>
-      prev.map((habit) => {
-        if (habit.id !== id) return habit;
-        const isDoneToday = habit.completedOn === todayKey;
-        return {
-          ...habit,
-          completedOn: isDoneToday ? null : todayKey,
-        };
-      })
-    );
+  const toggleHabitCompletion = async (id: string) => {
+    try {
+      await toggleHabit(id);
+      await loadJourney();
+    } catch (error) {
+      console.error("Failed to toggle habit:", error);
+      Alert.alert("Error", "Failed to update habit completion.");
+    }
   };
 
   const toggleDay = (
@@ -222,7 +260,7 @@ export default function Journey() {
     clearGoalForm();
   };
 
-  const addGoal = () => {
+  const addGoal = async () => {
     if (
       !goalTitle.trim() ||
       !goalTime.trim() ||
@@ -233,41 +271,48 @@ export default function Journey() {
       return;
     }
 
-    const newGoalId = String(Date.now());
-    let linkedHabitId: string | undefined;
+    try {
+      const createdGoal = await createGoal({
+        title: goalTitle.trim(),
+        time: goalTime.trim(),
+        specific: goalSpecific.trim(),
+        measurable: goalMeasurable.trim(),
+        achievable: goalAchievable.trim(),
+        relevant: goalRelevant.trim(),
+        timeBound: goalTimeBound.trim(),
+        completed: false,
+      });
 
-    if (goalHabitTitle.trim() && goalHabitDays.length > 0) {
-      linkedHabitId = `${newGoalId}-habit`;
+      const createdGoalId = createdGoal?._id ?? createdGoal?.id;
 
-      const linkedHabit: DailyHabit = {
-        id: linkedHabitId,
-        title: goalHabitTitle.trim(),
-        days: goalHabitDays,
-        completedOn: null,
-        linkedGoalId: newGoalId,
-      };
+      if (!createdGoalId) {
+        throw new Error("Created goal ID was not returned by the backend.");
+      }
 
-      setHabits((prev) => [linkedHabit, ...prev]);
+      if (goalHabitTitle.trim() && goalHabitDays.length > 0) {
+        const createdHabit = await createHabit({
+          title: goalHabitTitle.trim(),
+          days: goalHabitDays,
+          completedOn: null,
+          linkedGoalId: createdGoalId,
+        });
+
+        const createdHabitId = createdHabit?._id ?? createdHabit?.id;
+
+        if (createdHabitId) {
+          await updateGoal(createdGoalId, { linkedHabitId: createdHabitId });
+        }
+      }
+
+      await loadJourney();
+      setExpandedGoalId(createdGoalId);
+      setSelectedGoalId(null);
+      setShowGoalForm(false);
+      clearGoalForm();
+    } catch (error) {
+      console.error("Failed to create goal:", error);
+      Alert.alert("Error", "Failed to create SMART goal.");
     }
-
-    const newGoal: SmartGoal = {
-      id: newGoalId,
-      title: goalTitle.trim(),
-      time: goalTime.trim(),
-      specific: goalSpecific.trim(),
-      measurable: goalMeasurable.trim(),
-      achievable: goalAchievable.trim() || undefined,
-      relevant: goalRelevant.trim() || undefined,
-      timeBound: goalTimeBound.trim(),
-      completed: false,
-      linkedHabitId,
-    };
-
-    setGoals((prev) => [newGoal, ...prev]);
-    setExpandedGoalId(newGoal.id);
-    setSelectedGoalId(null);
-    setShowGoalForm(false);
-    clearGoalForm();
   };
 
   const startEditGoal = (goal: SmartGoal) => {
@@ -289,7 +334,7 @@ export default function Journey() {
     setShowGoalForm(true);
   };
 
-  const saveEditedGoal = () => {
+  const saveEditedGoal = async () => {
     if (
       !editingGoalId ||
       !goalTitle.trim() ||
@@ -301,81 +346,84 @@ export default function Journey() {
       return;
     }
 
-    const existingGoal = goals.find((goal) => goal.id === editingGoalId);
-    const existingLinkedHabit = habits.find(
-      (habit) => habit.id === existingGoal?.linkedHabitId
-    );
+    try {
+      const existingGoal = goals.find((goal) => goal.id === editingGoalId);
+      const existingLinkedHabit = habits.find(
+        (habit) => habit.id === existingGoal?.linkedHabitId
+      );
 
-    let nextLinkedHabitId = existingGoal?.linkedHabitId;
+      await updateGoal(editingGoalId, {
+        title: goalTitle.trim(),
+        time: goalTime.trim(),
+        specific: goalSpecific.trim(),
+        measurable: goalMeasurable.trim(),
+        achievable: goalAchievable.trim(),
+        relevant: goalRelevant.trim(),
+        timeBound: goalTimeBound.trim(),
+      });
 
-    if (goalHabitTitle.trim() && goalHabitDays.length > 0) {
-      if (existingLinkedHabit) {
-        setHabits((prev) =>
-          prev.map((habit) =>
-            habit.id === existingLinkedHabit.id
-              ? {
-                  ...habit,
-                  title: goalHabitTitle.trim(),
-                  days: goalHabitDays,
-                }
-              : habit
-          )
-        );
-      } else {
-        const newLinkedHabitId = `${editingGoalId}-habit`;
-        nextLinkedHabitId = newLinkedHabitId;
+      if (goalHabitTitle.trim() && goalHabitDays.length > 0) {
+        if (existingLinkedHabit) {
+          await updateHabit(existingLinkedHabit.id, {
+            title: goalHabitTitle.trim(),
+            days: goalHabitDays,
+            linkedGoalId: editingGoalId,
+          });
 
-        setHabits((prev) => [
-          {
-            id: newLinkedHabitId,
+          await updateGoal(editingGoalId, {
+            linkedHabitId: existingLinkedHabit.id,
+          });
+        } else {
+          const createdHabit = await createHabit({
             title: goalHabitTitle.trim(),
             days: goalHabitDays,
             completedOn: null,
             linkedGoalId: editingGoalId,
-          },
-          ...prev,
-        ]);
+          });
+
+          const createdHabitId = createdHabit?._id ?? createdHabit?.id;
+
+          if (createdHabitId) {
+            await updateGoal(editingGoalId, { linkedHabitId: createdHabitId });
+          }
+        }
+      } else {
+        if (existingLinkedHabit) {
+          await deleteHabit(existingLinkedHabit.id);
+        }
+
+        await updateGoal(editingGoalId, { linkedHabitId: null });
       }
-    } else if (existingLinkedHabit) {
-      setHabits((prev) =>
-        prev.filter((habit) => habit.id !== existingLinkedHabit.id)
-      );
-      nextLinkedHabitId = undefined;
+
+      await loadJourney();
+      setExpandedGoalId(editingGoalId);
+      setSelectedGoalId(null);
+      setShowGoalForm(false);
+      clearGoalForm();
+    } catch (error) {
+      console.error("Failed to update goal:", error);
+      Alert.alert("Error", "Failed to update SMART goal.");
     }
-
-    setGoals((prev) =>
-      prev.map((goal) =>
-        goal.id === editingGoalId
-          ? {
-              ...goal,
-              title: goalTitle.trim(),
-              time: goalTime.trim(),
-              specific: goalSpecific.trim(),
-              measurable: goalMeasurable.trim(),
-              achievable: goalAchievable.trim() || undefined,
-              relevant: goalRelevant.trim() || undefined,
-              timeBound: goalTimeBound.trim(),
-              linkedHabitId: nextLinkedHabitId,
-            }
-          : goal
-      )
-    );
-
-    setShowGoalForm(false);
-    clearGoalForm();
   };
 
-  const removeGoal = (id: string) => {
-    const goal = goals.find((item) => item.id === id);
+  const removeGoal = async (id: string) => {
+    try {
+      const goal = goals.find((item) => item.id === id);
 
-    if (goal?.linkedHabitId) {
-      setHabits((prev) => prev.filter((habit) => habit.id !== goal.linkedHabitId));
+      if (goal?.linkedHabitId) {
+        await deleteHabit(goal.linkedHabitId);
+      }
+
+      await deleteGoalApi(id);
+      await loadJourney();
+
+      if (expandedGoalId === id) setExpandedGoalId(null);
+      if (selectedGoalId === id) setSelectedGoalId(null);
+      if (editingGoalId === id) cancelGoalForm();
+    } catch (error) {
+      console.error("Failed to delete goal:", error);
+      Alert.alert("Error", "Failed to delete SMART goal.");
     }
-
-    setGoals((prev) => prev.filter((goalItem) => goalItem.id !== id));
-    if (expandedGoalId === id) setExpandedGoalId(null);
-    if (selectedGoalId === id) setSelectedGoalId(null);
-    if (editingGoalId === id) cancelGoalForm();
   };
 
   const toggleGoal = (id: string) => {
@@ -391,18 +439,17 @@ export default function Journey() {
     setSelectedGoalId(null);
   };
 
-  const markSelectedGoalCompleted = () => {
+  const markSelectedGoalCompleted = async () => {
     if (!selectedGoalId) return;
 
-    setGoals((prev) =>
-      prev.map((goal) =>
-        goal.id === selectedGoalId
-          ? { ...goal, completed: !goal.completed }
-          : goal
-      )
-    );
-
-    setSelectedGoalId(null);
+    try {
+      await toggleGoalApi(selectedGoalId);
+      await loadJourney();
+      setSelectedGoalId(null);
+    } catch (error) {
+      console.error("Failed to toggle goal completion:", error);
+      Alert.alert("Error", "Failed to update SMART goal.");
+    }
   };
 
   const deleteSelectedGoal = () => {
@@ -417,7 +464,9 @@ export default function Journey() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => removeGoal(selectedGoalId),
+          onPress: async () => {
+            await removeGoal(selectedGoalId);
+          },
         },
       ]
     );
