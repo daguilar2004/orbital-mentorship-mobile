@@ -2,10 +2,10 @@ import { useMemo } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { styles } from "../../styles/accountabilityStyles";
 import {
-    DailyHabit,
-    DayKey,
-    SmartGoal,
-    TabKey,
+  DailyHabit,
+  DayKey,
+  SmartGoal,
+  TabKey,
 } from "../../types/accountability";
 import DayDots from "./DayDots";
 import DaysSelector from "./DaysSelector";
@@ -27,12 +27,17 @@ type Props = {
   habitDays: DayKey[];
   setHabitDays: (v: DayKey[]) => void;
   editingHabitId: string | null;
+  selectedHabitId: string | null;
   addHabit: () => void;
   saveEditedHabit: () => void;
   cancelHabitForm: () => void;
   startEditHabit: (habit: DailyHabit) => void;
   removeHabit: (id: string) => void;
   toggleHabitCompletion: (id: string) => void;
+  selectHabit: (id: string) => void;
+  clearSelectedHabit: () => void;
+  markSelectedHabitCompleted: () => void;
+  deleteSelectedHabit: () => void;
 
   goals: SmartGoal[];
   expandedGoalId: string | null;
@@ -72,7 +77,7 @@ type Props = {
   toggleDay: (
     day: DayKey,
     selected: DayKey[],
-    setSelected: (days: DayKey[]) => void
+    setSelected: (days: DayKey[]) => void,
   ) => void;
 };
 
@@ -91,12 +96,17 @@ export default function AccountabilityScreen(props: Props) {
     habitDays,
     setHabitDays,
     editingHabitId,
+    selectedHabitId,
     addHabit,
     saveEditedHabit,
     cancelHabitForm,
     startEditHabit,
     removeHabit,
     toggleHabitCompletion,
+    selectHabit,
+    clearSelectedHabit,
+    markSelectedHabitCompleted,
+    deleteSelectedHabit,
 
     goals,
     expandedGoalId,
@@ -137,6 +147,7 @@ export default function AccountabilityScreen(props: Props) {
   } = props;
 
   const selectedGoal = goals.find((goal) => goal.id === selectedGoalId);
+  const selectedHabit = habits.find((habit) => habit.id === selectedHabitId);
 
   const linkedHabitMap = useMemo(() => {
     const map: Record<string, DailyHabit | undefined> = {};
@@ -146,8 +157,17 @@ export default function AccountabilityScreen(props: Props) {
     return map;
   }, [goals, habits]);
 
-  const todaysHabits = habits.filter((habit) => habit.days.includes(todayDayKey));
-  const otherHabits = habits.filter((habit) => !habit.days.includes(todayDayKey));
+  const todaysHabits = habits.filter((habit) =>
+    habit.days.includes(todayDayKey),
+  );
+  const otherHabits = habits.filter(
+    (habit) => !habit.days.includes(todayDayKey),
+  );
+
+  const clearSelections = () => {
+    clearSelectedGoal();
+    clearSelectedHabit();
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -156,7 +176,7 @@ export default function AccountabilityScreen(props: Props) {
         onClose={() => setShowGoalsHelp(false)}
       />
 
-      <Pressable style={{ flex: 1 }} onPress={clearSelectedGoal}>
+      <Pressable style={{ flex: 1 }} onPress={clearSelections}>
         <ScrollView
           style={styles.scrollBg}
           contentContainerStyle={styles.pagePad}
@@ -189,7 +209,7 @@ export default function AccountabilityScreen(props: Props) {
                 <Text style={styles.cardTitle}>Daily Habits</Text>
                 <Text style={styles.cardSub}>
                   These reset automatically each new day at 12:00 AM. Hold to
-                  delete.
+                  select.
                 </Text>
 
                 <View style={styles.addRow}>
@@ -212,14 +232,18 @@ export default function AccountabilityScreen(props: Props) {
                     style={styles.addBtnPurple}
                     onPress={() => setShowHabitForm(!showHabitForm)}
                   >
-                    <Text style={styles.addBtnText}>{showHabitForm ? "×" : "＋"}</Text>
+                    <Text style={styles.addBtnText}>
+                      {showHabitForm ? "×" : "＋"}
+                    </Text>
                   </Pressable>
                 </View>
 
                 {showHabitForm && (
                   <View style={styles.goalFormCard}>
                     <Text style={styles.goalFormTitle}>
-                      {editingHabitId ? "Edit Daily Habit" : "Create Daily Habit"}
+                      {editingHabitId
+                        ? "Edit Daily Habit"
+                        : "Create Daily Habit"}
                     </Text>
 
                     <TextInput
@@ -235,7 +259,9 @@ export default function AccountabilityScreen(props: Props) {
                     <Text style={styles.formLabel}>Select days</Text>
                     <DaysSelector
                       selected={habitDays}
-                      onToggle={(day) => toggleDay(day, habitDays, setHabitDays)}
+                      onToggle={(day) =>
+                        toggleDay(day, habitDays, setHabitDays)
+                      }
                     />
 
                     <View style={styles.goalFormActions}>
@@ -265,6 +291,7 @@ export default function AccountabilityScreen(props: Props) {
                     <Text style={styles.sectionMiniTitle}>For Today</Text>
                     {todaysHabits.map((habit) => {
                       const doneToday = habit.completedOn === todayKey;
+                      const selected = selectedHabitId === habit.id;
 
                       return (
                         <Pressable
@@ -272,9 +299,20 @@ export default function AccountabilityScreen(props: Props) {
                           style={[
                             styles.dailyHabitCard,
                             doneToday && styles.dailyHabitCardCompleted,
+                            selected && styles.smartGoalCardSelected,
                           ]}
-                          onLongPress={() => removeHabit(habit.id)}
+                          onLongPress={() => selectHabit(habit.id)}
                           delayLongPress={250}
+                          onPress={() => {
+                            if (selectedHabitId) {
+                              if (selected) {
+                                clearSelectedHabit();
+                              }
+                              return;
+                            }
+
+                            toggleHabitCompletion(habit.id);
+                          }}
                         >
                           <View style={styles.dailyHabitLeft}>
                             <View style={styles.dailyHabitTitleRow}>
@@ -300,29 +338,37 @@ export default function AccountabilityScreen(props: Props) {
                           </View>
 
                           <View style={styles.dailyHabitRight}>
-                            <Pressable
-                              style={styles.goalEditBtn}
-                              onPress={() => startEditHabit(habit)}
-                            >
-                              <Text style={styles.goalEditBtnText}>Edit</Text>
-                            </Pressable>
+                            {!selectedHabitId ? (
+                              <>
+                                <Pressable
+                                  style={styles.goalEditBtn}
+                                  onPress={() => startEditHabit(habit)}
+                                >
+                                  <Text style={styles.goalEditBtnText}>
+                                    Edit
+                                  </Text>
+                                </Pressable>
 
-                            <Pressable
-                              style={[
-                                styles.taskCheckBtn,
-                                doneToday && styles.taskCheckBtnDone,
-                              ]}
-                              onPress={() => toggleHabitCompletion(habit.id)}
-                            >
-                              <Text
-                                style={[
-                                  styles.taskCheckBtnText,
-                                  doneToday && styles.taskCheckBtnTextDone,
-                                ]}
-                              >
-                                ✓
-                              </Text>
-                            </Pressable>
+                                <Pressable
+                                  style={[
+                                    styles.taskCheckBtn,
+                                    doneToday && styles.taskCheckBtnDone,
+                                  ]}
+                                  onPress={() =>
+                                    toggleHabitCompletion(habit.id)
+                                  }
+                                >
+                                  <Text
+                                    style={[
+                                      styles.taskCheckBtnText,
+                                      doneToday && styles.taskCheckBtnTextDone,
+                                    ]}
+                                  >
+                                    ✓
+                                  </Text>
+                                </Pressable>
+                              </>
+                            ) : null}
                           </View>
                         </Pressable>
                       );
@@ -335,13 +381,25 @@ export default function AccountabilityScreen(props: Props) {
                     <Text style={styles.sectionMiniTitle}>Other Days</Text>
                     {otherHabits.map((habit) => {
                       const doneToday = habit.completedOn === todayKey;
+                      const selected = selectedHabitId === habit.id;
 
                       return (
                         <Pressable
                           key={habit.id}
-                          style={styles.dailyHabitCard}
-                          onLongPress={() => removeHabit(habit.id)}
+                          style={[
+                            styles.dailyHabitCard,
+                            selected && styles.smartGoalCardSelected,
+                          ]}
+                          onLongPress={() => selectHabit(habit.id)}
                           delayLongPress={250}
+                          onPress={() => {
+                            if (selectedHabitId) {
+                              if (selected) {
+                                clearSelectedHabit();
+                              }
+                              return;
+                            }
+                          }}
                         >
                           <View style={styles.dailyHabitLeft}>
                             <View style={styles.dailyHabitTitleRow}>
@@ -362,34 +420,42 @@ export default function AccountabilityScreen(props: Props) {
                           </View>
 
                           <View style={styles.dailyHabitRight}>
-                            <Pressable
-                              style={styles.goalEditBtn}
-                              onPress={() => startEditHabit(habit)}
-                            >
-                              <Text style={styles.goalEditBtnText}>Edit</Text>
-                            </Pressable>
+                            {!selectedHabitId ? (
+                              <>
+                                <Pressable
+                                  style={styles.goalEditBtn}
+                                  onPress={() => startEditHabit(habit)}
+                                >
+                                  <Text style={styles.goalEditBtnText}>
+                                    Edit
+                                  </Text>
+                                </Pressable>
 
-                            <Pressable
-                              style={[
-                                styles.taskCheckBtn,
-                                !habit.days.includes(todayDayKey) &&
-                                  styles.taskCheckBtnDisabled,
-                                doneToday && styles.taskCheckBtnDone,
-                              ]}
-                              disabled={!habit.days.includes(todayDayKey)}
-                              onPress={() => toggleHabitCompletion(habit.id)}
-                            >
-                              <Text
-                                style={[
-                                  styles.taskCheckBtnText,
-                                  !habit.days.includes(todayDayKey) &&
-                                    styles.taskCheckBtnTextDisabled,
-                                  doneToday && styles.taskCheckBtnTextDone,
-                                ]}
-                              >
-                                ✓
-                              </Text>
-                            </Pressable>
+                                <Pressable
+                                  style={[
+                                    styles.taskCheckBtn,
+                                    !habit.days.includes(todayDayKey) &&
+                                      styles.taskCheckBtnDisabled,
+                                    doneToday && styles.taskCheckBtnDone,
+                                  ]}
+                                  disabled={!habit.days.includes(todayDayKey)}
+                                  onPress={() =>
+                                    toggleHabitCompletion(habit.id)
+                                  }
+                                >
+                                  <Text
+                                    style={[
+                                      styles.taskCheckBtnText,
+                                      !habit.days.includes(todayDayKey) &&
+                                        styles.taskCheckBtnTextDisabled,
+                                      doneToday && styles.taskCheckBtnTextDone,
+                                    ]}
+                                  >
+                                    ✓
+                                  </Text>
+                                </Pressable>
+                              </>
+                            ) : null}
                           </View>
                         </Pressable>
                       );
@@ -582,7 +648,9 @@ export default function AccountabilityScreen(props: Props) {
                               ) : null}
                             </View>
 
-                            <Text style={styles.smartGoalTime}>{goal.time}</Text>
+                            <Text style={styles.smartGoalTime}>
+                              {goal.time}
+                            </Text>
 
                             {linkedHabit ? (
                               <View style={styles.linkedTaskPreview}>
@@ -673,6 +741,33 @@ export default function AccountabilityScreen(props: Props) {
         >
           <Text style={styles.floatingAddBtnText}>
             {showGoalForm ? "×" : "+"}
+          </Text>
+        </Pressable>
+      ) : activeTab === "habits" && selectedHabitId ? (
+        <>
+          <Pressable
+            style={styles.bottomLeftActionBtn}
+            onPress={deleteSelectedHabit}
+          >
+            <Text style={styles.bottomActionIcon}>🗑</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.floatingAddBtn}
+            onPress={markSelectedHabitCompleted}
+          >
+            <Text style={styles.bottomActionIcon}>
+              {selectedHabit?.completedOn === todayKey ? "↺" : "✓"}
+            </Text>
+          </Pressable>
+        </>
+      ) : activeTab === "habits" ? (
+        <Pressable
+          style={styles.floatingAddBtn}
+          onPress={() => setShowHabitForm(!showHabitForm)}
+        >
+          <Text style={styles.floatingAddBtnText}>
+            {showHabitForm ? "×" : "+"}
           </Text>
         </Pressable>
       ) : null}
