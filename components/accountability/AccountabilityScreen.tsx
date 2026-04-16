@@ -101,7 +101,6 @@ export default function AccountabilityScreen(props: Props) {
     saveEditedHabit,
     cancelHabitForm,
     startEditHabit,
-    removeHabit,
     toggleHabitCompletion,
     selectHabit,
     clearSelectedHabit,
