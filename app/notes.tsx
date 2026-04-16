@@ -322,7 +322,7 @@ function GraphView({
                     style={{ fontSize: 8, color: categoryColors[cat], textAlign: "center" }}
                     numberOfLines={2}
                   >
-                    {n.favorite ? "★ " : ""}
+                    {n.favorite ? "♥ " : ""}
                     {preview || n.title}
                   </Text>
                 </TouchableOpacity>
@@ -481,19 +481,18 @@ function TimelineView({
                       {displayLabels[item.type] ?? item.type}
                     </Text>
                   </View>
-                  {item.favorite ? (
-                    onToggleFavorite ? (
-                      <HeartButton
-                        selected
-                        onPress={() => onToggleFavorite(item._id || item.id || "")}
-                      />
-                    ) : (
-                      <MaterialCommunityIcons
-                        name="star"
-                        size={18}
-                        color="#FB8C00"
-                      />
-                    )
+
+                  {onToggleFavorite ? (
+                    <HeartButton
+                      selected={!!item.favorite}
+                      onPress={() => onToggleFavorite(item._id || item.id || "")}
+                    />
+                  ) : item.favorite ? (
+                    <MaterialCommunityIcons
+                      name="heart"
+                      size={18}
+                      color="#ff3b89"
+                    />
                   ) : null}
                 </View>
                 <Text style={tlStyles.noteTitle}>{item.title}</Text>
@@ -609,10 +608,10 @@ function FavoritesView({
   if (favNotes.length === 0) {
     return (
       <View style={favStyles.empty}>
-        <Text style={favStyles.star}>★</Text>
+        <Text style={favStyles.heart}>♥</Text>
         <Text style={favStyles.emptyTitle}>No favorites yet</Text>
         <Text style={favStyles.emptySubtitle}>
-          Tap ☆ on any note to add it here
+          Tap the heart on any note to add it here
         </Text>
       </View>
     );
@@ -669,7 +668,7 @@ const favStyles = StyleSheet.create({
     marginTop: 80,
     gap: 8,
   },
-  star: { fontSize: 48, color: "#FB8C00" },
+  heart: { fontSize: 48, color: "#ff3b89" },
   emptyTitle: { fontSize: 18, fontWeight: "700", color: "#111827" },
   emptySubtitle: { fontSize: 14, color: "#98A2B3" },
   count: { fontSize: 13, color: "#667085", marginBottom: 12 },
@@ -1714,26 +1713,10 @@ export default function Notes() {
                             <View style={styles.noteHeader}>
                               <Text style={styles.noteTitle}>{item.title}</Text>
                               {!selectMode && (
-                                <TouchableOpacity
+                                <HeartButton
+                                  selected={!!item.favorite}
                                   onPress={() => toggleFavorite(getNoteId(item))}
-                                  hitSlop={{
-                                    top: 8,
-                                    bottom: 8,
-                                    left: 8,
-                                    right: 8,
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      fontSize: 18,
-                                      color: item.favorite
-                                        ? "#FB8C00"
-                                        : "#D0D5DD",
-                                    }}
-                                  >
-                                    ★
-                                  </Text>
-                                </TouchableOpacity>
+                                />
                               )}
                             </View>
 
@@ -1768,70 +1751,71 @@ export default function Notes() {
                 })()}
             </View>
             {selectMode && (
-              <View style={styles.bulkBar}>
-                <View style={{ flexDirection: "row", justifyContent: 'space-between', alignItems: 'center' }}>
-                  <View style={{ flexDirection: "row", gap: 12 }}>
-                    <TouchableOpacity
-                      onPress={handleDeleteSelected}
-                      disabled={selectedIds.size === 0}
-                      style={[
-                        styles.bulkDeleteBtn,
-                        selectedIds.size === 0 && { opacity: 0.4 },
-                      ]}
-                    >
-                      <MaterialCommunityIcons name="trash-can" size={24} color="white" />
-                    </TouchableOpacity>
+              <>
+                {/* Trash — bottom left, mirrors the done button */}
+                <TouchableOpacity
+                  onPress={handleDeleteSelected}
+                  disabled={selectedIds.size === 0}
+                  style={[
+                    styles.bulkTrashBtn,
+                    selectedIds.size === 0 && { opacity: 0.4 },
+                  ]}
+                >
+                  <MaterialCommunityIcons name="trash-can" size={28} color="white" />
+                </TouchableOpacity>
 
-                    <TouchableOpacity
-                      onPress={() => {
-                        if (selectedIds.size === 1) {
-                          const selectedId = Array.from(selectedIds)[0];
-                          const selectedNote = notes.find((n) => getNoteId(n) === selectedId);
-                          if (selectedNote) {
-                            openEditNote(selectedNote);
-                            setSelectMode(false);
-                            setSelectedIds(new Set());
-                          }
-                        } else {
-                          Alert.alert("Edit note", "Select exactly one note to edit.");
-                        }
-                      }}
-                      disabled={selectedIds.size !== 1}
-                      style={[
-                        styles.bulkEditBtn,
-                        selectedIds.size !== 1 && { opacity: 0.4 },
-                      ]}
-                    >
-                      <MaterialCommunityIcons name="pencil" size={24} color="white" />
-                    </TouchableOpacity>
+                {/* Export — 100° around the done button AND THE  EXPORT BUTTON COLOR */}
+                <TouchableOpacity
+                  onPress={exportSelectedNotesToPDF}
+                  disabled={selectedIds.size === 0}
+                  style={[
+                    styles.bulkSatelliteBtn,
+                    { right: 42, bottom: 107, backgroundColor: "#cfc2eb" },  // EXPORT BUTTON COLOR
+                    selectedIds.size === 0 && { opacity: 0.4 },
+                  ]}
+                >
+                  <MaterialCommunityIcons name="file-export" size={22} color="white" />
+                </TouchableOpacity>
 
-                    <TouchableOpacity
-                      onPress={exportSelectedNotesToPDF}
-                      disabled={selectedIds.size === 0}
-                      style={[
-                        styles.bulkExportBtn,
-                        selectedIds.size === 0 && { opacity: 0.4 },
-                      ]}
-                    >
-                      <MaterialCommunityIcons name="file-export" size={24} color="white" />
-                    </TouchableOpacity>
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSelectMode(false);
-                      setSelectedIds(new Set());
-                    }}
-                    style={styles.bulkDoneBtn}
-                  >
-                    <MaterialCommunityIcons name="check" size={24} color="white" />
-                  </TouchableOpacity>
-                </View>
-              </View>
+                {/* Edit — 150° around the done button */}
+                <TouchableOpacity
+                  onPress={() => {
+                    if (selectedIds.size === 1) {
+                      const selectedId = Array.from(selectedIds)[0];
+                      const selectedNote = notes.find((n) => getNoteId(n) === selectedId);
+                      if (selectedNote) {
+                        openEditNote(selectedNote);
+                        setSelectMode(false);
+                        setSelectedIds(new Set());
+                      }
+                    } else {
+                      Alert.alert("Edit note", "Select exactly one note to edit.");
+                    }
+                  }}
+                  disabled={selectedIds.size !== 1}
+                  style={[
+                    styles.bulkSatelliteBtn,
+                    { right: 97, bottom: 68, backgroundColor: "#e373bd" }, // EDIT BUTTON COLOR
+                    selectedIds.size !== 1 && { opacity: 0.4 },
+                  ]}
+                >
+                  <MaterialCommunityIcons name="pencil" size={22} color="white" />
+                </TouchableOpacity>
+              </>
             )}
 
-            {/* ── FAB ──────────────────────────────────────────── */}
-            {!selectMode && (
+            {/* ── FAB / DONE BUTTON ────────────────────────────── */}
+            {selectMode ? (
+              <TouchableOpacity
+                style={[styles.fab, { backgroundColor: "#0b0c67" }]}
+                onPress={() => {
+                  setSelectMode(false);
+                  setSelectedIds(new Set());
+                }}
+              >
+                <MaterialCommunityIcons name="check" size={28} color="white" />
+              </TouchableOpacity>
+            ) : (
               <TouchableOpacity
                 style={styles.fab}
                 onPress={() => setModalVisible(true)}
@@ -2416,51 +2400,35 @@ const styles = StyleSheet.create({
     backgroundColor: "#E53935",
     borderColor: "#E53935",
   },
-  bulkBar: {
+  bulkTrashBtn: {
     position: "absolute",
-    bottom: 14,
-    left: 16,
-    right: 16,
-    backgroundColor: 'transparent',
-    flexDirection: "row",
+    bottom: 22,
+    left: 22,
+    backgroundColor: "#ff3b89",
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    justifyContent: "center",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 0,
-    paddingVertical: 16,
-    borderRadius: 20,
-    paddingRight: 8,
+    shadowColor: "#111827",
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
-  bulkExportBtn: {
+  // EXPORT AND EDIT BUTTONS
+  bulkSatelliteBtn: {
+    position: "absolute",
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: "#4CAF50",
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bulkDeleteBtn: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#E53935",
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bulkEditBtn: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#1E88E5",
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bulkDoneBtn: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#9CA3AF",
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 'auto',
+    backgroundColor: "#1a1b6b", // EXPORT AND EDIT BUTTONS
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#111827",
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
 });
