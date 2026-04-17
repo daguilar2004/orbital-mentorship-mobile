@@ -42,6 +42,7 @@ export function useGoalForm({
 }: UseGoalFormParams) {
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
+  const [isSubmittingGoal, setIsSubmittingGoal] = useState(false);
 
   const [goalTitle, setGoalTitle] = useState("");
   const [goalTime, setGoalTime] = useState("");
@@ -68,32 +69,43 @@ export function useGoalForm({
   };
 
   const cancelGoalForm = () => {
+    if (isSubmittingGoal) return;
     setShowGoalForm(false);
     clearGoalForm();
   };
 
   const handleAddGoal = async () => {
-    const success = await addGoal({
-      title: goalTitle,
-      time: goalTime,
-      specific: goalSpecific,
-      measurable: goalMeasurable,
-      achievable: goalAchievable,
-      relevant: goalRelevant,
-      timeBound: goalTimeBound,
-      goalHabitTitle,
-      goalHabitDays,
-    });
+    if (isSubmittingGoal) return false;
 
-    if (success) {
-      setShowGoalForm(false);
-      clearGoalForm();
+    setIsSubmittingGoal(true);
+
+    try {
+      const success = await addGoal({
+        title: goalTitle,
+        time: goalTime,
+        specific: goalSpecific,
+        measurable: goalMeasurable,
+        achievable: goalAchievable,
+        relevant: goalRelevant,
+        timeBound: goalTimeBound,
+        goalHabitTitle,
+        goalHabitDays,
+      });
+
+      if (success) {
+        setShowGoalForm(false);
+        clearGoalForm();
+      }
+
+      return success;
+    } finally {
+      setIsSubmittingGoal(false);
     }
-
-    return success;
   };
 
   const startEditGoal = (goal: SmartGoal) => {
+    if (isSubmittingGoal) return;
+
     setEditingGoalId(goal.id);
     setGoalTitle(goal.title);
     setGoalTime(goal.time);
@@ -112,33 +124,40 @@ export function useGoalForm({
   };
 
   const handleSaveEditedGoal = async () => {
-    if (!editingGoalId) return false;
+    if (!editingGoalId || isSubmittingGoal) return false;
 
-    const success = await saveEditedGoal({
-      id: editingGoalId,
-      title: goalTitle,
-      time: goalTime,
-      specific: goalSpecific,
-      measurable: goalMeasurable,
-      achievable: goalAchievable,
-      relevant: goalRelevant,
-      timeBound: goalTimeBound,
-      goalHabitTitle,
-      goalHabitDays,
-    });
+    setIsSubmittingGoal(true);
 
-    if (success) {
-      setShowGoalForm(false);
-      clearGoalForm();
+    try {
+      const success = await saveEditedGoal({
+        id: editingGoalId,
+        title: goalTitle,
+        time: goalTime,
+        specific: goalSpecific,
+        measurable: goalMeasurable,
+        achievable: goalAchievable,
+        relevant: goalRelevant,
+        timeBound: goalTimeBound,
+        goalHabitTitle,
+        goalHabitDays,
+      });
+
+      if (success) {
+        setShowGoalForm(false);
+        clearGoalForm();
+      }
+
+      return success;
+    } finally {
+      setIsSubmittingGoal(false);
     }
-
-    return success;
   };
 
   return {
     showGoalForm,
     setShowGoalForm,
     editingGoalId,
+    isSubmittingGoal,
     goalTitle,
     setGoalTitle,
     goalTime,

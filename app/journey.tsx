@@ -34,7 +34,6 @@ export default function Journey() {
     setExpandedGoalId,
     addHabit,
     saveEditedHabit,
-    removeHabit,
     toggleHabitCompletion,
     selectHabit,
     clearSelectedHabit,
