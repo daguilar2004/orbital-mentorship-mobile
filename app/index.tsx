@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Alert, ScrollView, Text, View } from "react-native";
 import { Phase, Task, useApp } from "./context/AppContext";
 import { styles } from "./styles/homeStyles";
 
@@ -72,6 +72,9 @@ export default function Home() {
   const [draftDesc, setDraftDesc] = useState("");
   const [draftResponse, setDraftResponse] = useState("");
   const [draftFeedback, setDraftFeedback] = useState("");
+  const [lastAutoExpandedPhaseId, setLastAutoExpandedPhaseId] = useState<
+    string | null
+  >(null);
 
   const xpPercent = Math.min(100, Math.round((totalXP / xpGoal) * 100));
 
@@ -81,10 +84,22 @@ export default function Home() {
   );
 
   useEffect(() => {
-    if (currentPhase) {
-      setExpanded(new Set([currentPhase.id]));
+    const firstAccessiblePhase = phases.find((p) => p.status !== "upcoming");
+    const phaseToExpand = currentPhase ?? firstAccessiblePhase;
+
+    if (!phaseToExpand) return;
+
+    if (lastAutoExpandedPhaseId !== phaseToExpand.id) {
+      setExpanded(new Set([phaseToExpand.id]));
+      setLastAutoExpandedPhaseId(phaseToExpand.id);
+      return;
     }
-  }, [currentPhase?.id]);
+
+    setExpanded((prev) => {
+      if (prev.size > 0) return prev;
+      return new Set([phaseToExpand.id]);
+    });
+  }, [currentPhase?.id, phases, lastAutoExpandedPhaseId]);
 
   const completedPhases = phases.filter((p) => p.status === "completed").length;
   const totalPhases = phases.length;
@@ -149,8 +164,21 @@ export default function Home() {
     setShowUnitPicker(false);
   }
 
-  function handleSaveTask() {
-    if (!newTaskTitle.trim() || !addingTaskToPhaseId) return;
+  function openTaskFormForPhase(phaseId: string) {
+    resetTaskForm();
+    setAddingTaskToPhaseId(phaseId);
+  }
+
+  async function handleSaveTask() {
+    if (!newTaskTitle.trim()) {
+      Alert.alert("Missing title", "Please enter a task title.");
+      return;
+    }
+
+    if (!addingTaskToPhaseId) {
+      Alert.alert("Task not ready", "Please reopen the task form and try again.");
+      return;
+    }
 
     const expectedTime = newTaskExpectedTimeValue.trim()
       ? {
@@ -170,28 +198,58 @@ export default function Home() {
     const resources =
       newTaskResources.length > 0 ? newTaskResources : undefined;
 
-    if (editingTaskId) {
-      editTask(
-        addingTaskToPhaseId,
-        editingTaskId,
-        newTaskTitle,
-        newTaskDueDate,
-        expectedTime,
-        skills,
-        resources,
+    try {
+      if (editingTaskId) {
+        await editTask(
+          addingTaskToPhaseId,
+          editingTaskId,
+          newTaskTitle,
+          newTaskDueDate,
+          expectedTime,
+          skills,
+          resources,
+        );
+      } else {
+        await addTaskToPhase(
+          addingTaskToPhaseId,
+          newTaskTitle,
+          newTaskDueDate,
+          expectedTime,
+          skills,
+          resources,
+        );
+      }
+
+      Alert.alert(
+        editingTaskId ? "Task updated" : "Task created",
+        editingTaskId
+          ? "Your task was updated successfully."
+          : "Your task was added successfully.",
       );
-    } else {
-      addTaskToPhase(
-        addingTaskToPhaseId,
-        newTaskTitle,
-        newTaskDueDate,
-        expectedTime,
-        skills,
-        resources,
+      resetTaskForm();
+    } catch {
+      Alert.alert(
+        editingTaskId ? "Task update failed" : "Task creation failed",
+        "Your task could not be saved. Please try again.",
       );
     }
+  }
 
-    resetTaskForm();
+  function handleEditTask(phase: Phase, task: Task) {
+    setAddingTaskToPhaseId(phase.id);
+    setEditingTaskId(task.id);
+    setEditingTaskPhaseId(phase.id);
+    setNewTaskTitle(task.title);
+    setNewTaskDueDate(task.dueDate.split("T")[0]);
+
+    // expected time (convert object → form state)
+    setNewTaskExpectedTimeValue(task.expectedTime?.value?.toString() || "");
+    setNewTaskExpectedTimeUnit(task.expectedTime?.unit || "days");
+
+    // skills (array → string)
+    setNewTaskSkills(task.skills?.join(", ") || "");
+
+    setNewTaskResources(task.resources || []);
   }
 
   return (
@@ -239,7 +297,8 @@ export default function Home() {
         setAddingPhase={setAddingPhase}
         openTask={openTask}
         deleteTask={deleteTask}
-        setAddingTaskToPhaseId={setAddingTaskToPhaseId}
+        onEditTask={handleEditTask}
+        openTaskFormForPhase={openTaskFormForPhase}
         setEditingPhaseId={setEditingPhaseId}
         setNewPhaseName={setNewPhaseName}
         setNewPhaseDescription={setNewPhaseDescription}

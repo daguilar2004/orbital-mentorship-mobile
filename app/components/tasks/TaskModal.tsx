@@ -27,15 +27,10 @@ type TaskModalProps = {
   draftFeedback: string;
   setDraftFeedback: React.Dispatch<React.SetStateAction<string>>;
   closeTask: () => void;
-  updateTaskDescription: (
-    phaseId: string,
-    taskId: string,
-    description: string,
-  ) => void;
-  submitTask: (phaseId: string, taskId: string, response: string) => void;
+  updateTaskDescription: (taskId: string, description: string) => void;
+  submitTask: (taskId: string, response: string) => void;
   addMockAttachment: (phaseId: string, taskId: string) => void;
   reviewTask: (
-    phaseId: string,
     taskId: string,
     decision: "approved" | "rejected",
     feedback: string,

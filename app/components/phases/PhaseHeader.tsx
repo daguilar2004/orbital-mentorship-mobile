@@ -66,7 +66,7 @@ export default function PhaseHeader({
             <Text style={styles.phaseTitle}>{phase.name}</Text>
 
             <Text style={styles.phaseDates}>
-              {phase.startDate} - {phase.endDate}
+              {phase.startDateFormatted} - {phase.endDateFormatted}
             </Text>
           </View>
         </View>
@@ -88,47 +88,45 @@ export default function PhaseHeader({
         </View>
       </Pressable>
 
-      {userRole === "mentee" && (
-        <TouchableOpacity
-          style={styles.phaseMenuButton}
-          onPress={() => {
-            Alert.alert("Phase Options", "Choose an action", [
-              {
-                text: "Edit",
-                onPress: () => {
-                  setEditingPhaseId(phase.id);
-                  setNewPhaseName(phase.name);
-                  setNewPhaseDescription("");
-                  setNewPhaseStart(phase.startDate);
-                  setNewPhaseEnd(phase.endDate);
-                  setAddingPhase(true);
-                },
+      <TouchableOpacity
+        style={styles.phaseMenuButton}
+        onPress={() => {
+          Alert.alert("Phase Options", "Choose an action", [
+            {
+              text: "Edit",
+              onPress: () => {
+                setEditingPhaseId(phase.id);
+                setNewPhaseName(phase.name);
+                setNewPhaseDescription("");
+                setNewPhaseStart(phase.startDate.split("T")[0]);
+                setNewPhaseEnd(phase.endDate.split("T")[0]);
+                setAddingPhase(true);
               },
-              {
-                text: "Delete",
-                style: "destructive",
-                onPress: () => {
-                  Alert.alert(
-                    "Delete Phase",
-                    "Are you sure you want to delete this phase?",
-                    [
-                      { text: "Cancel", style: "cancel" },
-                      {
-                        text: "Delete",
-                        style: "destructive",
-                        onPress: () => deletePhase(phase.id),
-                      },
-                    ],
-                  );
-                },
+            },
+            {
+              text: "Delete",
+              style: "destructive",
+              onPress: () => {
+                Alert.alert(
+                  "Delete Phase",
+                  "Are you sure you want to delete this phase?",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Delete",
+                      style: "destructive",
+                      onPress: () => deletePhase(phase.id),
+                    },
+                  ],
+                );
               },
-              { text: "Cancel", style: "cancel" },
-            ]);
-          }}
-        >
-          <Ionicons name="ellipsis-vertical" size={16} color="#6B7280" />
-        </TouchableOpacity>
-      )}
+            },
+            { text: "Cancel", style: "cancel" },
+          ]);
+        }}
+      >
+        <Ionicons name="ellipsis-vertical" size={16} color="#6B7280" />
+      </TouchableOpacity>
     </View>
   );
 }

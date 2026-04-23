@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, Text, TextInput, View } from "react-native";
 import { Phase, Task } from "../../context/AppContext";
 import { styles } from "../../styles/homeStyles";
 
@@ -9,10 +9,9 @@ type TaskReviewCardProps = {
   draftFeedback: string;
   setDraftFeedback: React.Dispatch<React.SetStateAction<string>>;
   reviewTask: (
-    phaseId: string,
     taskId: string,
     decision: "approved" | "rejected",
-    feedback: string,
+    mentorFeedback: string,
   ) => void;
   closeTask: () => void;
 };
@@ -41,15 +40,20 @@ export default function TaskReviewCard({
       <View style={styles.reviewBtnRow}>
         <Pressable
           style={styles.rejectBtn}
-          onPress={() => {
+          onPress={async () => {
             if (!activePhase || !activeTask) return;
-            reviewTask(
-              activePhase.id,
-              activeTask.id,
-              "rejected",
-              draftFeedback.trim(),
-            );
-            closeTask();
+            try {
+              await Promise.resolve(
+                reviewTask(activeTask.id, "rejected", draftFeedback.trim()),
+              );
+              Alert.alert("Task rejected", "The task was rejected.");
+              closeTask();
+            } catch {
+              Alert.alert(
+                "Review failed",
+                "The task could not be rejected. Please try again.",
+              );
+            }
           }}
         >
           <Text style={styles.rejectBtnText}>Reject</Text>
@@ -57,15 +61,20 @@ export default function TaskReviewCard({
 
         <Pressable
           style={styles.approveBtn}
-          onPress={() => {
+          onPress={async () => {
             if (!activePhase || !activeTask) return;
-            reviewTask(
-              activePhase.id,
-              activeTask.id,
-              "approved",
-              draftFeedback.trim(),
-            );
-            closeTask();
+            try {
+              await Promise.resolve(
+                reviewTask(activeTask.id, "approved", draftFeedback.trim()),
+              );
+              Alert.alert("Task accepted", "The task was accepted.");
+              closeTask();
+            } catch {
+              Alert.alert(
+                "Review failed",
+                "The task could not be accepted. Please try again.",
+              );
+            }
           }}
         >
           <Text style={styles.approveBtnText}>Accept</Text>

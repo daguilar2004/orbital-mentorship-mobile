@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, Text, TextInput, View } from "react-native";
 import { Phase, Task } from "../../context/AppContext";
 import { styles } from "../../styles/homeStyles";
 
@@ -13,7 +13,7 @@ type SubmittedResponseCardProps = {
   draftResponse: string;
   setDraftResponse: React.Dispatch<React.SetStateAction<string>>;
   addMockAttachment: (phaseId: string, taskId: string) => void;
-  submitTask: (phaseId: string, taskId: string, response: string) => void;
+  submitTask: (taskId: string, response: string) => void;
 };
 
 export default function SubmittedResponseCard({
@@ -54,9 +54,17 @@ export default function SubmittedResponseCard({
 
             <Pressable
               style={styles.primaryBtn}
-              onPress={() => {
+              onPress={async () => {
                 if (!activePhase || !activeTask) return;
-                submitTask(activePhase.id, activeTask.id, draftResponse.trim());
+                try {
+                  await Promise.resolve(submitTask(activeTask.id, draftResponse));
+                  Alert.alert("Task submitted", "Your response was submitted.");
+                } catch {
+                  Alert.alert(
+                    "Submission failed",
+                    "Your task could not be submitted. Please try again.",
+                  );
+                }
               }}
             >
               <Text style={styles.primaryBtnText}>

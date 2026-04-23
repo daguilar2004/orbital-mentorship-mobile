@@ -8,7 +8,8 @@ type TaskRowProps = {
   phase: Phase;
   userRole: UserRole;
   openTask: (phase: Phase, task: Task) => void;
-  deleteTask: (phaseId: string, taskId: string) => void;
+  deleteTask: (taskId: string) => void;
+  onEditTask: (phase: Phase, task: Task) => void;
 };
 
 function taskStatusIcon(
@@ -47,6 +48,7 @@ export default function TaskRow({
   userRole,
   openTask,
   deleteTask,
+  onEditTask,
 }: TaskRowProps) {
   return (
     <View style={styles.taskRow}>
@@ -70,7 +72,7 @@ export default function TaskRow({
             <Text style={styles.taskMeta}>
               <Text style={styles.xpText}>{task.xp} XP</Text>
               {"  •  "}
-              Due {task.dueDate}
+              Due {task.dueDateFormatted}
             </Text>
           </View>
         </View>
@@ -78,23 +80,26 @@ export default function TaskRow({
         <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
       </Pressable>
 
-      {userRole === "mentee" && (
-        <TouchableOpacity
-          style={styles.taskMenuButton}
-          onPress={() => {
-            Alert.alert("Task Options", "Choose an action", [
-              {
-                text: "Delete",
-                style: "destructive",
-                onPress: () => deleteTask(phase.id, task.id),
-              },
-              { text: "Cancel", style: "cancel" },
-            ]);
-          }}
-        >
-          <Ionicons name="ellipsis-vertical" size={14} color="#6B7280" />
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        style={styles.taskMenuButton}
+        onPress={() => {
+          Alert.alert("Task Options", "Choose an action", [
+            {
+              text: "Edit",
+              onPress: () => onEditTask(phase, task),
+            },
+            {
+              text: "Delete",
+              style: "destructive",
+              onPress: () => deleteTask(task.id),
+            },
+
+            { text: "Cancel", style: "cancel" },
+          ]);
+        }}
+      >
+        <Ionicons name="ellipsis-vertical" size={14} color="#6B7280" />
+      </TouchableOpacity>
     </View>
   );
 }
