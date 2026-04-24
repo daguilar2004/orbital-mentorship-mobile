@@ -8,7 +8,6 @@ import {
   ScrollView,
 } from "react-native";
 import { router } from "expo-router";
-import Slider from "@react-native-community/slider";
 import { Ionicons } from "@expo/vector-icons";
 
 const INDUSTRIES = [
@@ -74,8 +73,8 @@ export default function Questionnaire() {
       setCurrentQ(currentQ + 1);
       setShowDropdown(false);
     } else {
-      // finish questionnaire, go to profile-setup
-      router.push("/onboarding2/profile-setup");
+      // ✅ go back to hub after finishing
+      router.replace("/onboarding2");
     }
   };
 
@@ -104,23 +103,37 @@ export default function Questionnaire() {
             </Text>
 
             <View style={styles.scaleContainer}>
-              <Slider
-                style={styles.slider}
-                minimumValue={1}
-                maximumValue={10}
-                step={1}
-                value={answers.mentoringComfort}
-                onValueChange={(val) =>
-                  setAnswers({ ...answers, mentoringComfort: val })
-                }
-                minimumTrackTintColor="#7C3AED"
-                maximumTrackTintColor="#E5E7EB"
-              />
+              {/* simple numeric picker instead of slider */}
+              <View style={styles.numericControl}>
+                <Pressable
+                  onPress={() =>
+                    setAnswers((a) => ({
+                      ...a,
+                      mentoringComfort: Math.max(1, a.mentoringComfort - 1),
+                    }))
+                  }
+                  style={styles.stepBtn}
+                >
+                  <Text style={styles.stepBtnText}>-</Text>
+                </Pressable>
+                <Text style={styles.scaleValue}>
+                  {" "}
+                  {answers.mentoringComfort}{" "}
+                </Text>
+                <Pressable
+                  onPress={() =>
+                    setAnswers((a) => ({
+                      ...a,
+                      mentoringComfort: Math.min(10, a.mentoringComfort + 1),
+                    }))
+                  }
+                  style={styles.stepBtn}
+                >
+                  <Text style={styles.stepBtnText}>+</Text>
+                </Pressable>
+              </View>
               <View style={styles.scaleLabels}>
                 <Text style={styles.scaleLabel}>Formal</Text>
-                <Text style={styles.scaleValue}>
-                  {answers.mentoringComfort}
-                </Text>
                 <Text style={styles.scaleLabel}>Personal</Text>
               </View>
             </View>
@@ -331,7 +344,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   scaleContainer: { paddingVertical: 20 },
-  slider: { width: "100%", height: 40 },
   scaleLabels: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -340,6 +352,21 @@ const styles = StyleSheet.create({
   },
   scaleLabel: { fontSize: 13, color: "#6B7280", fontWeight: "500" },
   scaleValue: { fontSize: 24, fontWeight: "700", color: "#7C3AED" },
+  numericControl: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+  },
+  stepBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepBtnText: { fontSize: 18, fontWeight: "700", color: "#111827" },
   dropdown: {
     borderWidth: 1,
     borderColor: "#D1D5DB",

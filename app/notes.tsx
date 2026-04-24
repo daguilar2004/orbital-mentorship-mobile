@@ -23,6 +23,8 @@ import { useApp } from "./context/AppContext"; // App context with userRole
 /* API CONFIG */
 const AUTH_TOKEN_KEY = "AUTH_TOKEN";
 
+/* STORAGE */
+const NOTES_KEY = "NOTES_STORAGE";
 /* CATEGORY COLORS */
 const categoryColors: Record<string, string> = {
   Pre: "#ff3b89",
@@ -104,19 +106,8 @@ function noteTextStyle(f?: Formatting) {
   };
 }
 
-async function getHeadersWithAuth() {
-  // TODO: Replace with real token from AsyncStorage when login is implemented
-  const token = MOCK_AUTH_TOKEN;
-  return {
-    "Content-Type": "application/json",
-    ...(token && { Authorization: `Bearer ${token}` }),
-  };
-}
-
 type Note = {
-  _id?: string;
-  id?: string;
-  userId?: string;
+  id: string;
   type: string;
   title: string;
   text: string | string[];
@@ -162,7 +153,7 @@ const NOTE_NODE_R = 18; // visual radius of note circle
 
 // Pentagon positions for 5 category hubs
 const hubAngles: Record<string, number> = {
-  Pre: -Math.PI / 2,                 // top
+  Pre: -Math.PI / 2, // top
   During: -Math.PI / 2 + (2 * Math.PI) / 5,
   Post: -Math.PI / 2 + (4 * Math.PI) / 5,
   Daily: -Math.PI / 2 + (6 * Math.PI) / 5,
@@ -183,9 +174,17 @@ function notePos(hubX: number, hubY: number, i: number, n: number) {
 }
 
 function GraphLine({
-  x1, y1, x2, y2, color,
+  x1,
+  y1,
+  x2,
+  y2,
+  color,
 }: {
-  x1: number; y1: number; x2: number; y2: number; color: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color: string;
 }) {
   const dx = x2 - x1;
   const dy = y2 - y1;
@@ -281,7 +280,7 @@ function GraphView({
               const preview =
                 typeof n.text === "string"
                   ? n.text.slice(0, 24)
-                  : n.text[0]?.slice(0, 24) ?? "";
+                  : (n.text[0]?.slice(0, 24) ?? "");
               return (
                 <TouchableOpacity
                   key={n.id}
@@ -301,7 +300,11 @@ function GraphView({
                   }}
                 >
                   <Text
-                    style={{ fontSize: 8, color: categoryColors[cat], textAlign: "center" }}
+                    style={{
+                      fontSize: 8,
+                      color: categoryColors[cat],
+                      textAlign: "center",
+                    }}
                     numberOfLines={2}
                   >
                     {n.favorite ? "★ " : ""}
@@ -476,9 +479,7 @@ function TimelineView({
           ))}
 
           {/* Bottom rail continuation */}
-          {gi < groups.length - 1 && (
-            <View style={tlStyles.groupConnector} />
-          )}
+          {gi < groups.length - 1 && <View style={tlStyles.groupConnector} />}
         </View>
       ))}
     </ScrollView>
@@ -486,7 +487,12 @@ function TimelineView({
 }
 
 const tlStyles = StyleSheet.create({
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", marginTop: 80 },
+  empty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 80,
+  },
   emptyText: { color: "#98A2B3", fontSize: 16 },
   group: { marginBottom: 6 },
   dateRow: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
@@ -541,7 +547,12 @@ const tlStyles = StyleSheet.create({
     borderRadius: 999,
   },
   typeBadgeText: { fontSize: 11, fontWeight: "600" },
-  noteTitle: { fontSize: 14, fontWeight: "700", color: "#111827", marginBottom: 4 },
+  noteTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 4,
+  },
   notePreview: { fontSize: 12, color: "#667085", lineHeight: 18 },
   groupConnector: {
     width: 2,
@@ -607,7 +618,10 @@ function FavoritesView({
               ]}
             >
               <Text
-                style={[favStyles.badgeText, { color: categoryColors[item.type] }]}
+                style={[
+                  favStyles.badgeText,
+                  { color: categoryColors[item.type] },
+                ]}
               >
                 {displayLabels[item.type] ?? item.type}
               </Text>
@@ -798,8 +812,14 @@ export default function Notes() {
     setSelectedIds(new Set());
   };
 
-  const getNoteId = (note: Note) => note._id || note.id || "";
+  const toggleFavorite = (id: string) => {
+    const updated = notes.map((n) =>
+      n.id === id ? { ...n, favorite: !n.favorite } : n,
+    );
+    saveNotes(updated);
+  };
 
+  /* ── EDITOR ───────────────────────────────────────────── */
   const openEditNote = (note: Note) => {
     setEditingNote(note);
     setSelectedType(note.type);
@@ -825,25 +845,16 @@ export default function Notes() {
     setFmt(defaultFormatting);
   };
 
-  const formatDateKey = (createdAt?: string | number, id?: string) => {
-    let ts: number | undefined;
-    if (typeof createdAt === "string") {
-      ts = new Date(createdAt).getTime();
-    } else if (typeof createdAt === "number") {
-      ts = createdAt;
-    } else if (id && Number(id)) {
-      ts = Number(id);
-    }
-    if (!ts || isNaN(ts)) return "Unknown";
+  const formatDateKey = (createdAt?: number, id?: string) => {
+    const ts = createdAt ?? (Number(id) ? Number(id) : undefined);
+    if (!ts) return "Unknown";
     return new Date(ts).toLocaleDateString();
   };
 
   /* ── STORAGE ──────────────────────────────────────────── */
   useEffect(() => {
-    if (userId) {
-      loadData();
-    }
-  }, [userId]);
+    loadData();
+  }, []);
 
   const loadData = async () => {
     if (!userId) return;
@@ -861,16 +872,9 @@ export default function Notes() {
       const data = await response.json();
       const parsed = data.map((note: any) => ({
         ...note,
-        id: note._id,
         formatting: note.formatting ?? defaultFormatting,
       }));
       setNotes(parsed);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to load notes";
-      setError(errorMsg);
-      console.error("Failed to load notes:", err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -951,7 +955,7 @@ export default function Notes() {
 
     const subscription = BackHandler.addEventListener(
       "hardwareBackPress",
-      onBackPress
+      onBackPress,
     );
     return () => subscription.remove();
   }, [selectedType, modalVisible]);
@@ -982,7 +986,7 @@ export default function Notes() {
   };
 
   const exportSelectedNotesToPDF = async () => {
-    const selectedNotes = notes.filter((n) => selectedIds.has(getNoteId(n)));
+    const selectedNotes = notes.filter((n) => selectedIds.has(n.id));
     if (selectedNotes.length === 0) return;
 
     const htmlContent = generateMultiPageNoteHTML(selectedNotes);
@@ -998,14 +1002,9 @@ export default function Notes() {
   };
 
   const generateNoteHTML = (note: Note) => {
-    let dateStr = "";
-    if (note.createdAt) {
-      if (typeof note.createdAt === "string") {
-        dateStr = new Date(note.createdAt).toLocaleDateString();
-      } else if (typeof note.createdAt === "number") {
-        dateStr = new Date(note.createdAt).toLocaleDateString();
-      }
-    }
+    const date = note.createdAt
+      ? new Date(note.createdAt).toLocaleDateString()
+      : "";
     let html = `
       <html>
         <head>
@@ -1055,7 +1054,7 @@ export default function Notes() {
 
     if (Array.isArray(note.text)) {
       note.text.forEach((section, index) => {
-        const label = getLabels(note.type)[index] || '';
+        const label = getLabels(note.type)[index] || "";
         html += `
           <div class="section">
             <div class="section-label">${label}</div>
@@ -1064,7 +1063,7 @@ export default function Notes() {
         `;
       });
     } else {
-      const label = getLabels(note.type) || '';
+      const label = getLabels(note.type) || "";
       html += `
         <div class="section">
           <div class="section-label">${label}</div>
@@ -1073,8 +1072,8 @@ export default function Notes() {
       `;
     }
 
-    if (dateStr) {
-      html += `<div class="date">Created: ${escapeHtml(dateStr)}</div>`;
+    if (date) {
+      html += `<div class="date">Created: ${escapeHtml(date)}</div>`;
     }
 
     html += `
@@ -1133,14 +1132,16 @@ export default function Notes() {
     `;
 
     selectedNotes.forEach((note) => {
-      const date = note.createdAt ? new Date(note.createdAt).toLocaleDateString() : '';
+      const date = note.createdAt
+        ? new Date(note.createdAt).toLocaleDateString()
+        : "";
       html += `<div class="page">`;
       html += `<h1>${note.title}</h1>`;
       html += `<div class="type">${displayLabels[note.type] || note.type}</div>`;
 
       if (Array.isArray(note.text)) {
         note.text.forEach((section, index) => {
-          const label = getLabels(note.type)[index] || '';
+          const label = getLabels(note.type)[index] || "";
           html += `
             <div class="section">
               <div class="section-label">${label}</div>
@@ -1149,7 +1150,7 @@ export default function Notes() {
           `;
         });
       } else {
-        const label = getLabels(note.type) || '';
+        const label = getLabels(note.type) || "";
         html += `
           <div class="section">
             <div class="section-label">${label}</div>
@@ -1190,9 +1191,8 @@ export default function Notes() {
     return (defaultLabels as any)[type];
   };
 
-  /* SAVE NOTE */
-  const handleSave = async () => {
-    // If title is empty, use current date
+  /* ── SAVE NOTE ────────────────────────────────────────── */
+  const handleSave = () => {
     const finalTitle = noteTitle.trim() || new Date().toLocaleDateString();
     const labels = getLabels(selectedType);
     let noteContent: string | string[] = text;
@@ -1207,22 +1207,25 @@ export default function Notes() {
 
     if (editingNote) {
       const updatedNote: Note = {
-        _id: getNoteId(editingNote),
+        ...editingNote,
         type: selectedType!,
         title: finalTitle,
         text: noteContent,
         formatting: fmt,
-        createdAt: editingNote.createdAt,
+        createdAt: editingNote.createdAt ?? Date.now(),
       };
-      await saveNotes(updatedNote, "update");
+      saveNotes(notes.map((n) => (n.id === editingNote.id ? updatedNote : n)));
     } else {
       const newNote: Note = {
+        id: Date.now().toString(),
         type: selectedType!,
         title: finalTitle,
         text: noteContent,
         formatting: fmt,
+        createdAt: Date.now(),
+        favorite: false,
       };
-      await saveNotes(newNote, "create");
+      saveNotes([newNote, ...notes]);
     }
     closeEditor();
   };
@@ -1235,7 +1238,7 @@ export default function Notes() {
     let matchesText = false;
     if (Array.isArray(n.text)) {
       matchesText = n.text.some((t) =>
-        (t ?? "").toLowerCase().includes(searchLower)
+        (t ?? "").toLowerCase().includes(searchLower),
       );
     } else if (typeof n.text === "string") {
       matchesText = n.text.toLowerCase().includes(searchLower);
@@ -1288,6 +1291,12 @@ export default function Notes() {
     );
   }
 
+  const toggleSortMode = (mode: Exclude<SortMode, "default">) => {
+    setSortMode((current) => (current === mode ? "default" : mode));
+    setSortMenuOpen(false);
+  };
+
+  /* ── RENDER ───────────────────────────────────────────── */
   return (
     <SafeAreaView style={styles.safeArea}>
       <Pressable style={styles.container} onPress={() => { setSortMenuOpen(false); setInsightsMenuOpen(false); }}>
