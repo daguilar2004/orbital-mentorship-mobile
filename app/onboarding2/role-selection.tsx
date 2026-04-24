@@ -1,131 +1,325 @@
-import { router } from "expo-router";
 import React from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  ScrollView,
+} from "react-native";
+import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
-export default function RoleSelection() {
-  const [step, setStep] = React.useState<1 | 2>(1);
-  const [selected, setSelected] = React.useState<"mentor" | "mentee" | null>(
-    null,
-  );
-  const [firstName, setFirstName] = React.useState("");
-  const [lastName, setLastName] = React.useState("");
-  const [address, setAddress] = React.useState("");
-  const [zip, setZip] = React.useState("");
+const INDUSTRIES = [
+  "Technology",
+  "Finance",
+  "Healthcare",
+  "Education",
+  "Manufacturing",
+  "Retail",
+  "Energy",
+  "Real Estate",
+  "Transportation",
+  "Other",
+];
 
-  const handleContinue = () => {
-    if (step === 1) {
-      setStep(2);
-    } else {
-      // Final step → navigate somewhere
-      router.push("/onboarding2"); // or wherever you want
+interface QuestionnaireAnswers {
+  mentoringComfort: number;
+  industry: string;
+  mentorIndustry: string;
+  mentorSkillset: string;
+  developmentGoal: string;
+  holdingBack: string;
+}
+
+export default function Questionnaire() {
+  const [currentQ, setCurrentQ] = React.useState(1);
+  const [showDropdown, setShowDropdown] = React.useState(false);
+  const [answers, setAnswers] = React.useState<QuestionnaireAnswers>({
+    mentoringComfort: 5,
+    industry: "",
+    mentorIndustry: "",
+    mentorSkillset: "",
+    developmentGoal: "",
+    holdingBack: "",
+  });
+
+  const totalQuestions = 6;
+  const minWords = 20;
+
+  const countWords = (text: string) => text.trim().split(/\s+/).length;
+
+  const isCurrentAnswerValid = () => {
+    switch (currentQ) {
+      case 1:
+        return answers.mentoringComfort !== null;
+      case 2:
+        return answers.industry !== "";
+      case 3:
+        return countWords(answers.mentorIndustry) >= minWords;
+      case 4:
+        return countWords(answers.mentorSkillset) >= minWords;
+      case 5:
+        return countWords(answers.developmentGoal) >= minWords;
+      case 6:
+        return countWords(answers.holdingBack) >= minWords;
+      default:
+        return false;
     }
   };
+
+  const handleNext = () => {
+    if (currentQ < totalQuestions) {
+      setCurrentQ(currentQ + 1);
+      setShowDropdown(false);
+    } else {
+      // ✅ go back to hub after finishing
+      router.replace("/onboarding2");
+    }
+  };
+
+  const handlePrev = () => {
+    if (currentQ > 1) {
+      setCurrentQ(currentQ - 1);
+      setShowDropdown(false);
+    }
+  };
+
   return (
     <View style={styles.screen}>
-      {step === 1 ? (
-        <>
-          <Text style={styles.title}>Which role are you taking?</Text>
-          <View style={styles.optionContainer}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Questionnaire</Text>
+        <Text style={styles.stepIndicator}>
+          Question {currentQ} of {totalQuestions}
+        </Text>
+      </View>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Q1: Mentoring Comfort */}
+        {currentQ === 1 && (
+          <View style={styles.questionContainer}>
+            <Text style={styles.questionTitle}>
+              How close of a mentoring relationship are you comfortable with?
+            </Text>
+
+            <View style={styles.scaleContainer}>
+              {/* simple numeric picker instead of slider */}
+              <View style={styles.numericControl}>
+                <Pressable
+                  onPress={() =>
+                    setAnswers((a) => ({
+                      ...a,
+                      mentoringComfort: Math.max(1, a.mentoringComfort - 1),
+                    }))
+                  }
+                  style={styles.stepBtn}
+                >
+                  <Text style={styles.stepBtnText}>-</Text>
+                </Pressable>
+                <Text style={styles.scaleValue}>
+                  {" "}
+                  {answers.mentoringComfort}{" "}
+                </Text>
+                <Pressable
+                  onPress={() =>
+                    setAnswers((a) => ({
+                      ...a,
+                      mentoringComfort: Math.min(10, a.mentoringComfort + 1),
+                    }))
+                  }
+                  style={styles.stepBtn}
+                >
+                  <Text style={styles.stepBtnText}>+</Text>
+                </Pressable>
+              </View>
+              <View style={styles.scaleLabels}>
+                <Text style={styles.scaleLabel}>Formal</Text>
+                <Text style={styles.scaleLabel}>Personal</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Q2: Industry Dropdown */}
+        {currentQ === 2 && (
+          <View style={styles.questionContainer}>
+            <Text style={styles.questionTitle}>
+              What industry or domain are you studying?
+            </Text>
+
             <Pressable
-              style={[
-                styles.option,
-                selected === "mentor" && styles.optionSelected,
-              ]}
-              onPress={() => setSelected("mentor")}
+              style={styles.dropdown}
+              onPress={() => setShowDropdown(!showDropdown)}
             >
-              <Text style={styles.optionTitle}>Im here to GUIDE!</Text>
-              <Text style={styles.optionLabel}>MENTOR</Text>
+              <Text style={styles.dropdownText}>
+                {answers.industry || "Select industry"}
+              </Text>
+              <Ionicons
+                name={showDropdown ? "chevron-up" : "chevron-down"}
+                size={24}
+                color="#7C3AED"
+              />
             </Pressable>
 
-            <Pressable
-              style={[
-                styles.option,
-                selected === "mentee" && styles.optionSelected,
-              ]}
-              onPress={() => setSelected("mentee")}
-            >
-              <Text style={styles.optionTitle}>Im here to LEARN!</Text>
-              <Text style={styles.optionLabel}>MENTEE</Text>
-            </Pressable>
+            {showDropdown && (
+              <View style={styles.dropdownMenu}>
+                {INDUSTRIES.map((ind) => (
+                  <Pressable
+                    key={ind}
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setAnswers({ ...answers, industry: ind });
+                      setShowDropdown(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownItemText,
+                        answers.industry === ind && styles.dropdownItemSelected,
+                      ]}
+                    >
+                      {ind}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
           </View>
-        </>
-      ) : (
-        <>
-          <Text style={styles.title}>Set Up Your Profile</Text>
-          <Text style={styles.subtitle}>
-            Please provide your first name, last name, and ZIP code. This
-            information is essential for your profile and will be displayed to
-            other users.
-          </Text>
+        )}
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>First Name</Text>
+        {/* Q3: Mentor Industry */}
+        {currentQ === 3 && (
+          <View style={styles.questionContainer}>
+            <Text style={styles.questionTitle}>
+              What industry should your mentor be in?
+            </Text>
             <TextInput
-              style={styles.input}
-              placeholder="First Name"
-              value={firstName}
-              onChangeText={setFirstName}
+              style={styles.textarea}
+              placeholder="Type your answer (minimum 20 words)..."
+              multiline
+              numberOfLines={5}
+              value={answers.mentorIndustry}
+              onChangeText={(text) =>
+                setAnswers({ ...answers, mentorIndustry: text })
+              }
               placeholderTextColor="#999"
             />
+            <Text style={styles.wordCount}>
+              {countWords(answers.mentorIndustry)}/20 words
+            </Text>
           </View>
+        )}
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Last Name</Text>
+        {/* Q4: Mentor Skillset */}
+        {currentQ === 4 && (
+          <View style={styles.questionContainer}>
+            <Text style={styles.questionTitle}>
+              What kind of skillset should your mentor have?
+            </Text>
             <TextInput
-              style={styles.input}
-              placeholder="Last Name"
-              value={lastName}
-              onChangeText={setLastName}
+              style={styles.textarea}
+              placeholder="Type your answer (minimum 20 words)..."
+              multiline
+              numberOfLines={5}
+              value={answers.mentorSkillset}
+              onChangeText={(text) =>
+                setAnswers({ ...answers, mentorSkillset: text })
+              }
               placeholderTextColor="#999"
             />
+            <Text style={styles.wordCount}>
+              {countWords(answers.mentorSkillset)}/20 words
+            </Text>
           </View>
+        )}
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Address</Text>
+        {/* Q5: Development Goal */}
+        {currentQ === 5 && (
+          <View style={styles.questionContainer}>
+            <Text style={styles.questionTitle}>
+              What is your most urgent professional development goal right now?
+            </Text>
             <TextInput
-              style={styles.input}
-              placeholder="Street address, city, state"
-              value={address}
-              onChangeText={setAddress}
+              style={styles.textarea}
+              placeholder="Type your answer (minimum 20 words)..."
+              multiline
+              numberOfLines={5}
+              value={answers.developmentGoal}
+              onChangeText={(text) =>
+                setAnswers({ ...answers, developmentGoal: text })
+              }
               placeholderTextColor="#999"
             />
+            <Text style={styles.wordCount}>
+              {countWords(answers.developmentGoal)}/20 words
+            </Text>
           </View>
+        )}
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>ZIP Code</Text>
+        {/* Q6: Holding Back */}
+        {currentQ === 6 && (
+          <View style={styles.questionContainer}>
+            <Text style={styles.questionTitle}>
+              What is holding you back from overcoming that goal?
+            </Text>
             <TextInput
-              style={styles.input}
-              placeholder="Zip Code"
-              value={zip}
-              onChangeText={setZip}
-              keyboardType="numeric"
+              style={styles.textarea}
+              placeholder="Type your answer (minimum 20 words)..."
+              multiline
+              numberOfLines={5}
+              value={answers.holdingBack}
+              onChangeText={(text) =>
+                setAnswers({ ...answers, holdingBack: text })
+              }
               placeholderTextColor="#999"
             />
+            <Text style={styles.wordCount}>
+              {countWords(answers.holdingBack)}/20 words
+            </Text>
           </View>
-        </>
-      )}
+        )}
+      </ScrollView>
 
-      <View style={styles.actions}>
+      {/* Navigation */}
+      <View style={styles.footer}>
         <Pressable
-          style={[
-            styles.button,
-            (step === 1 && !selected) || (step === 2 && !firstName)
-              ? styles.disabledButton
-              : null,
-          ]}
-          onPress={handleContinue}
-          disabled={(step === 1 && !selected) || (step === 2 && !firstName)}
+          style={[styles.navButton, currentQ === 1 && styles.navButtonDisabled]}
+          onPress={handlePrev}
+          disabled={currentQ === 1}
         >
-          <Text style={styles.buttonText}>
-            {step === 1 ? "Continue" : "Complete"}
+          <Ionicons
+            name="chevron-back"
+            size={20}
+            color={currentQ === 1 ? "#CCC" : "#7C3AED"}
+          />
+          <Text
+            style={[styles.navText, currentQ === 1 && styles.navTextDisabled]}
+          >
+            Previous
           </Text>
         </Pressable>
 
         <Pressable
-          style={[styles.button, styles.secondary]}
-          onPress={() => router.push("/onboarding2")}
+          style={[
+            styles.navButton,
+            !isCurrentAnswerValid() && styles.navButtonDisabled,
+          ]}
+          onPress={handleNext}
+          disabled={!isCurrentAnswerValid()}
         >
-          <Text style={styles.secondaryText}>Back to Onboarding 2</Text>
+          <Text
+            style={[
+              styles.navText,
+              !isCurrentAnswerValid() && styles.navTextDisabled,
+            ]}
+          >
+            {currentQ === totalQuestions ? "Finish" : "Next"}
+          </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color={!isCurrentAnswerValid() ? "#CCC" : "#7C3AED"}
+          />
         </Pressable>
       </View>
     </View>
@@ -133,64 +327,100 @@ export default function RoleSelection() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: 16, backgroundColor: "#fff" },
-  title: { fontSize: 22, fontWeight: "700", marginBottom: 8 },
-  subtitle: { color: "#6B7280", marginBottom: 24 },
-  actions: { marginTop: 20 },
-  button: {
-    backgroundColor: "#7C3AED",
-    padding: 14,
-    borderRadius: 10,
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  buttonText: { color: "#fff", fontWeight: "600" },
-  secondary: { backgroundColor: "#F3F4F6" },
-  secondaryText: { color: "#374151", fontWeight: "600" },
-  disabledButton: { opacity: 0.5 },
-  optionContainer: {
-    marginTop: 24,
-    gap: 16,
-  },
-  option: {
-    borderWidth: 2,
-    borderColor: "#D1D5DB",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-  },
-  optionSelected: {
-    borderColor: "#7C3AED",
-    backgroundColor: "#F3E8FF",
-  },
-  optionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  optionLabel: {
-    fontSize: 14,
-    color: "#6B7280",
-    fontWeight: "700",
-  },
-  formGroup: { width: "100%", marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: "500", color: "#374151", marginBottom: 8 },
-  input: {
-    width: "100%",
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 12,
+  screen: { flex: 1, backgroundColor: "#F9FAFB" },
+  header: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontSize: 16,
+    backgroundColor: "#fff",
+  },
+  title: { fontSize: 20, fontWeight: "700", color: "#111827" },
+  stepIndicator: { fontSize: 13, color: "#999", marginTop: 4 },
+  content: { flex: 1, paddingHorizontal: 16, paddingVertical: 20 },
+  questionContainer: { marginBottom: 24 },
+  questionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
     color: "#111827",
+    marginBottom: 20,
   },
-  fileButton: {
-    backgroundColor: "#F3F4F6",
-    padding: 12,
-    borderRadius: 10,
+  scaleContainer: { paddingVertical: 20 },
+  scaleLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    marginTop: 16,
   },
-  fileButtonText: { color: "#374151", fontWeight: "600" },
+  scaleLabel: { fontSize: 13, color: "#6B7280", fontWeight: "500" },
+  scaleValue: { fontSize: 24, fontWeight: "700", color: "#7C3AED" },
+  numericControl: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+  },
+  stepBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepBtnText: { fontSize: 18, fontWeight: "700", color: "#111827" },
+  dropdown: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  dropdownText: { fontSize: 15, color: "#111827" },
+  dropdownMenu: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 10,
+    marginTop: 8,
+    backgroundColor: "#fff",
+  },
+  dropdownItem: { paddingHorizontal: 14, paddingVertical: 12 },
+  dropdownItemText: { fontSize: 14, color: "#6B7280" },
+  dropdownItemSelected: { color: "#7C3AED", fontWeight: "600" },
+  textarea: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: "#111827",
+    textAlignVertical: "top",
+  },
+  wordCount: { fontSize: 12, color: "#999", marginTop: 6 },
+  footer: {
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  navButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#7C3AED",
+    gap: 6,
+  },
+  navButtonDisabled: { borderColor: "#CCC", opacity: 0.5 },
+  navText: { fontSize: 14, fontWeight: "600", color: "#7C3AED" },
+  navTextDisabled: { color: "#CCC" },
 });
