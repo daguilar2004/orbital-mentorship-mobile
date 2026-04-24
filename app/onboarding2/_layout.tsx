@@ -1,6 +1,10 @@
-import React from "react";
 import { Stack } from "expo-router";
+import { AppProvider } from "../context/AppContext";
 
-export default function Onboarding2Layout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+export default function Layout() {
+  return (
+    <AppProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </AppProvider>
+  );
 }
