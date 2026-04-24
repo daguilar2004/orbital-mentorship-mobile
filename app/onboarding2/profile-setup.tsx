@@ -1,17 +1,15 @@
-import React, { useState } from "react";
-import * as ImagePicker from "expo-image-picker";
-import * as DocumentPicker from "expo-document-picker";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  TextInput,
-  ScrollView,
-  Alert,
-} from "react-native";
-import { router } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { useState } from "react";
+import {
+    Alert,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from "react-native";
 import { useApp } from "../context/AppContext";
 const defaultProfile = {
   firstName: "",
@@ -280,7 +278,7 @@ export default function ProfileSetup() {
 
           {questionnaireAnswers.holdingBack && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>What's Holding You Back</Text>
+              <Text style={styles.sectionTitle}>What&apos;s Holding You Back</Text>
               <Text style={styles.sectionText}>
                 {questionnaireAnswers.holdingBack}
               </Text>

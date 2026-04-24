@@ -1,11 +1,14 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   BackHandler,
   Modal,
+  PanResponder,
   Pressable,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,18 +16,22 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useApp } from "./context/AppContext";
+import { API_BASE_URL } from "./api/index";
+import { MOCK_AUTH_TOKEN, MOCK_USER_ID } from "./config/mockAuth";
+import { useApp } from "./context/AppContext"; // App context with userRole
+
+/* API CONFIG */
+const AUTH_TOKEN_KEY = "AUTH_TOKEN";
 
 /* STORAGE */
 const NOTES_KEY = "NOTES_STORAGE";
 /* CATEGORY COLORS */
 const categoryColors: Record<string, string> = {
-  Pre: "#4CAF50",
-  During: "#2196F3",
-  Post: "#FF9800",
-  Daily: "#9C27B0",
-  New: "#607D8B",
+  Pre: "#ff3b89",
+  During: "#0b0c67",
+  Post: "#e373bd",
+  Daily: "#0b0c67",
+  New: "#cfc2eb",
 };
 
 const options = ["Pre", "During", "Post", "Daily", "New"];
@@ -105,7 +112,8 @@ type Note = {
   title: string;
   text: string | string[];
   formatting?: Formatting;
-  createdAt?: number;
+  createdAt?: string | number;
+  updatedAt?: string | number;
   favorite?: boolean;
 };
 
@@ -117,21 +125,21 @@ const viewMenuModes: {
   key: ViewMode;
   label: string;
 }[] = [
-  { key: "list", label: "List" },
-  { key: "folder", label: "Folders" },
-  { key: "timeline", label: "Timeline" },
-  { key: "favorites", label: "Favorites" },
-  { key: "graph", label: "Graph" },
-];
+    { key: "list", label: "List" },
+    { key: "folder", label: "Folders" },
+    { key: "timeline", label: "Timeline" },
+    { key: "favorites", label: "Favorites" },
+    { key: "graph", label: "Graph" },
+  ];
 
 const sortMenuModes: {
   key: Exclude<SortMode, "default">;
   label: string;
 }[] = [
-  { key: "az", label: "A-Z" },
-  { key: "za", label: "Z-A" },
-  { key: "favorites", label: "Favorites" },
-];
+    { key: "az", label: "A-Z" },
+    { key: "za", label: "Z-A" },
+    { key: "favorites", label: "Favorites" },
+  ];
 
 /* ── GRAPH HELPERS ─────────────────────────────────────── */
 const CANVAS_W = 440;
@@ -381,9 +389,9 @@ function TimelineView({
   getLabels: (type: string | null) => any;
 }) {
   const sorted = [...notes].sort((a, b) => {
-    const ta = a.createdAt ?? Number(a.id) ?? 0;
-    const tb = b.createdAt ?? Number(b.id) ?? 0;
-    return tb - ta;
+    const ta = typeof a.createdAt === "string" ? new Date(a.createdAt).getTime() : (a.createdAt ?? Number(a.id) ?? 0);
+    const tb = typeof b.createdAt === "string" ? new Date(b.createdAt).getTime() : (b.createdAt ?? Number(b.id) ?? 0);
+    return (tb as number) - (ta as number);
   });
 
   const groups: { dateKey: string; notes: Note[] }[] = [];
@@ -573,9 +581,9 @@ function FavoritesView({
   const favNotes = notes
     .filter((n) => n.favorite)
     .sort((a, b) => {
-      const ta = a.createdAt ?? Number(a.id) ?? 0;
-      const tb = b.createdAt ?? Number(b.id) ?? 0;
-      return tb - ta;
+      const ta = typeof a.createdAt === "string" ? new Date(a.createdAt).getTime() : (a.createdAt ?? Number(a.id) ?? 0);
+      const tb = typeof b.createdAt === "string" ? new Date(b.createdAt).getTime() : (b.createdAt ?? Number(b.id) ?? 0);
+      return (tb as number) - (ta as number);
     });
 
   if (favNotes.length === 0) {
@@ -619,7 +627,7 @@ function FavoritesView({
               </Text>
             </View>
             <TouchableOpacity
-              onPress={() => onToggleFavorite(item.id)}
+              onPress={() => onToggleFavorite(item._id || item.id || "")}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Text style={{ color: "#FB8C00", fontSize: 20 }}>★</Text>
@@ -633,17 +641,9 @@ function FavoritesView({
               : item.text}
           </Text>
 
-          <View style={favStyles.actions}>
-            <TouchableOpacity onPress={() => onExport(item)}>
-              <Text style={styles.noteActionExport}>Export</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => onOpenNote(item)}>
-              <Text style={{ color: "#1E88E5", fontSize: 13 }}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => onDelete(item.id)}>
-              <Text style={{ color: "#E53935", fontSize: 13 }}>Delete</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={{ fontSize: 11, color: "#98A2B3", marginTop: 8, textAlign: "right" }}>
+            Hold to edit · export · delete
+          </Text>
         </TouchableOpacity>
       ))}
     </ScrollView>
@@ -698,7 +698,9 @@ const favStyles = StyleSheet.create({
    MAIN NOTES SCREEN
 ═══════════════════════════════════════════════════════════ */
 export default function Notes() {
-  const { userRole } = useApp();
+  const { userRole } = useApp(); // mentor or mentee
+  // TODO: Replace MOCK_USER_ID with real user._id when login is implemented
+  const userId = MOCK_USER_ID;
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -722,10 +724,49 @@ export default function Notes() {
   const [insightsMenuOpen, setInsightsMenuOpen] = useState(false);
 
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [contextMenuNote, setContextMenuNote] = useState<string | null>(null);
+  const [exitConfirmVisible, setExitConfirmVisible] = useState(false);
 
-  /* ── CRUD ─────────────────────────────────────────────── */
-  const handleDeleteOne = (id: string) => {
-    saveNotes(notes.filter((n) => n.id !== id));
+  const editorPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) =>
+        gs.dx > 40 && Math.abs(gs.dy) < 60,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dx > 80) {
+          setExitConfirmVisible(true);
+        }
+      },
+    })
+  ).current;
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleDeleteOne = async (id: string) => {
+    if (!userId) return;
+    setLoading(true);
+    try {
+      const headers = await getHeadersWithAuth();
+      const response = await fetch(`${API_BASE_URL}/notes/${id}`, {
+        method: "DELETE",
+        headers,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        throw new Error(
+          `Failed to delete note (${response.status} ${response.statusText})${errorText ? `: ${errorText}` : ""}`
+        );
+      }
+
+      const updated = notes.filter((n) => getNoteId(n) !== id);
+      setNotes(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete note");
+      Alert.alert("Error", "Failed to delete note");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleSelectNote = (id: string) => {
@@ -740,10 +781,30 @@ export default function Notes() {
     });
   };
 
-  const handleDeleteSelected = () => {
-    saveNotes(notes.filter((n) => !selectedIds.has(n.id)));
-    setSelectedIds(new Set());
-    setSelectMode(false);
+  const handleDeleteSelected = async () => {
+    if (!userId) return;
+    setLoading(true);
+    try {
+      const headers = await getHeadersWithAuth();
+      const deletePromises = Array.from(selectedIds).map((id) =>
+        fetch(`${API_BASE_URL}/notes/${id}`, {
+          method: "DELETE",
+          headers,
+        })
+      );
+
+      await Promise.all(deletePromises);
+
+      const updated = notes.filter((n) => !selectedIds.has(getNoteId(n)));
+      setNotes(updated);
+      setSelectedIds(new Set());
+      setSelectMode(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete notes");
+      Alert.alert("Error", "Failed to delete selected notes");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const exitSelectMode = () => {
@@ -796,9 +857,20 @@ export default function Notes() {
   }, []);
 
   const loadData = async () => {
-    const savedNotes = await AsyncStorage.getItem(NOTES_KEY);
-    if (savedNotes) {
-      const parsed = JSON.parse(savedNotes).map((note: any) => ({
+    if (!userId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const headers = await getHeadersWithAuth();
+      const response = await fetch(`${API_BASE_URL}/notes/${userId}`, {
+        method: "GET",
+        headers,
+      });
+
+      if (!response.ok) throw new Error("Failed to load notes");
+
+      const data = await response.json();
+      const parsed = data.map((note: any) => ({
         ...note,
         formatting: note.formatting ?? defaultFormatting,
       }));
@@ -806,9 +878,54 @@ export default function Notes() {
     }
   };
 
-  const saveNotes = async (updated: Note[]) => {
-    setNotes(updated);
-    await AsyncStorage.setItem(NOTES_KEY, JSON.stringify(updated));
+  const saveNotes = async (noteData: Note, action: "create" | "update") => {
+    if (!userId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const headers = await getHeadersWithAuth();
+      const payload = {
+        type: noteData.type,
+        title: noteData.title,
+        text: noteData.text,
+        formatting: noteData.formatting,
+      };
+
+      let response;
+      if (action === "create") {
+        response = await fetch(`${API_BASE_URL}/notes/${userId}`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+        });
+      } else {
+        const noteId = getNoteId(noteData);
+        response = await fetch(`${API_BASE_URL}/notes/${noteId}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify(payload),
+        });
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        throw new Error(
+          `Failed to ${action} note (${response.status} ${response.statusText})${errorText ? `: ${errorText}` : ""}`
+        );
+      }
+
+      const savedNote = await response.json();
+      await loadData();
+
+      return savedNote;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : `Failed to ${action} note`;
+      setError(errorMsg);
+      Alert.alert("Error", errorMsg);
+      console.error(`Failed to ${action} note:`, err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const escapeHtml = (text: string) => {
@@ -1063,11 +1180,12 @@ export default function Notes() {
     if (type === "Pre") {
       return userRole === "mentor"
         ? [
-            "What do I want to meaningfully practice or strengthen in myself as a mentor during this meeting?",
-            "What tendency of mine should I be mindful of in this conversation?",
-            "How can I guide this conversation in a way that builds the mentee's independent thinking not reliance on me?",
-            "What would 'showing up well' as a mentor look like in this meeting, regardless of the outcome?",
-          ]
+          "What do I want to meaningfully practice or strengthen in myself as a mentor during this meeting?",
+          "What tendency of mine should I be mindful of in this conversation?",
+          "How can I guide this conversation in a way that builds the mentee's independent thinking not reliance on me?",
+          "What would 'showing up well' as a mentor look like in this meeting, regardless of the outcome?",
+        ]
+
         : defaultLabels.Pre;
     }
     return (defaultLabels as any)[type];
@@ -1112,6 +1230,7 @@ export default function Notes() {
     closeEditor();
   };
 
+
   /* ── FILTER ───────────────────────────────────────────── */
   const filteredNotes = notes.filter((n) => {
     const searchLower = search.toLowerCase();
@@ -1129,34 +1248,48 @@ export default function Notes() {
     return matchesSearch && matchesFilter;
   });
 
-  const visibleNotes = filteredNotes
-    .filter((n) => (sortMode === "favorites" ? n.favorite : true))
-    .sort((a, b) => {
-      if (sortMode === "az") {
-        return a.title.localeCompare(b.title);
-      }
-      if (sortMode === "za") {
-        return b.title.localeCompare(a.title);
-      }
-      const ta = a.createdAt ?? Number(a.id) ?? 0;
-      const tb = b.createdAt ?? Number(b.id) ?? 0;
-      return tb - ta;
-    });
+  /* ── SORT AND FILTER LOGIC ──────────────────────────── */
+  let visibleNotes = [...filteredNotes];
+  if (sortMode === "az") {
+    visibleNotes.sort((a, b) => (a.title ?? "").localeCompare(b.title ?? ""));
+  } else if (sortMode === "za") {
+    visibleNotes.sort((a, b) => (b.title ?? "").localeCompare(a.title ?? ""));
+  } else if (sortMode === "favorites") {
+    visibleNotes = visibleNotes.filter((n) => n.favorite);
+  }
 
-  const groupedNotes = options.reduce((acc: Record<string, Note[]>, cat) => {
-    acc[cat] = visibleNotes.filter((n) => n.type === cat);
-    return acc;
-  }, {});
+  const groupedNotes = options.reduce(
+    (acc: Record<string, Note[]>, category) => {
+      acc[category] = visibleNotes.filter((n) => n.type === category);
+      return acc;
+    },
+    {}
+  );
+
+  const toggleSortMode = (mode: Exclude<SortMode, "default">) => {
+    setSortMode(mode);
+  };
 
   const setActiveView = (mode: ViewMode) => {
     setViewMode(mode);
-    setSortMenuOpen(false);
-    setInsightsMenuOpen(false);
-    if (mode !== "folder") {
-      setOpenedFolder(null);
-      setFolderFilter(null);
-    }
   };
+
+  const toggleFavorite = (id: string) => {
+    setNotes((prevNotes) =>
+      prevNotes.map((n) =>
+        getNoteId(n) === id ? { ...n, favorite: !n.favorite } : n
+      )
+    );
+  };
+
+  if (loading && notes.length === 0) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color="#7C3AED" />
+        <Text style={{ marginTop: 10 }}>Loading notes...</Text>
+      </View>
+    );
+  }
 
   const toggleSortMode = (mode: Exclude<SortMode, "default">) => {
     setSortMode((current) => (current === mode ? "default" : mode));
@@ -1166,31 +1299,90 @@ export default function Notes() {
   /* ── RENDER ───────────────────────────────────────────── */
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {!selectedType && (
-          <>
-            {/* ── TOP BAR ──────────────────────────────────────── */}
-            <View style={styles.topBar}>
-              <View style={styles.toolbarRow}>
-                <View style={styles.searchField}>
-                  <Text style={styles.searchGlyph}>⌕</Text>
-                  <TextInput
-                    placeholder="Search notes"
-                    placeholderTextColor="#98A2B3"
-                    value={search}
-                    onChangeText={setSearch}
-                    style={styles.searchInput}
-                  />
-                </View>
+      <Pressable style={styles.container} onPress={() => { setSortMenuOpen(false); setInsightsMenuOpen(false); }}>
+      {!selectedType && (
+        <>
+      {/* ── TOP BAR ──────────────────────────────────────── */}
+      <View style={styles.topBar}>
+        <View style={styles.toolbarRow}>
+          <View style={styles.searchField}>
+            <Text style={styles.searchGlyph}>⌕</Text>
+            <TextInput
+              placeholder="Search notes"
+              placeholderTextColor="#98A2B3"
+              value={search}
+              onChangeText={setSearch}
+              style={styles.searchInput}
+            />
+          </View>
+
+          <TouchableOpacity
+            onPress={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+            style={[styles.headerButton, selectMode && styles.headerButtonActive]}
+          >
+            <Text
+              style={[
+                styles.headerButtonText,
+                selectMode && styles.headerButtonTextOnDark,
+              ]}
+            >
+              {selectMode ? "Done" : "Select"}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.dropdownWrap}>
+            <TouchableOpacity
+              onPress={() => {
+                setSortMenuOpen((open) => !open);
+                setInsightsMenuOpen(false);
+              }}
+              style={[
+                styles.headerButton,
+                styles.sortButton,
+                sortMenuOpen && styles.headerButtonActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.sortIcon,
+                  sortMenuOpen && styles.headerButtonTextOnDark,
+                ]}
+              >
+                ⇅
+              </Text>
+            </TouchableOpacity>
+
+            {sortMenuOpen && (
+              <View style={styles.dropdownMenu} onStartShouldSetResponder={() => true}>
+                {sortMenuModes.map((mode) => {
+                  const isActive = sortMode === mode.key;
+                  return (
+                    <TouchableOpacity
+                      key={mode.key}
+                      onPress={() => { toggleSortMode(mode.key); setSortMenuOpen(false); }}
+                      style={[
+                        styles.dropdownItem,
+                        isActive && styles.dropdownItemActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownItemTitle,
+                          isActive && styles.dropdownItemTitleActive,
+                        ]}
+                      >
+                        {mode.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </View>
 
                 <TouchableOpacity
-                  onPress={() =>
-                    selectMode ? exitSelectMode() : setSelectMode(true)
-                  }
-                  style={[
-                    styles.headerButton,
-                    selectMode && styles.headerButtonActive,
-                  ]}
+                  onPress={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+                  style={[styles.headerButton, selectMode && styles.headerButtonActive]}
                 >
                   <Text
                     style={[
@@ -1202,19 +1394,14 @@ export default function Notes() {
                   </Text>
                 </TouchableOpacity>
 
-                <View style={styles.dropdownWrap}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSortMenuOpen((open) => !open);
-                      setInsightsMenuOpen(false);
-                    }}
-                    style={[
-                      styles.headerButton,
-                      styles.sortButton,
-                      sortMenuOpen && styles.headerButtonActive,
-                    ]}
-                  >
-                    <Text
+            {insightsMenuOpen && (
+              <View style={styles.dropdownMenu} onStartShouldSetResponder={() => true}>
+                {viewMenuModes.map((mode) => {
+                  const isActive = viewMode === mode.key;
+                  return (
+                    <TouchableOpacity
+                      key={mode.key}
+                      onPress={() => { setActiveView(mode.key); setInsightsMenuOpen(false); }}
                       style={[
                         styles.sortIcon,
                         sortMenuOpen && styles.headerButtonTextOnDark,
@@ -1254,9 +1441,17 @@ export default function Notes() {
 
                 <View style={styles.dropdownWrap}>
                   <TouchableOpacity
+                    key={getNoteId(item)}
                     onPress={() => {
-                      setInsightsMenuOpen((open) => !open);
-                      setSortMenuOpen(false);
+                      if (contextMenuNote === getNoteId(item)) { setContextMenuNote(null); return; }
+                      selectMode ? toggleSelectNote(getNoteId(item)) : openEditNote(item);
+                    }}
+                    onLongPress={() => {
+                      if (selectMode) {
+                        toggleSelectNote(getNoteId(item));
+                      } else {
+                        setContextMenuNote(getNoteId(item));
+                      }
                     }}
                     style={[
                       styles.headerButton,
@@ -1264,45 +1459,83 @@ export default function Notes() {
                       insightsMenuOpen && styles.headerButtonActive,
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.headerButtonText,
-                        insightsMenuOpen && styles.headerButtonTextOnDark,
-                      ]}
-                    >
-                      Views
-                    </Text>
-                    <Text
-                      style={[
-                        styles.dropdownCaret,
-                        insightsMenuOpen && styles.headerButtonTextOnDark,
-                      ]}
-                    >
-                      ▾
-                    </Text>
-                  </TouchableOpacity>
+                    {selectMode && (
+                      <TouchableOpacity
+                        onPress={() => toggleSelectNote(getNoteId(item))}
+                        style={[styles.checkbox, selectedIds.has(getNoteId(item)) && styles.checkboxSelected, { marginRight: 12 }]}
+                      />
+                    )}
 
-                  {insightsMenuOpen && (
-                    <View style={styles.dropdownMenu}>
-                      {viewMenuModes.map((mode) => {
-                        const isActive = viewMode === mode.key;
-                        return (
+                        <View style={{ flex: 1 }}>
+                          <View style={styles.noteHeader}>
+                            <Text style={styles.noteTitle}>{item.title}</Text>
+                            {!selectMode && (
+                              <TouchableOpacity
+                                onPress={() => toggleFavorite(getNoteId(item))}
+                                hitSlop={{
+                                  top: 16,
+                                  bottom: 16,
+                                  left: 16,
+                                  right: 16,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 24,
+                                    color: item.favorite
+                                      ? "#FB8C00"
+                                      : "#D0D5DD",
+                                  }}
+                                >
+                                  ★
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+
+                          {Array.isArray(item.text) ? (
+                            item.text.map((section, index) => (
+                              <View key={index} style={styles.noteSection}>
+                                <Text style={styles.sectionLabel}>
+                                  {getLabels(category)[index]}
+                                </Text>
+                                <Text style={noteTextStyle(item.formatting)}>
+                                  {section}
+                                </Text>
+                              </View>
+                            ))
+                          ) : (
+                            <>
+                              <Text style={styles.sectionLabel}>
+                                {getLabels(category)}
+                              </Text>
+                              <Text style={noteTextStyle(item.formatting)}>
+                                {item.text}
+                              </Text>
+                            </>
+                          )}
+
+                      {contextMenuNote === getNoteId(item) && (
+                        <View style={styles.contextMenu}>
                           <TouchableOpacity
-                            key={mode.key}
-                            onPress={() => setActiveView(mode.key)}
-                            style={[
-                              styles.dropdownItem,
-                              isActive && styles.dropdownItemActive,
-                            ]}
+                            onPress={() => { exportNoteToPDF(item); setContextMenuNote(null); }}
+                            style={styles.contextMenuItem}
                           >
-                            <Text
-                              style={[
-                                styles.dropdownItemTitle,
-                                isActive && styles.dropdownItemTitleActive,
-                              ]}
-                            >
-                              {mode.label}
-                            </Text>
+                            <Text style={styles.noteActionExport}>Export</Text>
+                          </TouchableOpacity>
+                          <View style={styles.contextMenuDivider} />
+                          <TouchableOpacity
+                            onPress={() => { openEditNote(item); setContextMenuNote(null); }}
+                            style={styles.contextMenuItem}
+                          >
+                            <Text style={styles.noteActionEdit}>Edit</Text>
+                          </TouchableOpacity>
+                          <View style={styles.contextMenuDivider} />
+                          <TouchableOpacity
+                            onPress={() => { handleDeleteOne(getNoteId(item)); setContextMenuNote(null); }}
+                            style={styles.contextMenuItem}
+                          >
+                            <Text style={styles.noteActionDelete}>Delete</Text>
                           </TouchableOpacity>
                         );
                       })}
@@ -1372,9 +1605,7 @@ export default function Notes() {
                             <View
                               style={[
                                 styles.groupCount,
-                                {
-                                  backgroundColor: `${categoryColors[category]}18`,
-                                },
+                                { backgroundColor: `${categoryColors[category]}18` },
                               ]}
                             >
                               <Text
@@ -1390,47 +1621,27 @@ export default function Notes() {
 
                           {groupedNotes[category].map((item) => (
                             <TouchableOpacity
-                              key={item.id}
-                              onPress={() =>
-                                selectMode
-                                  ? toggleSelectNote(item.id)
-                                  : openEditNote(item)
-                              }
+                              key={getNoteId(item)}
+                              onPress={() => (selectMode ? toggleSelectNote(getNoteId(item)) : openEditNote(item))}
                               onLongPress={() => {
                                 setSelectMode(true);
-                                toggleSelectNote(item.id);
+                                toggleSelectNote(getNoteId(item));
                               }}
-                              style={[
-                                styles.noteCard,
-                                {
-                                  borderLeftColor: categoryColors[category],
-                                  flexDirection: "row",
-                                  alignItems: "flex-start",
-                                },
-                                selectedIds.has(item.id) &&
-                                  styles.noteCardSelected,
-                              ]}
+                              style={[styles.noteCard, { borderLeftColor: categoryColors[category], flexDirection: "row", alignItems: "flex-start" }]}
                             >
                               {selectMode && (
                                 <TouchableOpacity
-                                  onPress={() => toggleSelectNote(item.id)}
-                                  style={[
-                                    styles.checkbox,
-                                    selectedIds.has(item.id) &&
-                                      styles.checkboxSelected,
-                                    { marginRight: 12 },
-                                  ]}
+                                  onPress={() => toggleSelectNote(getNoteId(item))}
+                                  style={[styles.checkbox, selectedIds.has(getNoteId(item)) && styles.checkboxSelected, { marginRight: 12 }]}
                                 />
                               )}
 
                               <View style={{ flex: 1 }}>
                                 <View style={styles.noteHeader}>
-                                  <Text style={styles.noteTitle}>
-                                    {item.title}
-                                  </Text>
+                                  <Text style={styles.noteTitle}>{item.title}</Text>
                                   {!selectMode && (
                                     <TouchableOpacity
-                                      onPress={() => toggleFavorite(item.id)}
+                                      onPress={() => toggleFavorite(getNoteId(item))}
                                       hitSlop={{
                                         top: 8,
                                         bottom: 8,
@@ -1442,7 +1653,7 @@ export default function Notes() {
                                         style={{
                                           fontSize: 18,
                                           color: item.favorite
-                                            ? "#FB8C00"
+                                            ? "#ff3b89"
                                             : "#D0D5DD",
                                         }}
                                       >
@@ -1454,16 +1665,11 @@ export default function Notes() {
 
                                 {Array.isArray(item.text) ? (
                                   item.text.map((section, index) => (
-                                    <View
-                                      key={index}
-                                      style={styles.noteSection}
-                                    >
+                                    <View key={index} style={styles.noteSection}>
                                       <Text style={styles.sectionLabel}>
                                         {getLabels(category)[index]}
                                       </Text>
-                                      <Text
-                                        style={noteTextStyle(item.formatting)}
-                                      >
+                                      <Text style={noteTextStyle(item.formatting)}>
                                         {section}
                                       </Text>
                                     </View>
@@ -1473,9 +1679,7 @@ export default function Notes() {
                                     <Text style={styles.sectionLabel}>
                                       {getLabels(category)}
                                     </Text>
-                                    <Text
-                                      style={noteTextStyle(item.formatting)}
-                                    >
+                                    <Text style={noteTextStyle(item.formatting)}>
                                       {item.text}
                                     </Text>
                                   </>
@@ -1493,9 +1697,7 @@ export default function Notes() {
                                     <TouchableOpacity
                                       onPress={() => openEditNote(item)}
                                     >
-                                      <Text style={styles.noteActionEdit}>
-                                        Edit
-                                      </Text>
+                                      <Text style={styles.noteActionEdit}>Edit</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                       onPress={() => handleDeleteOne(item.id)}
@@ -1510,7 +1712,7 @@ export default function Notes() {
                             </TouchableOpacity>
                           ))}
                         </View>
-                      ) : null,
+                      ) : null
                     )
                   )}
                 </ScrollView>
@@ -1573,9 +1775,8 @@ export default function Notes() {
                     );
                   }
 
-                  const folderNotes = (folders[openedFolder] || []).filter(
-                    (note) =>
-                      folderFilter ? note.type === folderFilter : true,
+                  const folderNotes = (folders[openedFolder] || []).filter((note) =>
+                    folderFilter ? note.type === folderFilter : true
                   );
 
                   return (
@@ -1587,9 +1788,7 @@ export default function Notes() {
                         }}
                         style={styles.backButton}
                       >
-                        <Text style={styles.backButtonText}>
-                          ‹ Back to folders
-                        </Text>
+                        <Text style={styles.backButtonText}>‹ Back to folders</Text>
                       </TouchableOpacity>
 
                       <ScrollView
@@ -1613,8 +1812,7 @@ export default function Notes() {
                             <Text
                               style={[
                                 styles.filterBtnText,
-                                folderFilter === opt &&
-                                  styles.filterBtnTextActive,
+                                folderFilter === opt && styles.filterBtnTextActive,
                               ]}
                             >
                               {opt}
@@ -1623,176 +1821,214 @@ export default function Notes() {
                         ))}
                       </ScrollView>
 
-                      {folderNotes.length === 0 ? (
-                        <View style={styles.emptyState}>
-                          <Text style={styles.emptyStateTitle}>
-                            No notes found
-                          </Text>
-                          <Text style={styles.emptyStateText}>
-                            Try a different folder filter.
-                          </Text>
-                        </View>
-                      ) : (
-                        folderNotes.map((item) => (
-                          <TouchableOpacity
-                            key={item.id}
-                            onPress={() =>
-                              selectMode
-                                ? toggleSelectNote(item.id)
-                                : openEditNote(item)
-                            }
-                            onLongPress={() => {
-                              setSelectMode(true);
-                              toggleSelectNote(item.id);
-                            }}
-                            style={[
-                              styles.noteCard,
-                              {
-                                borderLeftColor:
-                                  categoryColors[item.type] ?? "#999",
-                                flexDirection: "row",
-                                alignItems: "flex-start",
-                              },
-                              selectedIds.has(item.id) &&
-                                styles.noteCardSelected,
-                            ]}
-                          >
-                            {selectMode && (
-                              <TouchableOpacity
-                                onPress={() => toggleSelectNote(item.id)}
-                                style={[
-                                  styles.checkbox,
-                                  selectedIds.has(item.id) &&
-                                    styles.checkboxSelected,
-                                  { marginRight: 12 },
-                                ]}
-                              />
-                            )}
+                      {folderNotes.map((item) => (
+                        <TouchableOpacity
+                          key={getNoteId(item)}
+                          onPress={() => (selectMode ? toggleSelectNote(getNoteId(item)) : openEditNote(item))}
+                          onLongPress={() => {
+                            setSelectMode(true);
+                            toggleSelectNote(getNoteId(item));
+                          }}
+                          style={[
+                            styles.noteCard,
+                            {
+                              borderLeftColor: categoryColors[item.type] ?? "#999",
+                              flexDirection: "row",
+                              alignItems: "flex-start",
+                            },
+                          ]}
+                        >
+                          {selectMode && (
+                            <TouchableOpacity
+                              onPress={() => toggleSelectNote(getNoteId(item))}
+                              style={[
+                                styles.checkbox,
+                                selectedIds.has(getNoteId(item)) && styles.checkboxSelected,
+                                { marginRight: 12 },
+                              ]}
+                            />
+                          )}
 
-                            <View style={{ flex: 1 }}>
-                              <View style={styles.noteHeader}>
-                                <Text style={styles.noteTitle}>
-                                  {item.title}
-                                </Text>
-                                {!selectMode && (
-                                  <TouchableOpacity
-                                    onPress={() => toggleFavorite(item.id)}
-                                    hitSlop={{
-                                      top: 8,
-                                      bottom: 8,
-                                      left: 8,
-                                      right: 8,
+                          <View style={{ flex: 1 }}>
+                            <View style={styles.noteHeader}>
+                              <Text style={styles.noteTitle}>{item.title}</Text>
+                              {!selectMode && (
+                                <TouchableOpacity
+                                  onPress={() => toggleFavorite(getNoteId(item))}
+                                  hitSlop={{
+                                    top: 8,
+                                    bottom: 8,
+                                    left: 8,
+                                    right: 8,
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 18,
+                                      color: item.favorite
+                                        ? "#FB8C00"
+                                        : "#D0D5DD",
                                     }}
                                   >
-                                    <Text
-                                      style={{
-                                        fontSize: 18,
-                                        color: item.favorite
-                                          ? "#FB8C00"
-                                          : "#D0D5DD",
-                                      }}
-                                    >
-                                      ★
-                                    </Text>
-                                  </TouchableOpacity>
-                                )}
-                              </View>
-
-                              {Array.isArray(item.text) ? (
-                                item.text.map((section, index) => (
-                                  <View key={index} style={styles.noteSection}>
-                                    <Text style={styles.sectionLabel}>
-                                      {getLabels(item.type)?.[index]}
-                                    </Text>
-                                    <Text
-                                      style={noteTextStyle(item.formatting)}
-                                    >
-                                      {section}
-                                    </Text>
-                                  </View>
-                                ))
-                              ) : (
-                                <>
-                                  <Text style={styles.sectionLabel}>
-                                    {getLabels(item.type)}
+                                    ★
                                   </Text>
-                                  <Text style={noteTextStyle(item.formatting)}>
-                                    {item.text}
-                                  </Text>
-                                </>
-                              )}
-
-                              {!selectMode && (
-                                <View style={styles.noteActions}>
-                                  <TouchableOpacity
-                                    onPress={() => exportNoteToPDF(item)}
-                                  >
-                                    <Text style={styles.noteActionExport}>
-                                      Export
-                                    </Text>
-                                  </TouchableOpacity>
-                                  <TouchableOpacity
-                                    onPress={() => openEditNote(item)}
-                                  >
-                                    <Text style={styles.noteActionEdit}>
-                                      Edit
-                                    </Text>
-                                  </TouchableOpacity>
-                                  <TouchableOpacity
-                                    onPress={() => handleDeleteOne(item.id)}
-                                  >
-                                    <Text style={styles.noteActionDelete}>
-                                      Delete
-                                    </Text>
-                                  </TouchableOpacity>
-                                </View>
+                                </TouchableOpacity>
                               )}
                             </View>
-                          </TouchableOpacity>
-                        ))
-                      )}
+
+                            {Array.isArray(item.text) ? (
+                              item.text.map((section, index) => (
+                                <View key={index} style={styles.noteSection}>
+                                  <Text style={styles.sectionLabel}>
+                                    {getLabels(item.type)?.[index]}
+                                  </Text>
+                                  <Text style={noteTextStyle(item.formatting)}>
+                                    {section}
+                                  </Text>
+                                </View>
+                              ))
+                            ) : (
+                              <>
+                                <Text style={styles.sectionLabel}>
+                                  {getLabels(item.type)}
+                                </Text>
+                                <Text style={noteTextStyle(item.formatting)}>
+                                  {item.text}
+                                </Text>
+                              </>
+                            )}
+
+                            {!selectMode && (
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  justifyContent: "flex-end",
+                                  marginTop: 8,
+                                }}
+                              >
+                                <TouchableOpacity onPress={() => exportNoteToPDF(item)} style={{ marginRight: 12 }}>
+                                  <Text style={{ color: "#4CAF50" }}>Export</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  onPress={() => openEditNote(item)}
+                                  style={{ marginRight: 12 }}
+                                >
+                                  <Text style={{ color: "#1E88E5" }}>Edit</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity onPress={() => handleDeleteOne(getNoteId(item))}>
+                                  <Text style={{ color: "#E53935" }}>Delete</Text>
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      ))}
                     </ScrollView>
                   );
                 })()}
             </View>
-
-            {/* ── BULK DELETE BAR ──────────────────────────────── */}
             {selectMode && (
               <View style={styles.bulkBar}>
                 <Text style={{ color: "white", fontSize: 14 }}>
                   {selectedIds.size} selected
                 </Text>
-                <View style={{ flexDirection: "row", gap: 12 }}>
-                  <TouchableOpacity
-                    onPress={exportSelectedNotesToPDF}
-                    disabled={selectedIds.size === 0}
-                    style={[
-                      styles.bulkExportBtn,
-                      selectedIds.size === 0 && { opacity: 0.4 },
-                    ]}
-                  >
-                    <Text style={{ color: "white", fontWeight: "bold" }}>
-                      Export
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleDeleteSelected}
-                    disabled={selectedIds.size === 0}
-                    style={[
-                      styles.bulkDeleteBtn,
-                      selectedIds.size === 0 && { opacity: 0.4 },
-                    ]}
-                  >
-                    <Text style={{ color: "white", fontWeight: "bold" }}>
-                      Delete
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
 
-            {/* ── FAB ──────────────────────────────────────────── */}
-            {!selectMode && (
+      {/* ── FULL SCREEN EDITOR ───────────────────────────── */}
+      {selectedType && (
+        <View style={styles.fullScreenEditor} {...editorPanResponder.panHandlers}>
+
+          {/* ── SWIPE-TO-EXIT CONFIRMATION ─────────────────── */}
+          <Modal
+            transparent
+            visible={exitConfirmVisible}
+            animationType="fade"
+            onRequestClose={() => setExitConfirmVisible(false)}
+          >
+            <View style={styles.exitOverlay}>
+              <View style={styles.exitSheet}>
+                <Text style={styles.exitTitle}>Exit note?</Text>
+                <Text style={styles.exitSubtitle}>
+                  Do you want to save your changes before leaving?
+                </Text>
+                <TouchableOpacity
+                  style={styles.exitBtnSave}
+                  onPress={async () => {
+                    setExitConfirmVisible(false);
+                    await handleSave();
+                  }}
+                >
+                  <Text style={styles.exitBtnSaveText}>Save and exit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.exitBtnDiscard}
+                  onPress={() => {
+                    setExitConfirmVisible(false);
+                    closeEditor();
+                  }}
+                >
+                  <Text style={styles.exitBtnDiscardText}>Don't save and exit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.exitBtnCancel}
+                  onPress={() => setExitConfirmVisible(false)}
+                >
+                  <Text style={styles.exitBtnCancelText}>Keep editing</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
+            <TextInput
+              style={styles.titleInput}
+              placeholder="Enter Title..."
+              value={noteTitle}
+              onChangeText={setNoteTitle}
+            />
+
+            {/* TOOLBAR */}
+            <View style={styles.toolbar}>
+              <TouchableOpacity
+                style={[styles.toolbarBtn, fmt.bold && styles.toolbarBtnActive]}
+                onPress={() => setFmt((f) => ({ ...f, bold: !f.bold }))}
+              >
+                <Text style={{ fontWeight: "bold" }}>B</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.toolbarBtn,
+                  fmt.italic && styles.toolbarBtnActive,
+                ]}
+                onPress={() => setFmt((f) => ({ ...f, italic: !f.italic }))}
+              >
+                <Text style={{ fontStyle: "italic" }}>I</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.toolbarBtn,
+                  fmt.underline && styles.toolbarBtnActive,
+                ]}
+                onPress={() =>
+                  setFmt((f) => ({ ...f, underline: !f.underline }))
+                }
+              >
+                <Text style={{ textDecorationLine: "underline" }}>U</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.toolbarBtn}
+                onPress={() =>
+                  setFmt((f) => ({ ...f, fontSize: Math.max(10, f.fontSize - 2) }))
+                }
+              >
+                <Text>A-</Text>
+              </TouchableOpacity>
+              <Text>{fmt.fontSize}</Text>
               <TouchableOpacity
                 style={styles.fab}
                 onPress={() => setModalVisible(true)}
@@ -1811,10 +2047,7 @@ export default function Notes() {
           presentationStyle="overFullScreen"
           statusBarTranslucent={true}
         >
-          <Pressable
-            style={styles.overlay1}
-            onPress={() => setModalVisible(false)}
-          >
+          <Pressable style={styles.overlay1} onPress={() => setModalVisible(false)}>
             <View style={styles.bottomSheet}>
               {options.map((option) => (
                 <TouchableOpacity
@@ -1829,7 +2062,9 @@ export default function Notes() {
                     else setMultiText([]);
                   }}
                 >
-                  <Text style={{ fontSize: 18, color: categoryColors[option] }}>
+                  <Text
+                    style={{ fontSize: 18, color: categoryColors[option] }}
+                  >
                     {displayLabels[option] ?? option}
                   </Text>
                 </TouchableOpacity>
@@ -1852,10 +2087,7 @@ export default function Notes() {
               {/* TOOLBAR */}
               <View style={styles.toolbar}>
                 <TouchableOpacity
-                  style={[
-                    styles.toolbarBtn,
-                    fmt.bold && styles.toolbarBtnActive,
-                  ]}
+                  style={[styles.toolbarBtn, fmt.bold && styles.toolbarBtnActive]}
                   onPress={() => setFmt((f) => ({ ...f, bold: !f.bold }))}
                 >
                   <Text style={{ fontWeight: "bold" }}>B</Text>
@@ -1883,10 +2115,7 @@ export default function Notes() {
                 <TouchableOpacity
                   style={styles.toolbarBtn}
                   onPress={() =>
-                    setFmt((f) => ({
-                      ...f,
-                      fontSize: Math.max(10, f.fontSize - 2),
-                    }))
+                    setFmt((f) => ({ ...f, fontSize: Math.max(10, f.fontSize - 2) }))
                   }
                 >
                   <Text>A-</Text>
@@ -1939,9 +2168,7 @@ export default function Notes() {
                 ))
               ) : (
                 <>
-                  <Text style={styles.sectionLabel}>
-                    {getLabels(selectedType)}
-                  </Text>
+                  <Text style={styles.sectionLabel}>{getLabels(selectedType)}</Text>
                   <TextInput
                     style={[styles.input, noteTextStyle(fmt)]}
                     multiline
@@ -1961,16 +2188,13 @@ export default function Notes() {
                 <Text style={{ color: "white" }}>Save</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={closeEditor}
-              >
-                <Text>Cancel</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        )}
-      </View>
+            <TouchableOpacity style={styles.cancelButton} onPress={closeEditor}>
+              <Text>Cancel</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      )}
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -1996,19 +2220,19 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#0b0c67",
     paddingHorizontal: 14,
     paddingVertical: 2,
   },
   searchGlyph: {
     fontSize: 16,
-    color: "#98A2B3",
+    color: "#ffffff",
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: "#101828",
+    color: "#ffffff",
     paddingVertical: 11,
   },
   headerButton: {
@@ -2017,7 +2241,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "#D0D5DD",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#0b0c67",
     justifyContent: "center",
   },
   sortButton: {
@@ -2032,7 +2256,7 @@ const styles = StyleSheet.create({
   headerButtonText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#344054",
+    color: "#ffffff",
   },
   headerButtonTextOnDark: {
     color: "#FFFFFF",
@@ -2040,7 +2264,7 @@ const styles = StyleSheet.create({
   sortIcon: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#344054",
+    color: "#ffffff",
   },
   dropdownWrap: {
     position: "relative",
@@ -2238,6 +2462,95 @@ const styles = StyleSheet.create({
     color: "#DC2626",
     fontSize: 13,
     fontWeight: "600",
+  },
+  exitOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 28,
+  },
+  exitSheet: {
+    width: "100%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  },
+  exitTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 8,
+  },
+  exitSubtitle: {
+    fontSize: 14,
+    color: "#667085",
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  exitBtnSave: {
+    width: "100%",
+    backgroundColor: "#111827",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  exitBtnSaveText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  exitBtnDiscard: {
+    width: "100%",
+    backgroundColor: "#FEE2E2",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  exitBtnDiscardText: {
+    color: "#DC2626",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  exitBtnCancel: {
+    width: "100%",
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  exitBtnCancelText: {
+    color: "#667085",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  contextMenu: {
+    marginTop: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    overflow: "hidden",
+  },
+  contextMenuItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  contextMenuDivider: {
+    height: 1,
+    backgroundColor: "#F2F4F7",
   },
   folderCard: {
     flexDirection: "row",
