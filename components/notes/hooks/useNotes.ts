@@ -14,8 +14,6 @@ async function getHeadersWithAuth() {
   };
 }
 
-const isMultiType = (type: string) =>
-  ["Pre", "During", "Post", "Daily"].includes(type);
 
 export function useNotes(userId: string, userRole: string) {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -39,22 +37,12 @@ export function useNotes(userId: string, userRole: string) {
       if (!response.ok) throw new Error("Failed to load notes");
 
       const data = await response.json();
-      const parsed = data.map((note: any) => {
-        let text: string | string[];
-        if (Array.isArray(note.sections) && note.sections.length > 0) {
-          text = isMultiType(note.type)
-            ? note.sections.map((s: any) => s.text ?? "")
-            : (note.sections[0]?.text ?? "");
-        } else {
-          text = note.text ?? "";
-        }
-        return {
-          ...note,
-          id: note._id,
-          text,
-          formatting: note.formatting ?? defaultFormatting,
-        };
-      });
+      const parsed = data.map((note: any) => ({
+        ...note,
+        id: note._id,
+        text: note.text ?? "",
+        formatting: note.formatting ?? defaultFormatting,
+      }));
       setNotes(parsed);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to load notes";
@@ -71,19 +59,10 @@ export function useNotes(userId: string, userRole: string) {
     setError(null);
     try {
       const headers = await getHeadersWithAuth();
-      const noteLabels = getLabels(noteData.type, userRole);
-      const labelsArr = Array.isArray(noteLabels)
-        ? noteLabels
-        : [String(noteLabels ?? "")];
-      const sections = Array.isArray(noteData.text)
-        ? noteData.text.map((t, i) => ({ label: labelsArr[i] ?? "", text: t }))
-        : [{ label: labelsArr[0] ?? "", text: noteData.text as string }];
-
       const payload = {
-        userRole,
         type: noteData.type,
         title: noteData.title,
-        sections,
+        text: noteData.text,
         formatting: noteData.formatting,
       };
 

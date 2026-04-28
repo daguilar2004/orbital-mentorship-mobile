@@ -58,7 +58,6 @@ export const defaultFormatting: Formatting = {
 
 export const fontColors = [
   "#000000",
-  "#000000",
   "#e373bd",
   "#cfc2eb",
   "#FB8C00",
