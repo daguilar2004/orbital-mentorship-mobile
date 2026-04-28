@@ -101,11 +101,13 @@ export default function PhaseModal({
     }
   };
 
+  import { Platform } from "react-native";
+
   return (
     <Modal visible={addingPhase} transparent animationType="fade">
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.select({ ios: "padding", android: "height" })}
       >
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={resetPhaseForm} />
