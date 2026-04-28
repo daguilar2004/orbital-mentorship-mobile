@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
 import {
   View,
   Text,
@@ -11,17 +13,63 @@ import {
 import { router } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useApp } from "../context/AppContext";
-
+const defaultProfile = {
+  firstName: "",
+  lastName: "",
+  bio: "",
+  headline: "",
+  goals: "",
+  industries: [],
+  skills: [],
+  links: [],
+  profilePicture: null,
+  resume: null,
+};
 export default function ProfileSetup() {
+  const pickProfileImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert("Permission required", "Allow access to photos");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      setFormData((prev) => ({
+        ...prev,
+        profilePicture: result.assets[0].uri,
+      }));
+    }
+  };
+
+  const pickResume = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: "*/*",
+    });
+
+    if (result.canceled === false) {
+      setFormData((prev) => ({
+        ...prev,
+        resume: result.assets[0].uri,
+      }));
+    }
+  };
+
+  const app = useApp();
   const { profileData, setProfileData, questionnaireAnswers } = useApp();
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState(profileData);
+  const [formData, setFormData] = useState(profileData || defaultProfile);
   const [tempIndustry, setTempIndustry] = useState("");
   const [tempSkill, setTempSkill] = useState("");
   const [tempLink, setTempLink] = useState("");
 
   const hasProfile =
-    profileData.firstName || profileData.lastName || profileData.bio;
+    profileData?.firstName || profileData?.lastName || profileData?.bio;
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -85,7 +133,11 @@ export default function ProfileSetup() {
     }
     setProfileData(formData);
     setIsEditing(false);
+
     Alert.alert("Success", "Profile saved successfully!");
+
+    // ✅ go back to hub
+    router.replace("/onboarding2");
   };
 
   const handleCancel = () => {
@@ -240,7 +292,7 @@ export default function ProfileSetup() {
         <View style={styles.actions}>
           <Pressable
             style={styles.button}
-            onPress={() => router.push("/onboarding2/connect")}
+            onPress={() => router.push("/onboarding2")}
           >
             <Text style={styles.buttonText}>Next: Connect</Text>
           </Pressable>
@@ -280,7 +332,7 @@ export default function ProfileSetup() {
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>Profile Picture</Text>
-        <Pressable style={styles.fileInput}>
+        <Pressable style={styles.fileInput} onPress={pickProfileImage}>
           <MaterialIcons name="image" size={24} color="#9CA3AF" />
           <Text style={styles.fileInputText}>
             {formData.profilePicture ? "File chosen" : "No file chosen"}
@@ -290,7 +342,7 @@ export default function ProfileSetup() {
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>Resume</Text>
-        <Pressable style={styles.fileInput}>
+        <Pressable style={styles.fileInput} onPress={pickResume}>
           <MaterialIcons name="description" size={24} color="#9CA3AF" />
           <Text style={styles.fileInputText}>
             {formData.resume ? "File chosen" : "No file chosen"}

@@ -1,6 +1,6 @@
-import React from "react";
-import { View, Text, StyleSheet, Pressable, TextInput } from "react-native";
 import { router } from "expo-router";
+import React from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 export default function RoleSelection() {
   const [step, setStep] = React.useState<1 | 2>(1);
@@ -12,6 +12,14 @@ export default function RoleSelection() {
   const [address, setAddress] = React.useState("");
   const [zip, setZip] = React.useState("");
 
+  const handleContinue = () => {
+    if (step === 1) {
+      setStep(2);
+    } else {
+      // Final step → navigate somewhere
+      router.push("/onboarding2"); // or wherever you want
+    }
+  };
   return (
     <View style={styles.screen}>
       {step === 1 ? (
@@ -25,7 +33,7 @@ export default function RoleSelection() {
               ]}
               onPress={() => setSelected("mentor")}
             >
-              <Text style={styles.optionTitle}>I'm here to GUIDE!</Text>
+              <Text style={styles.optionTitle}>Im here to GUIDE!</Text>
               <Text style={styles.optionLabel}>MENTOR</Text>
             </Pressable>
 
@@ -36,7 +44,7 @@ export default function RoleSelection() {
               ]}
               onPress={() => setSelected("mentee")}
             >
-              <Text style={styles.optionTitle}>I'm here to LEARN!</Text>
+              <Text style={styles.optionTitle}>Im here to LEARN!</Text>
               <Text style={styles.optionLabel}>MENTEE</Text>
             </Pressable>
           </View>
@@ -166,7 +174,6 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     fontWeight: "700",
   },
-  subtitle: { color: "#6B7280", marginBottom: 24 },
   formGroup: { width: "100%", marginBottom: 16 },
   label: { fontSize: 14, fontWeight: "500", color: "#374151", marginBottom: 8 },
   input: {

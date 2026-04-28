@@ -73,8 +73,8 @@ export default function Questionnaire() {
       setCurrentQ(currentQ + 1);
       setShowDropdown(false);
     } else {
-      // finish questionnaire, go to profile-setup
-      router.push("/onboarding2/profile-setup");
+      // ✅ go back to hub after finishing
+      router.replace("/onboarding2");
     }
   };
 

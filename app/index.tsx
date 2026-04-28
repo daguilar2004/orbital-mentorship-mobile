@@ -1,49 +1,114 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useMemo, useState } from "react";
-import {
-  Alert,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Alert, ScrollView, Text, View } from "react-native";
 import { Phase, Task, useApp } from "./context/AppContext";
+import { styles } from "./styles/homeStyles";
+
+import PhaseModal from "./components/modals/PhaseModal";
+import TaskFormModal from "./components/modals/TaskFormModal";
+import PhasesSection from "./components/phases/PhasesSection";
+import TaskModal from "./components/tasks/TaskModal";
+
+type TaskResource = {
+  type: "link" | "file";
+  value: string;
+  label?: string;
+  fileInfo?: {
+    name: string;
+    size: number;
+    uri: string;
+    mimeType?: string;
+  };
+};
 
 export default function Home() {
   const {
     phases,
     totalXP,
+    xpGoal,
     userRole,
+    addPhase,
+    editPhase,
+    deletePhase,
+    addTaskToPhase,
+    editTask,
+    deleteTask,
     submitTask,
     addMockAttachment,
     updateTaskDescription,
     reviewTask,
   } = useApp();
 
+  const [addingPhase, setAddingPhase] = useState(false);
+  const [newPhaseName, setNewPhaseName] = useState("");
+  const [newPhaseDescription, setNewPhaseDescription] = useState("");
+  const [newPhaseStart, setNewPhaseStart] = useState("");
+  const [newPhaseEnd, setNewPhaseEnd] = useState("");
+  const [editingPhaseId, setEditingPhaseId] = useState<string | null>(null);
+
+  const [addingTaskToPhaseId, setAddingTaskToPhaseId] = useState<string | null>(
+    null,
+  );
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTaskPhaseId, setEditingTaskPhaseId] = useState<string | null>(
+    null,
+  );
+
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDueDate, setNewTaskDueDate] = useState("");
+  const [newTaskExpectedTimeValue, setNewTaskExpectedTimeValue] = useState("");
+  const [newTaskExpectedTimeUnit, setNewTaskExpectedTimeUnit] = useState<
+    "hours" | "days" | "weeks"
+  >("hours");
+  const [newTaskSkills, setNewTaskSkills] = useState("");
+  const [newTaskResources, setNewTaskResources] = useState<TaskResource[]>([]);
+  const [showUnitPicker, setShowUnitPicker] = useState(false);
+
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const [activePhaseId, setActivePhaseId] = useState<string | null>(null);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+
+  const [draftDesc, setDraftDesc] = useState("");
+  const [draftResponse, setDraftResponse] = useState("");
+  const [draftFeedback, setDraftFeedback] = useState("");
+  const [lastAutoExpandedPhaseId, setLastAutoExpandedPhaseId] = useState<
+    string | null
+  >(null);
+
+  const xpPercent = Math.min(100, Math.round((totalXP / xpGoal) * 100));
+
   const currentPhase = useMemo(
     () => phases.find((p) => p.status === "current"),
     [phases],
   );
 
-  // accordion
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  // modal
-  const [activePhaseId, setActivePhaseId] = useState<string | null>(null);
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
-
-  // local draft fields for modal
-  const [draftDesc, setDraftDesc] = useState("");
-  const [draftResponse, setDraftResponse] = useState("");
-  const [draftFeedback, setDraftFeedback] = useState("");
-  const [draftReflection, setDraftReflection] = useState("");
-
   useEffect(() => {
-    if (currentPhase) setExpanded(new Set([currentPhase.id]));
-  }, [currentPhase?.id]);
+    const firstAccessiblePhase = phases.find((p) => p.status !== "upcoming");
+    const phaseToExpand = currentPhase ?? firstAccessiblePhase;
+
+    if (!phaseToExpand) return;
+
+    if (lastAutoExpandedPhaseId !== phaseToExpand.id) {
+      setExpanded(new Set([phaseToExpand.id]));
+      setLastAutoExpandedPhaseId(phaseToExpand.id);
+      return;
+    }
+
+    setExpanded((prev) => {
+      if (prev.size > 0) return prev;
+      return new Set([phaseToExpand.id]);
+    });
+  }, [currentPhase?.id, phases, lastAutoExpandedPhaseId]);
+
+  const completedPhases = phases.filter((p) => p.status === "completed").length;
+  const totalPhases = phases.length;
+
+  const pendingTasksCount = useMemo(() => {
+    return phases
+      .flatMap((p) => p.tasks)
+      .filter((t) => t.status === "pending" || t.status === "submitted").length;
+  }, [phases]);
 
   const activePhase = useMemo(() => {
     if (!activePhaseId) return null;
@@ -60,11 +125,11 @@ export default function Home() {
     setDraftDesc(activeTask.description ?? "");
     setDraftResponse(activeTask.submittedResponse ?? "");
     setDraftFeedback(activeTask.mentorFeedback ?? "");
-    setDraftReflection("");
   }, [activeTask?.id]);
 
   function togglePhase(phase: Phase) {
     if (phase.status === "upcoming") return;
+
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(phase.id)) next.delete(phase.id);
@@ -84,67 +149,111 @@ export default function Home() {
     setDraftDesc("");
     setDraftResponse("");
     setDraftFeedback("");
-    setDraftReflection("");
   }
 
-  function getTasksNeedingAttention(phase: Phase) {
-    if (userRole === "mentor") {
-      return phase.tasks.filter((t) => t.status === "submitted");
-    }
-
-    return phase.tasks.filter(
-      (t) => t.status === "pending" || t.status === "rejected",
-    );
+  function resetTaskForm() {
+    setAddingTaskToPhaseId(null);
+    setEditingTaskId(null);
+    setEditingTaskPhaseId(null);
+    setNewTaskTitle("");
+    setNewTaskDueDate("");
+    setNewTaskExpectedTimeValue("");
+    setNewTaskExpectedTimeUnit("hours");
+    setNewTaskSkills("");
+    setNewTaskResources([]);
+    setShowUnitPicker(false);
   }
 
-  function handleSubmitTask() {
-    if (!activePhase || !activeTask) return;
+  function openTaskFormForPhase(phaseId: string) {
+    resetTaskForm();
+    setAddingTaskToPhaseId(phaseId);
+  }
 
-    const trimmedResponse = draftResponse.trim();
-    const trimmedReflection = draftReflection.trim();
-
-    if (activeTask.status === "rejected") {
-      if (!trimmedResponse) {
-        Alert.alert(
-          "Response required",
-          "Please update your response before resubmitting.",
-        );
-        return;
-      }
-
-      if (!trimmedReflection) {
-        Alert.alert(
-          "Reflection required",
-          "Please answer the reflection question before resubmitting.",
-        );
-        return;
-      }
-
-      const combinedSubmission = `${trimmedResponse}
-
---- Revision Reflection ---
-Based on mentor feedback, what problems did you run into, and how can you fix them?
-
-${trimmedReflection}`;
-
-      submitTask(activePhase.id, activeTask.id, combinedSubmission);
+  async function handleSaveTask() {
+    if (!newTaskTitle.trim()) {
+      Alert.alert("Missing title", "Please enter a task title.");
       return;
     }
 
-    if (!trimmedResponse) {
+    if (!addingTaskToPhaseId) {
+      Alert.alert("Task not ready", "Please reopen the task form and try again.");
+      return;
+    }
+
+    const expectedTime = newTaskExpectedTimeValue.trim()
+      ? {
+          value: parseInt(newTaskExpectedTimeValue, 10),
+          unit: newTaskExpectedTimeUnit,
+        }
+      : undefined;
+
+    const skills =
+      newTaskSkills.trim().length > 0
+        ? newTaskSkills
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0)
+        : undefined;
+
+    const resources =
+      newTaskResources.length > 0 ? newTaskResources : undefined;
+
+    try {
+      if (editingTaskId) {
+        await editTask(
+          addingTaskToPhaseId,
+          editingTaskId,
+          newTaskTitle,
+          newTaskDueDate,
+          expectedTime,
+          skills,
+          resources,
+        );
+      } else {
+        await addTaskToPhase(
+          addingTaskToPhaseId,
+          newTaskTitle,
+          newTaskDueDate,
+          expectedTime,
+          skills,
+          resources,
+        );
+      }
+
       Alert.alert(
-        "Response required",
-        "Please write your response before submitting.",
+        editingTaskId ? "Task updated" : "Task created",
+        editingTaskId
+          ? "Your task was updated successfully."
+          : "Your task was added successfully.",
       );
-      return;
+      resetTaskForm();
+    } catch {
+      Alert.alert(
+        editingTaskId ? "Task update failed" : "Task creation failed",
+        "Your task could not be saved. Please try again.",
+      );
     }
+  }
 
-    submitTask(activePhase.id, activeTask.id, trimmedResponse);
+  function handleEditTask(phase: Phase, task: Task) {
+    setAddingTaskToPhaseId(phase.id);
+    setEditingTaskId(task.id);
+    setEditingTaskPhaseId(phase.id);
+    setNewTaskTitle(task.title);
+    setNewTaskDueDate(task.dueDate.split("T")[0]);
+
+    // expected time (convert object → form state)
+    setNewTaskExpectedTimeValue(task.expectedTime?.value?.toString() || "");
+    setNewTaskExpectedTimeUnit(task.expectedTime?.unit || "days");
+
+    // skills (array → string)
+    setNewTaskSkills(task.skills?.join(", ") || "");
+
+    setNewTaskResources(task.resources || []);
   }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.h1}>Welcome back!</Text>
         <Text style={styles.subtitle}>
@@ -154,530 +263,110 @@ ${trimmedReflection}`;
         </Text>
       </View>
 
-      {/* Stats */}
       <View style={styles.statsGrid}>
         <StatCard
           icon="trophy"
-          iconBg="#F3E8FF"
-          iconColor="#7C3AED"
+          iconBg="#0b0c67"
+          iconColor="#F3E8FF"
           label="Total XP"
           value={`${totalXP}`}
+          progress={xpPercent}
+          progressMax={xpGoal}
+        />
+        <StatCard
+          icon="trending-up"
+          iconBg="#0b0c67"
+          iconColor="#F3E8FF"
+          label="Progress"
+          value={`${completedPhases}/${totalPhases}`}
+        />
+        <StatCard
+          icon="flag"
+          iconBg="#0b0c67"
+          iconColor="#F3E8FF"
+          label={userRole === "mentee" ? "Pending Tasks" : "Tasks to Review"}
+          value={`${pendingTasksCount}`}
         />
       </View>
 
-      {/* Phases on Home */}
-      <Text style={styles.sectionTitle}>Phases</Text>
+      <PhasesSection
+        phases={phases}
+        userRole={userRole}
+        expanded={expanded}
+        togglePhase={togglePhase}
+        setAddingPhase={setAddingPhase}
+        openTask={openTask}
+        deleteTask={deleteTask}
+        onEditTask={handleEditTask}
+        openTaskFormForPhase={openTaskFormForPhase}
+        setEditingPhaseId={setEditingPhaseId}
+        setNewPhaseName={setNewPhaseName}
+        setNewPhaseDescription={setNewPhaseDescription}
+        setNewPhaseStart={setNewPhaseStart}
+        setNewPhaseEnd={setNewPhaseEnd}
+        deletePhase={deletePhase}
+      />
 
-      <View style={{ gap: 12 }}>
-        {phases.map((phase, idx) => {
-          const isExpanded = expanded.has(phase.id);
-          const isLocked = phase.status === "upcoming";
+      <TaskModal
+        activeTask={activeTask}
+        activePhase={activePhase}
+        userRole={userRole}
+        draftDesc={draftDesc}
+        setDraftDesc={setDraftDesc}
+        draftResponse={draftResponse}
+        setDraftResponse={setDraftResponse}
+        draftFeedback={draftFeedback}
+        setDraftFeedback={setDraftFeedback}
+        closeTask={closeTask}
+        updateTaskDescription={updateTaskDescription}
+        submitTask={submitTask}
+        addMockAttachment={addMockAttachment}
+        reviewTask={reviewTask}
+        taskStatusColor={taskStatusColor}
+        taskStatusIcon={taskStatusIcon}
+        statusLabel={statusLabel}
+      />
 
-          const approvedCount = phase.tasks.filter(
-            (t) => t.status === "approved",
-          ).length;
-          const totalTasks = phase.tasks.length;
-          const progressPct =
-            totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
+      <PhaseModal
+        addingPhase={addingPhase}
+        editingPhaseId={editingPhaseId}
+        newPhaseName={newPhaseName}
+        setNewPhaseName={setNewPhaseName}
+        newPhaseDescription={newPhaseDescription}
+        setNewPhaseDescription={setNewPhaseDescription}
+        newPhaseStart={newPhaseStart}
+        setNewPhaseStart={setNewPhaseStart}
+        newPhaseEnd={newPhaseEnd}
+        setNewPhaseEnd={setNewPhaseEnd}
+        setAddingPhase={setAddingPhase}
+        setEditingPhaseId={setEditingPhaseId}
+        addPhase={addPhase}
+        editPhase={editPhase}
+      />
 
-          const tasksNeedingAttention = getTasksNeedingAttention(phase);
-
-          const cardStyle =
-            phase.status === "current"
-              ? styles.phaseCardCurrent
-              : phase.status === "completed"
-                ? styles.phaseCardCompleted
-                : styles.phaseCardUpcoming;
-
-          return (
-            <View key={phase.id} style={[styles.phaseCardBase, cardStyle]}>
-              <Pressable
-                onPress={() => togglePhase(phase)}
-                style={({ pressed }) => [
-                  styles.phaseHeaderRow,
-                  pressed && !isLocked && styles.pressed,
-                ]}
-              >
-                <View style={styles.phaseLeft}>
-                  <View
-                    style={[
-                      styles.phaseIndexBubble,
-                      phase.status === "current" && styles.bubbleCurrent,
-                      phase.status === "completed" && styles.bubbleCompleted,
-                      phase.status === "upcoming" && styles.bubbleUpcoming,
-                    ]}
-                  >
-                    <Text style={styles.phaseIndexText}>{idx + 1}</Text>
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.phaseTitleRow}>
-                      <Text style={styles.phaseTitle}>{phase.name}</Text>
-                      {phase.status === "current" ? (
-                        <View style={styles.badgeActive}>
-                          <Text style={styles.badgeActiveText}>Active</Text>
-                        </View>
-                      ) : null}
-                    </View>
-
-                    <Text style={styles.phaseDates}>
-                      {phase.startDate} - {phase.endDate}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.phaseRight}>
-                  {phase.status === "completed" ? (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={20}
-                      color="#16A34A"
-                    />
-                  ) : null}
-
-                  {phase.status === "upcoming" ? (
-                    <Ionicons name="lock-closed" size={18} color="#9CA3AF" />
-                  ) : (
-                    <Ionicons
-                      name={isExpanded ? "chevron-up" : "chevron-down"}
-                      size={18}
-                      color="#6B7280"
-                    />
-                  )}
-                </View>
-              </Pressable>
-
-              <View style={{ marginTop: 10 }}>
-                <View style={styles.rowBetween}>
-                  <Text style={styles.smallMuted}>Tasks Progress</Text>
-                  <Text style={[styles.small, styles.bold]}>
-                    {approvedCount}/{totalTasks}
-                  </Text>
-                </View>
-
-                <View style={styles.progressTrack}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      phase.status === "completed"
-                        ? { backgroundColor: "#16A34A" }
-                        : { backgroundColor: "#7C3AED" },
-                      { width: `${progressPct}%` },
-                    ]}
-                  />
-                </View>
-              </View>
-
-              {/* Pending tasks under progress bar */}
-              {!isLocked ? (
-                <View style={styles.pendingSection}>
-                  <View style={styles.rowBetween}>
-                    <Text style={styles.pendingSectionTitle}>
-                      {userRole === "mentor"
-                        ? "Tasks to Review"
-                        : "Pending Tasks"}
-                    </Text>
-                    <Text style={[styles.small, styles.bold]}>
-                      {tasksNeedingAttention.length}
-                    </Text>
-                  </View>
-
-                  {tasksNeedingAttention.length > 0 ? (
-                    <View style={styles.pendingList}>
-                      {tasksNeedingAttention.map((task) => (
-                        <Pressable
-                          key={task.id}
-                          onPress={() => openTask(phase, task)}
-                          style={({ pressed }) => [
-                            styles.pendingTaskRow,
-                            pressed && styles.taskPressed,
-                          ]}
-                        >
-                          <View style={styles.taskLeft}>
-                            <Ionicons
-                              name={taskStatusIcon(task.status)}
-                              size={18}
-                              color={taskStatusColor(task.status)}
-                            />
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.taskTitle}>{task.title}</Text>
-                              <Text style={styles.taskMeta}>
-                                <Text style={styles.xpText}>{task.xp} XP</Text>
-                                {"  •  "}
-                                Due {task.dueDate}
-                              </Text>
-                            </View>
-                          </View>
-
-                          <Ionicons
-                            name="chevron-forward"
-                            size={18}
-                            color="#9CA3AF"
-                          />
-                        </Pressable>
-                      ))}
-                    </View>
-                  ) : (
-                    <Text style={styles.smallMuted}>
-                      {userRole === "mentor"
-                        ? "No tasks need review right now."
-                        : "No pending tasks right now."}
-                    </Text>
-                  )}
-                </View>
-              ) : null}
-
-              {isExpanded && !isLocked ? (
-                <View style={styles.phaseBody}>
-                  {phase.tasks.map((task) => (
-                    <Pressable
-                      key={task.id}
-                      onPress={() => openTask(phase, task)}
-                      style={({ pressed }) => [
-                        styles.taskRow,
-                        pressed && styles.taskPressed,
-                      ]}
-                    >
-                      <View style={styles.taskLeft}>
-                        <Ionicons
-                          name={taskStatusIcon(task.status)}
-                          size={18}
-                          color={taskStatusColor(task.status)}
-                        />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.taskTitle}>{task.title}</Text>
-                          <Text style={styles.taskMeta}>
-                            <Text style={styles.xpText}>{task.xp} XP</Text>
-                            {"  •  "}
-                            Due {task.dueDate}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <Ionicons
-                        name="chevron-forward"
-                        size={18}
-                        color="#9CA3AF"
-                      />
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-          );
-        })}
-      </View>
-
-      {/* ------------------ TASK MODAL ------------------ */}
-      <Modal
-        visible={!!activeTask}
-        transparent
-        animationType="slide"
-        onRequestClose={closeTask}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={closeTask} />
-
-        <View style={styles.modalSheet}>
-          <View style={styles.modalGrabber} />
-
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={styles.modalContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Status chip */}
-            <View style={{ alignItems: "center", marginBottom: 10 }}>
-              <View
-                style={[
-                  styles.statusChip,
-                  {
-                    borderColor: taskStatusColor(
-                      activeTask?.status ?? "pending",
-                    ),
-                  },
-                ]}
-              >
-                <Ionicons
-                  name={taskStatusIcon(activeTask?.status ?? "pending")}
-                  size={16}
-                  color={taskStatusColor(activeTask?.status ?? "pending")}
-                />
-                <Text
-                  style={[
-                    styles.statusChipText,
-                    {
-                      color: taskStatusColor(activeTask?.status ?? "pending"),
-                    },
-                  ]}
-                >
-                  {statusLabel(activeTask?.status ?? "pending")}
-                </Text>
-              </View>
-            </View>
-
-            {/* Title */}
-            <Text style={styles.modalTitle}>{activeTask?.title}</Text>
-
-            {/* Description */}
-            <View style={styles.modalCard}>
-              <Text style={styles.cardHeading}>Task Description</Text>
-
-              {userRole === "mentor" ? (
-                <>
-                  <TextInput
-                    value={draftDesc}
-                    onChangeText={setDraftDesc}
-                    multiline
-                    style={styles.textArea}
-                    placeholder="Write the task description…"
-                  />
-                  <Pressable
-                    style={styles.primaryBtn}
-                    onPress={() => {
-                      if (!activePhase || !activeTask) return;
-                      updateTaskDescription(
-                        activePhase.id,
-                        activeTask.id,
-                        draftDesc.trim(),
-                      );
-                    }}
-                  >
-                    <Text style={styles.primaryBtnText}>Save Description</Text>
-                  </Pressable>
-                </>
-              ) : (
-                <Text style={styles.bodyText}>
-                  {activeTask?.description || "No description."}
-                </Text>
-              )}
-
-              <View style={styles.metaRow}>
-                <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-                <Text style={styles.metaText}>Due: {activeTask?.dueDate}</Text>
-
-                <Ionicons name="ribbon-outline" size={16} color="#6B7280" />
-                <Text
-                  style={[
-                    styles.metaText,
-                    { color: "#7C3AED", fontWeight: "800" },
-                  ]}
-                >
-                  {activeTask?.xp} XP
-                </Text>
-              </View>
-            </View>
-
-            {/* Submitted Response */}
-            <View style={styles.modalCard}>
-              <Text style={styles.cardHeading}>
-                {activeTask?.status === "rejected"
-                  ? "Updated Response"
-                  : "Submitted Response"}
-              </Text>
-
-              {userRole === "mentee" ? (
-                <>
-                  <TextInput
-                    value={draftResponse}
-                    onChangeText={setDraftResponse}
-                    multiline
-                    style={styles.textArea}
-                    placeholder={
-                      activeTask?.status === "rejected"
-                        ? "Update your response based on the mentor feedback…"
-                        : "Write your response…"
-                    }
-                  />
-
-                  {activeTask?.status === "rejected" ? (
-                    <View style={styles.reflectionCard}>
-                      <Text style={styles.reflectionPrompt}>
-                        Based on mentor feedback, what problems did you run
-                        into, and how can you fix them?
-                      </Text>
-                      <TextInput
-                        value={draftReflection}
-                        onChangeText={setDraftReflection}
-                        multiline
-                        style={styles.textArea}
-                        placeholder="Describe the issues you ran into and how you plan to address them…"
-                      />
-                    </View>
-                  ) : null}
-
-                  <View style={styles.rowGap}>
-                    <Pressable
-                      style={styles.secondaryBtn}
-                      onPress={() => {
-                        if (!activePhase || !activeTask) return;
-                        addMockAttachment(activePhase.id, activeTask.id);
-                      }}
-                    >
-                      <Ionicons name="attach" size={16} color="#111827" />
-                      <Text style={styles.secondaryBtnText}>
-                        Add Attachment
-                      </Text>
-                    </Pressable>
-
-                    <Pressable
-                      style={styles.primaryBtn}
-                      onPress={handleSubmitTask}
-                    >
-                      <Text style={styles.primaryBtnText}>
-                        {activeTask?.status === "submitted" ||
-                        activeTask?.status === "rejected"
-                          ? "Resubmit"
-                          : "Submit"}
-                      </Text>
-                    </Pressable>
-                  </View>
-
-                  {activeTask?.submittedAt ? (
-                    <Text style={styles.smallMuted}>
-                      Submitted on {activeTask.submittedAt}
-                    </Text>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  <Text style={styles.bodyText}>
-                    {activeTask?.submittedResponse
-                      ? activeTask.submittedResponse
-                      : "No response submitted yet."}
-                  </Text>
-                  {activeTask?.submittedAt ? (
-                    <Text style={styles.smallMuted}>
-                      Submitted on {activeTask.submittedAt}
-                    </Text>
-                  ) : null}
-                </>
-              )}
-            </View>
-
-            {/* Attachments */}
-            <View style={styles.modalCard}>
-              <Text style={styles.cardHeading}>Attached Files</Text>
-
-              {activeTask?.attachments && activeTask.attachments.length > 0 ? (
-                <View style={{ gap: 10, marginTop: 8 }}>
-                  {activeTask.attachments.map((a) => (
-                    <View key={a.id} style={styles.fileRow}>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 10,
-                          flex: 1,
-                        }}
-                      >
-                        <Ionicons
-                          name="document-outline"
-                          size={18}
-                          color="#6B7280"
-                        />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.fileName}>{a.name}</Text>
-                          <Text style={styles.fileSize}>{a.sizeLabel}</Text>
-                        </View>
-                      </View>
-
-                      <Pressable onPress={() => {}}>
-                        <Ionicons
-                          name="download-outline"
-                          size={18}
-                          color="#2563EB"
-                        />
-                      </Pressable>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <Text style={styles.smallMuted}>No files attached.</Text>
-              )}
-            </View>
-
-            {/* Mentor Review Section */}
-            {userRole === "mentor" ? (
-              <View style={styles.modalCard}>
-                <Text style={styles.cardHeading}>Task Review</Text>
-
-                <TextInput
-                  value={draftFeedback}
-                  onChangeText={setDraftFeedback}
-                  multiline
-                  style={styles.textArea}
-                  placeholder="Leave feedback for the mentee…"
-                />
-
-                <View style={styles.reviewBtnRow}>
-                  <Pressable
-                    style={styles.rejectBtn}
-                    onPress={() => {
-                      if (!activePhase || !activeTask) return;
-                      reviewTask(
-                        activePhase.id,
-                        activeTask.id,
-                        "rejected",
-                        draftFeedback.trim(),
-                      );
-                    }}
-                  >
-                    <Text style={styles.rejectBtnText}>Reject</Text>
-                  </Pressable>
-
-                  <Pressable
-                    style={styles.approveBtn}
-                    onPress={() => {
-                      if (!activePhase || !activeTask) return;
-                      reviewTask(
-                        activePhase.id,
-                        activeTask.id,
-                        "approved",
-                        draftFeedback.trim(),
-                      );
-                    }}
-                  >
-                    <Text style={styles.approveBtnText}>Accept</Text>
-                  </Pressable>
-                </View>
-
-                {activeTask?.reviewedAt ? (
-                  <Text style={styles.smallMuted}>
-                    Reviewed on {activeTask.reviewedAt}
-                  </Text>
-                ) : null}
-              </View>
-            ) : activeTask?.mentorFeedback ? (
-              <View style={styles.modalCard}>
-                <Text style={styles.cardHeading}>Mentor Feedback</Text>
-                <Text style={styles.bodyText}>{activeTask.mentorFeedback}</Text>
-                {activeTask.reviewedAt ? (
-                  <Text style={styles.smallMuted}>
-                    Reviewed on {activeTask.reviewedAt}
-                  </Text>
-                ) : null}
-              </View>
-            ) : null}
-
-            {/* Close */}
-            <Pressable
-              onPress={closeTask}
-              style={[
-                styles.secondaryBtn,
-                { marginTop: 10, justifyContent: "center" },
-              ]}
-            >
-              <Text style={styles.secondaryBtnText}>Close</Text>
-            </Pressable>
-          </ScrollView>
-        </View>
-      </Modal>
+      <TaskFormModal
+        addingTaskToPhaseId={addingTaskToPhaseId}
+        editingTaskId={editingTaskId}
+        closeTaskModal={resetTaskForm}
+        handleSaveTask={handleSaveTask}
+        newTaskTitle={newTaskTitle}
+        setNewTaskTitle={setNewTaskTitle}
+        newTaskDueDate={newTaskDueDate}
+        setNewTaskDueDate={setNewTaskDueDate}
+        newTaskExpectedTimeValue={newTaskExpectedTimeValue}
+        setNewTaskExpectedTimeValue={setNewTaskExpectedTimeValue}
+        newTaskExpectedTimeUnit={newTaskExpectedTimeUnit}
+        setNewTaskExpectedTimeUnit={setNewTaskExpectedTimeUnit}
+        newTaskSkills={newTaskSkills}
+        setNewTaskSkills={setNewTaskSkills}
+        newTaskResources={newTaskResources}
+        setNewTaskResources={setNewTaskResources}
+        showUnitPicker={showUnitPicker}
+        setShowUnitPicker={setShowUnitPicker}
+      />
     </ScrollView>
   );
 }
-
-/* ---------- UI helpers ---------- */
 
 function statusLabel(status: Task["status"]) {
   switch (status) {
@@ -712,14 +401,14 @@ function taskStatusIcon(
 function taskStatusColor(status: Task["status"]) {
   switch (status) {
     case "approved":
-      return "#16A34A";
+      return "#0b0c67";
     case "submitted":
-      return "#2563EB";
+      return "#ff3b89";
     case "rejected":
       return "#DC2626";
     case "pending":
     default:
-      return "#6B7280";
+      return "#646c7c";
   }
 }
 
@@ -729,6 +418,8 @@ function StatCard(props: {
   iconColor: string;
   label: string;
   value: string;
+  progress?: number;
+  progressMax?: number;
 }) {
   return (
     <View style={styles.statCard}>
@@ -741,310 +432,28 @@ function StatCard(props: {
           <Text style={styles.statValue}>{props.value}</Text>
         </View>
       </View>
+
+      {typeof props.progress === "number" && (
+        <>
+          <View style={[styles.progressBar, { marginTop: 8 }]}>
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${props.progress}%`,
+                  backgroundColor: "#0B0C67",
+                },
+              ]}
+            />
+          </View>
+          <Text
+            style={[styles.progressLabel, { marginTop: 4, textAlign: "right" }]}
+          >
+            {props.progress}%{" "}
+            {props.progressMax ? `(${props.progressMax} XP goal)` : ""}
+          </Text>
+        </>
+      )}
     </View>
   );
 }
-
-/* ---------- styles ---------- */
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F7F7FB" },
-  container: { padding: 16, paddingBottom: 28, gap: 16 },
-
-  header: { gap: 6 },
-  h1: { fontSize: 28, fontWeight: "800" },
-  subtitle: { fontSize: 14, color: "#4B5563" },
-
-  sectionTitle: { fontSize: 18, fontWeight: "800" },
-
-  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  statCard: {
-    flexGrow: 1,
-    flexBasis: 160,
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  statRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  iconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  statLabel: { fontSize: 12, color: "#6B7280" },
-  statValue: { fontSize: 22, fontWeight: "800", marginTop: 2 },
-
-  phaseCardBase: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-  },
-  phaseCardCompleted: { borderColor: "#86EFAC" },
-  phaseCardCurrent: { borderColor: "#C4B5FD" },
-  phaseCardUpcoming: { borderColor: "#E5E7EB", opacity: 0.75 },
-
-  phaseHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  phaseLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
-  phaseRight: { flexDirection: "row", alignItems: "center", gap: 8 },
-
-  phaseIndexBubble: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#E5E7EB",
-  },
-  bubbleCompleted: { backgroundColor: "#DCFCE7" },
-  bubbleCurrent: { backgroundColor: "#EDE9FE" },
-  bubbleUpcoming: { backgroundColor: "#F3F4F6" },
-  phaseIndexText: { fontWeight: "800", color: "#111827" },
-
-  phaseTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  phaseTitle: { fontSize: 16, fontWeight: "800" },
-  phaseDates: { fontSize: 12, color: "#6B7280", marginTop: 2 },
-
-  badgeActive: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: "#EDE9FE",
-  },
-  badgeActiveText: { fontSize: 12, fontWeight: "800", color: "#7C3AED" },
-
-  rowBetween: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  small: { fontSize: 13, color: "#374151" },
-  smallMuted: { fontSize: 13, color: "#6B7280" },
-  bold: { fontWeight: "800" },
-
-  progressTrack: {
-    height: 8,
-    backgroundColor: "#E5E7EB",
-    borderRadius: 999,
-    overflow: "hidden",
-  },
-  progressFill: { height: "100%", borderRadius: 999 },
-
-  pendingSection: {
-    marginTop: 14,
-    gap: 8,
-  },
-  pendingSectionTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#111827",
-  },
-  pendingList: {
-    gap: 10,
-  },
-  pendingTaskRow: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "white",
-  },
-
-  phaseBody: {
-    marginTop: 14,
-    gap: 10,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
-  },
-
-  taskRow: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "white",
-  },
-  taskPressed: { borderColor: "#C4B5FD" },
-  taskLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-  taskTitle: { fontSize: 14, fontWeight: "800", color: "#111827" },
-  taskMeta: { fontSize: 12, color: "#6B7280", marginTop: 2 },
-  xpText: { color: "#7C3AED", fontWeight: "800" },
-
-  pressed: { opacity: 0.9 },
-
-  modalRoot: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-
-  modalContent: {
-    paddingBottom: 24,
-  },
-
-  modalSheet: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    maxHeight: "92%",
-    backgroundColor: "white",
-    padding: 16,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    borderTopWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)" },
-  modalGrabber: {
-    alignSelf: "center",
-    width: 48,
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: "#E5E7EB",
-    marginBottom: 10,
-  },
-
-  statusChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    backgroundColor: "#F8FAFC",
-  },
-  statusChipText: { fontSize: 12, fontWeight: "900" },
-
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "900",
-    color: "#111827",
-    marginBottom: 10,
-  },
-
-  modalCard: {
-    backgroundColor: "white",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
-    gap: 10,
-  },
-  cardHeading: { fontSize: 14, fontWeight: "900", color: "#111827" },
-
-  bodyText: { fontSize: 13, color: "#111827", lineHeight: 19 },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  metaText: { fontSize: 12, color: "#6B7280" },
-
-  textArea: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
-    padding: 10,
-    minHeight: 90,
-    textAlignVertical: "top",
-    fontSize: 13,
-    color: "#111827",
-    backgroundColor: "#FFFFFF",
-  },
-
-  reflectionCard: {
-    marginTop: 2,
-    gap: 8,
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  reflectionPrompt: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#111827",
-    lineHeight: 19,
-  },
-
-  rowGap: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  primaryBtn: {
-    backgroundColor: "#7C3AED",
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: "center",
-    flex: 1,
-  },
-  primaryBtnText: { color: "white", fontWeight: "900" },
-
-  secondaryBtn: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 12,
-  },
-  secondaryBtnText: { color: "#111827", fontWeight: "900" },
-
-  fileRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
-    padding: 10,
-  },
-  fileName: { fontSize: 13, fontWeight: "900", color: "#111827" },
-  fileSize: { fontSize: 12, color: "#6B7280", marginTop: 2 },
-
-  reviewBtnRow: { flexDirection: "row", gap: 10 },
-  rejectBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#FCA5A5",
-    alignItems: "center",
-  },
-  rejectBtnText: { fontWeight: "900", color: "#DC2626" },
-  approveBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: "#16A34A",
-    alignItems: "center",
-  },
-  approveBtnText: { fontWeight: "900", color: "white" },
-});
