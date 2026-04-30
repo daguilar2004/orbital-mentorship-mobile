@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Redirect } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { Phase, Task, useApp } from "./context/AppContext";
+import { useAuth0App } from "./context/Auth0Provider";
 import { styles } from "./styles/homeStyles";
 
 import PhaseModal from "./components/modals/PhaseModal";
@@ -39,6 +41,7 @@ export default function Home() {
     reviewTask,
   } = useApp();
 
+  const { user, isAuthenticated, login, logout, isLoading } = useAuth0App();
   const [addingPhase, setAddingPhase] = useState(false);
   const [newPhaseName, setNewPhaseName] = useState("");
   const [newPhaseDescription, setNewPhaseDescription] = useState("");
@@ -111,6 +114,9 @@ export default function Home() {
     setDraftResponse(activeTask.submittedResponse ?? "");
     setDraftFeedback(activeTask.mentorFeedback ?? "");
   }, [activeTask?.id]);
+  if (!isAuthenticated) {
+    return <Redirect href="/" />;
+  }
 
   function togglePhase(phase: Phase) {
     if (phase.status === "upcoming") return;
@@ -203,6 +209,42 @@ export default function Home() {
             ? "Continue your learning journey"
             : "Manage your mentees progress"}
         </Text>
+      </View>
+      <View style={{ marginTop: 8, marginBottom: 8 }}>
+        {isAuthenticated ? (
+          <>
+            <Text style={styles.subtitle}>
+              Signed in as {user?.name || user?.email || "User"}
+            </Text>
+            <Pressable
+              style={[
+                styles.secondaryBtn,
+                { marginTop: 8, alignSelf: "flex-start" },
+              ]}
+              onPress={() => {
+                void logout();
+              }}
+            >
+              <Text style={styles.secondaryBtnText}>
+                {isLoading ? "Signing out..." : "Log Out"}
+              </Text>
+            </Pressable>
+          </>
+        ) : (
+          <Pressable
+            style={[
+              styles.primaryBtn,
+              { marginTop: 8, alignSelf: "flex-start" },
+            ]}
+            onPress={() => {
+              void login();
+            }}
+          >
+            <Text style={styles.primaryBtnText}>
+              {isLoading ? "Signing in..." : "Log In"}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.statsGrid}>

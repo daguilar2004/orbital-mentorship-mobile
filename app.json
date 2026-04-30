@@ -37,6 +37,13 @@
       "favicon": "./app/assets/logo.png"
     },
     "plugins": [
+      [
+        "react-native-auth0",
+        {
+          "domain": "dev-r4ni6rpttlphjtpa.us.auth0.com",
+          "customScheme": "orbitalmentorship"
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",
