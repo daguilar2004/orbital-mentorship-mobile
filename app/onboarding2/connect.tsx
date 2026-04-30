@@ -12,7 +12,7 @@ export default function Connect() {
       <View style={styles.actions}>
         <Pressable
           style={styles.button}
-          onPress={() => router.replace("/")}
+          onPress={() => router.replace("/homepage")}
         >
           <Text style={styles.buttonText}>Finish Onboarding</Text>
         </Pressable>

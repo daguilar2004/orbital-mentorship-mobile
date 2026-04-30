@@ -30,7 +30,7 @@ import { useApp } from "./context/AppContext";
 
 export default function Notes() {
   const { userRole } = useApp();
-  const userId = MOCK_USER_ID;
+  const userId = "ZYP3KRDJi76TZzh4ZIA28Zypl1k8UK9N";
 
   const { notes, loading, error, loadData, saveNote, deleteNote, deleteSelected, toggleFavorite } =
     useNotes(userId, userRole);

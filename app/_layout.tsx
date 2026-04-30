@@ -47,7 +47,7 @@ function AppDrawer() {
         name="index"
         options={{
           drawerItemStyle: { display: "none" },
-          headerShown: false,
+          headerShown: true,
         }}
       />
 

@@ -1,5 +1,14 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
-import Auth0 from"react-native-auth0";
+import * as AuthSession from "expo-auth-session";
+import * as WebBrowser from "expo-web-browser";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+WebBrowser.maybeCompleteAuthSession();
 
 type AuthUser = {
   sub?: string;
@@ -18,49 +27,71 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const auth0 = new Auth0({
-  domain: process.env.EXPO_PUBLIC_AUTH0_DOMAIN!,
-  clientId: process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID!,
-});
-
-export function Auth0AppProvider({ children }: { children: React.ReactNode }) {
+export function Auth0AppProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const redirectUri = AuthSession.makeRedirectUri({
+    useProxy: true,
+  });
+
+  // 🔥 IMPORTANT: replace this with your real backend or auth provider
+  const discovery = {
+    authorizationEndpoint: "mongodb://YOUR_HOST_IP:27017/orbital-mentorship-dev",
+  };
+
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(
+    {
+      clientId: process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID ?? "dummy",
+      redirectUri,
+      scopes: ["openid", "profile", "email"],
+    },
+    discovery,
+  );
+
+  // ✅ HANDLE LOGIN RESULT
+  useEffect(() => {
+    const handleAuth = async () => {
+      if (response?.type === "success") {
+        setIsLoading(true);
+
+        try {
+          // If using backend auth, you'd fetch user here
+          setUser({
+            sub: "demo-user",
+            name: "User",
+            email: "user@example.com",
+          });
+
+          console.log("LOGIN SUCCESS");
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    handleAuth();
+  }, [response]);
 
   const login = async () => {
     try {
       setIsLoading(true);
-
-      const credentials = await auth0.webAuth.authorize({
-        scope: "openid profile email",
-      });
-
-      console.log("LOGIN OK");
-      console.log("Access token present:", !!credentials.accessToken);
-      const profile = await auth0.auth.userInfo({
-        token: credentials.accessToken,
-      });
-      setUser(profile as AuthUser);
-
-      console.log("User profile:", profile);
-    } catch (error) {
-      console.error("Auth0 login error:", error);
+      await promptAsync();
+    } catch (e) {
+      console.error("Login error:", e);
     } finally {
       setIsLoading(false);
     }
   };
 
   const logout = async () => {
-    try {
-      setIsLoading(true);
-      await auth0.webAuth.clearSession();
-      setUser(null);
-      console.log("LOGOUT OK");
-    } catch (error) {
-      console.error("Auth0 logout error:", error);
-    } finally {
-      setIsLoading(false);
-    }
+    setUser(null);
   };
 
   const value = useMemo(
@@ -74,7 +105,11 @@ export function Auth0AppProvider({ children }: { children: React.ReactNode }) {
     [user, isLoading],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth0App() {

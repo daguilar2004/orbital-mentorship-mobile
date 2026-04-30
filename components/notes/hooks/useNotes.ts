@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { Alert } from "react-native";
 import { API_BASE_URL } from "@/app/api/index";
-import { MOCK_AUTH_TOKEN } from "@/app/config/mockAuth";
 import { defaultFormatting } from "../constants";
 import { Note } from "../types";
 import { getLabels, getNoteId } from "../utils";
 
 async function getHeadersWithAuth() {
-    const token = MOCK_AUTH_TOKEN;
+    const token = "ZYP3KRDJi76TZzh4ZIA28Zypl1k8UK9N";
     return {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
