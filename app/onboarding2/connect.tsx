@@ -1,6 +1,5 @@
-import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
 import { router } from "expo-router";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function Connect() {
   return (
@@ -35,7 +34,7 @@ const styles = StyleSheet.create({
   subtitle: { color: "#6B7280", marginBottom: 24 },
   actions: { marginTop: 20 },
   button: {
-    backgroundColor: "#10B981",
+    backgroundColor: "#0b0c67",
     padding: 14,
     borderRadius: 10,
     alignItems: "center",

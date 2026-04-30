@@ -2,13 +2,13 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { useApp } from "../context/AppContext";
 
@@ -100,7 +100,7 @@ export default function ProfileSetup() {
         <View style={styles.header}>
           <Text style={styles.title}>Your Profile</Text>
           <Pressable style={styles.editButton} onPress={handleEdit}>
-            <MaterialIcons name="edit" size={16} color="#7C3AED" />
+            <MaterialIcons name="edit" size={16} color="#0b0c67" />
             <Text style={styles.editButtonText}>Edit Profile</Text>
           </Pressable>
         </View>
@@ -353,7 +353,7 @@ export default function ProfileSetup() {
             <View key={i} style={styles.tag}>
               <Text style={styles.tagText}>{ind}</Text>
               <Pressable onPress={() => removeIndustry(i)}>
-                <MaterialIcons name="close" size={16} color="#7C3AED" />
+                <MaterialIcons name="close" size={16} color="#0b0c67" />
               </Pressable>
             </View>
           ))}
@@ -379,7 +379,7 @@ export default function ProfileSetup() {
             <View key={i} style={styles.tag}>
               <Text style={styles.tagText}>{skill}</Text>
               <Pressable onPress={() => removeSkill(i)}>
-                <MaterialIcons name="close" size={16} color="#7C3AED" />
+                <MaterialIcons name="close" size={16} color="#0b0c67" />
               </Pressable>
             </View>
           ))}
@@ -405,7 +405,7 @@ export default function ProfileSetup() {
             <View key={i} style={styles.linkTag}>
               <Text style={styles.linkTagText}>{link}</Text>
               <Pressable onPress={() => removeLink(i)}>
-                <MaterialIcons name="close" size={16} color="#7C3AED" />
+                <MaterialIcons name="close" size={16} color="#0b0c67" />
               </Pressable>
             </View>
           ))}
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     gap: 4,
   },
-  editButtonText: { color: "#7C3AED", fontWeight: "600", fontSize: 12 },
+  editButtonText: { color: "#0b0c67", fontWeight: "600", fontSize: 12 },
 
   // Card Styles
   card: {
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#0b0c67",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     gap: 6,
   },
-  tagText: { fontSize: 12, color: "#6B3EDA", fontWeight: "500" },
+  tagText: { fontSize: 12, color: "#0b0c67", fontWeight: "500" },
   linkTag: {
     flexDirection: "row",
     alignItems: "center",
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     justifyContent: "space-between",
   },
-  linkTagText: { fontSize: 12, color: "#1e40af", fontWeight: "500" },
+  linkTagText: { fontSize: 12, color: "#0b0c67", fontWeight: "500" },
 
   // Form Styles
   formGroup: { marginBottom: 20 },
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
     color: "#111",
   },
   addButton: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#0b0c67",
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
@@ -572,7 +572,7 @@ const styles = StyleSheet.create({
   // Action Buttons
   actions: { marginTop: 20, marginBottom: 32 },
   button: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#0b0c67",
     padding: 14,
     borderRadius: 10,
     alignItems: "center",
