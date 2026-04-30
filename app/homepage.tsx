@@ -1,14 +1,15 @@
-import { useAuth0 } from "@auth0/auth0-react";
 import { Ionicons } from "@expo/vector-icons";
 import { Redirect } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import PhaseModal from "../components/modals/PhaseModal";
-import TaskFormModal from "../components/modals/TaskFormModal";
-import PhasesSection from "../components/phases/PhasesSection";
-import TaskModal from "../components/tasks/TaskModal";
-import { Phase, Task, useApp } from "../context/AppContext";
-import { styles } from "../styles/homeStyles";
+import { Phase, Task, useApp } from "./context/AppContext";
+import { useAuth0App } from "./context/Auth0Provider";
+import { styles } from "./styles/homeStyles";
+
+import PhaseModal from "./components/modals/PhaseModal";
+import TaskFormModal from "./components/modals/TaskFormModal";
+import PhasesSection from "./components/phases/PhasesSection";
+import TaskModal from "./components/tasks/TaskModal";
 
 type TaskResource = {
   type: "link" | "file";
@@ -40,9 +41,7 @@ export default function Home() {
     reviewTask,
   } = useApp();
 
-  // const { user, isAuthenticated, login, logout, isLoading } = useAuth0App();
-  const { user, isAuthenticated, isLoading, loginWithRedirect, logout } =
-    useAuth0();
+  const { user, isAuthenticated, login, logout, isLoading } = useAuth0App();
   const [addingPhase, setAddingPhase] = useState(false);
   const [newPhaseName, setNewPhaseName] = useState("");
   const [newPhaseDescription, setNewPhaseDescription] = useState("");
@@ -223,12 +222,7 @@ export default function Home() {
                 { marginTop: 8, alignSelf: "flex-start" },
               ]}
               onPress={() => {
-                // void logout();
-                logout({
-                  logoutParams: {
-                    returnTo: window.location.origin,
-                  },
-                });
+                void logout();
               }}
             >
               <Text style={styles.secondaryBtnText}>
@@ -243,8 +237,7 @@ export default function Home() {
               { marginTop: 8, alignSelf: "flex-start" },
             ]}
             onPress={() => {
-              // void login();
-              loginWithRedirect();
+              void login();
             }}
           >
             <Text style={styles.primaryBtnText}>

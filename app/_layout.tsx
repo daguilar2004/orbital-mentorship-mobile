@@ -7,9 +7,8 @@ import { Drawer } from "expo-router/drawer";
 import { StyleSheet, Switch, Text, View } from "react-native";
 import "react-native-gesture-handler";
 
-import { AppProvider, useApp } from "../context/AppContext";
-// import { Auth0AppProvider } from "../context/Auth0Provider";
-import { Auth0WebProvider } from "../context/Auth0WebProvider";
+import { AppProvider, useApp } from "./context/AppContext";
+import { Auth0AppProvider } from "./context/Auth0Provider";
 
 function CustomDrawerContent(props: any) {
   const { userRole, toggleRole } = useApp();
@@ -48,7 +47,7 @@ function AppDrawer() {
         name="index"
         options={{
           drawerItemStyle: { display: "none" },
-          headerShown: false,
+          headerShown: true,
         }}
       />
 
@@ -101,11 +100,11 @@ function AppDrawer() {
 
 export default function Layout() {
   return (
-    <Auth0WebProvider>
+    <Auth0AppProvider>
       <AppProvider>
         <AppDrawer />
       </AppProvider>
-    </Auth0WebProvider>
+    </Auth0AppProvider>
   );
 }
 

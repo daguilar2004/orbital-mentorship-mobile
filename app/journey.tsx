@@ -20,6 +20,11 @@ type DailyHabit = {
   days: DayKey[];
   completedOn?: string | null;
   linkedGoalId?: string;
+  trigger?: string;
+  motivation?: string;
+  action?: string;
+  reinforcement?: string;
+  reflection?: string;
 };
 
 type SmartGoal = {
@@ -73,12 +78,22 @@ export default function Journey() {
       title: "Morning meditation",
       days: ["S", "M", "T", "W", "T2", "F", "S2"],
       completedOn: null,
+      trigger: "",
+      motivation: "",
+      action: "",
+      reinforcement: "",
+      reflection: "",
     },
     {
       id: "h2",
       title: "Daily coding practice",
       days: ["S", "M", "T", "W", "T2", "F", "S2"],
       completedOn: null,
+      trigger: "",
+      motivation: "",
+      action: "",
+      reinforcement: "",
+      reflection: "",
     },
   ]);
 
@@ -86,6 +101,11 @@ export default function Journey() {
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
   const [habitTitle, setHabitTitle] = useState("");
   const [habitDays, setHabitDays] = useState<DayKey[]>([]);
+  const [habitTrigger, setHabitTrigger] = useState("");
+  const [habitMotivation, setHabitMotivation] = useState("");
+  const [habitAction, setHabitAction] = useState("");
+  const [habitReinforcement, setHabitReinforcement] = useState("");
+  const [habitReflection, setHabitReflection] = useState("");
 
   const [goals, setGoals] = useState<SmartGoal[]>([
     {
@@ -118,6 +138,11 @@ export default function Journey() {
           days: ["M", "W", "F"],
           completedOn: null,
           linkedGoalId: "g1",
+          trigger: "",
+          motivation: "",
+          action: "",
+          reinforcement: "",
+          reflection: "",
         },
       ];
     });
@@ -152,6 +177,11 @@ export default function Journey() {
   const clearHabitForm = () => {
     setHabitTitle("");
     setHabitDays([]);
+    setHabitTrigger("");
+    setHabitMotivation("");
+    setHabitAction("");
+    setHabitReinforcement("");
+    setHabitReflection("");
     setEditingHabitId(null);
   };
 
@@ -168,6 +198,11 @@ export default function Journey() {
       title: habitTitle.trim(),
       days: habitDays,
       completedOn: null,
+      trigger: habitTrigger.trim(),
+      motivation: habitMotivation.trim(),
+      action: habitAction.trim(),
+      reinforcement: habitReinforcement.trim(),
+      reflection: habitReflection.trim(),
     };
 
     setHabits((prev) => [newHabit, ...prev]);
@@ -179,6 +214,11 @@ export default function Journey() {
     setEditingHabitId(habit.id);
     setHabitTitle(habit.title);
     setHabitDays(habit.days);
+    setHabitTrigger(habit.trigger ?? "");
+    setHabitMotivation(habit.motivation ?? "");
+    setHabitAction(habit.action ?? "");
+    setHabitReinforcement(habit.reinforcement ?? "");
+    setHabitReflection(habit.reflection ?? "");
     setShowHabitForm(true);
   };
 
@@ -192,6 +232,11 @@ export default function Journey() {
               ...habit,
               title: habitTitle.trim(),
               days: habitDays,
+              trigger: habitTrigger.trim(),
+              motivation: habitMotivation.trim(),
+              action: habitAction.trim(),
+              reinforcement: habitReinforcement.trim(),
+              reflection: habitReflection.trim(),
             }
           : habit,
       ),
@@ -204,25 +249,29 @@ export default function Journey() {
   const removeHabit = (id: string) => {
     const linkedGoal = goals.find((goal) => goal.linkedHabitId === id);
 
-    Alert.alert("Delete daily habit?", "Do you want to delete this daily habit?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          setHabits((prev) => prev.filter((habit) => habit.id !== id));
-          if (linkedGoal) {
-            setGoals((prev) =>
-              prev.map((goal) =>
-                goal.id === linkedGoal.id
-                  ? { ...goal, linkedHabitId: undefined }
-                  : goal,
-              ),
-            );
-          }
+    Alert.alert(
+      "Delete daily habit?",
+      "Do you want to delete this daily habit?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            setHabits((prev) => prev.filter((habit) => habit.id !== id));
+            if (linkedGoal) {
+              setGoals((prev) =>
+                prev.map((goal) =>
+                  goal.id === linkedGoal.id
+                    ? { ...goal, linkedHabitId: undefined }
+                    : goal,
+                ),
+              );
+            }
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   const toggleHabitCompletion = (id: string) => {
@@ -291,6 +340,11 @@ export default function Journey() {
         days: goalHabitDays,
         completedOn: null,
         linkedGoalId: newGoalId,
+        trigger: "",
+        motivation: "",
+        action: "",
+        reinforcement: "",
+        reflection: "",
       };
 
       setHabits((prev) => [linkedHabit, ...prev]);
@@ -378,6 +432,11 @@ export default function Journey() {
             days: goalHabitDays,
             completedOn: null,
             linkedGoalId: editingGoalId,
+            trigger: "",
+            motivation: "",
+            action: "",
+            reinforcement: "",
+            reflection: "",
           },
           ...prev,
         ]);
@@ -415,7 +474,9 @@ export default function Journey() {
     const goal = goals.find((item) => item.id === id);
 
     if (goal?.linkedHabitId) {
-      setHabits((prev) => prev.filter((habit) => habit.id !== goal.linkedHabitId));
+      setHabits((prev) =>
+        prev.filter((habit) => habit.id !== goal.linkedHabitId),
+      );
     }
 
     setGoals((prev) => prev.filter((goalItem) => goalItem.id !== id));
@@ -491,6 +552,16 @@ export default function Journey() {
           setHabitTitle={setHabitTitle}
           habitDays={habitDays}
           setHabitDays={setHabitDays}
+          habitTrigger={habitTrigger}
+          setHabitTrigger={setHabitTrigger}
+          habitMotivation={habitMotivation}
+          setHabitMotivation={setHabitMotivation}
+          habitAction={habitAction}
+          setHabitAction={setHabitAction}
+          habitReinforcement={habitReinforcement}
+          setHabitReinforcement={setHabitReinforcement}
+          habitReflection={habitReflection}
+          setHabitReflection={setHabitReflection}
           editingHabitId={editingHabitId}
           addHabit={addHabit}
           saveEditedHabit={saveEditedHabit}
@@ -604,6 +675,16 @@ function AccountabilityScreen(props: {
   setHabitTitle: (v: string) => void;
   habitDays: DayKey[];
   setHabitDays: (v: DayKey[]) => void;
+  habitTrigger: string;
+  setHabitTrigger: (v: string) => void;
+  habitMotivation: string;
+  setHabitMotivation: (v: string) => void;
+  habitAction: string;
+  setHabitAction: (v: string) => void;
+  habitReinforcement: string;
+  setHabitReinforcement: (v: string) => void;
+  habitReflection: string;
+  setHabitReflection: (v: string) => void;
   editingHabitId: string | null;
   addHabit: () => void;
   saveEditedHabit: () => void;
@@ -666,6 +747,16 @@ function AccountabilityScreen(props: {
     setHabitTitle,
     habitDays,
     setHabitDays,
+    habitTrigger,
+    setHabitTrigger,
+    habitMotivation,
+    setHabitMotivation,
+    habitAction,
+    setHabitAction,
+    habitReinforcement,
+    setHabitReinforcement,
+    habitReflection,
+    setHabitReflection,
     editingHabitId,
     addHabit,
     saveEditedHabit,
@@ -722,8 +813,12 @@ function AccountabilityScreen(props: {
     return map;
   }, [goals, habits]);
 
-  const todaysHabits = habits.filter((habit) => habit.days.includes(todayDayKey));
-  const otherHabits = habits.filter((habit) => !habit.days.includes(todayDayKey));
+  const todaysHabits = habits.filter((habit) =>
+    habit.days.includes(todayDayKey),
+  );
+  const otherHabits = habits.filter(
+    (habit) => !habit.days.includes(todayDayKey),
+  );
 
   return (
     <View style={{ flex: 1 }}>
@@ -788,14 +883,18 @@ function AccountabilityScreen(props: {
                     style={styles.addBtnPurple}
                     onPress={() => setShowHabitForm(!showHabitForm)}
                   >
-                    <Text style={styles.addBtnText}>{showHabitForm ? "×" : "＋"}</Text>
+                    <Text style={styles.addBtnText}>
+                      {showHabitForm ? "×" : "＋"}
+                    </Text>
                   </Pressable>
                 </View>
 
                 {showHabitForm && (
                   <View style={styles.goalFormCard}>
                     <Text style={styles.goalFormTitle}>
-                      {editingHabitId ? "Edit Daily Habit" : "Create Daily Habit"}
+                      {editingHabitId
+                        ? "Edit Daily Habit"
+                        : "Create Daily Habit"}
                     </Text>
 
                     <TextInput
@@ -806,12 +905,74 @@ function AccountabilityScreen(props: {
                       style={styles.input}
                     />
 
+                    <View style={{ height: 10 }} />
+
+                    <TextInput
+                      value={habitTrigger}
+                      onChangeText={setHabitTrigger}
+                      placeholder="Trigger: Example — Right after I brush my teeth in the morning"
+                      placeholderTextColor="#9CA3AF"
+                      multiline
+                      style={styles.formTextArea}
+                      textAlignVertical="top"
+                    />
+
+                    <View style={{ height: 10 }} />
+
+                    <TextInput
+                      value={habitMotivation}
+                      onChangeText={setHabitMotivation}
+                      placeholder="Motivation: Example — I want to feel more calm and focused during the day"
+                      placeholderTextColor="#9CA3AF"
+                      multiline
+                      style={styles.formTextArea}
+                      textAlignVertical="top"
+                    />
+
+                    <View style={{ height: 10 }} />
+
+                    <TextInput
+                      value={habitAction}
+                      onChangeText={setHabitAction}
+                      placeholder="Action: Example — I will meditate for 5 minutes on my bed"
+                      placeholderTextColor="#9CA3AF"
+                      multiline
+                      style={styles.formTextArea}
+                      textAlignVertical="top"
+                    />
+
+                    <View style={{ height: 10 }} />
+
+                    <TextInput
+                      value={habitReinforcement}
+                      onChangeText={setHabitReinforcement}
+                      placeholder="Reinforcement: Example — I’ll let myself have my coffee after I finish"
+                      placeholderTextColor="#9CA3AF"
+                      multiline
+                      style={styles.formTextArea}
+                      textAlignVertical="top"
+                    />
+
+                    <View style={{ height: 10 }} />
+
+                    <TextInput
+                      value={habitReflection}
+                      onChangeText={setHabitReflection}
+                      placeholder="Reflection: Example — It went well today, I felt more relaxed after"
+                      placeholderTextColor="#9CA3AF"
+                      multiline
+                      style={styles.formTextArea}
+                      textAlignVertical="top"
+                    />
+
                     <View style={{ height: 12 }} />
 
                     <Text style={styles.formLabel}>Select days</Text>
                     <DaysSelector
                       selected={habitDays}
-                      onToggle={(day) => toggleDay(day, habitDays, setHabitDays)}
+                      onToggle={(day) =>
+                        toggleDay(day, habitDays, setHabitDays)
+                      }
                     />
 
                     <View style={styles.goalFormActions}>
@@ -1158,7 +1319,9 @@ function AccountabilityScreen(props: {
                               ) : null}
                             </View>
 
-                            <Text style={styles.smartGoalTime}>{goal.time}</Text>
+                            <Text style={styles.smartGoalTime}>
+                              {goal.time}
+                            </Text>
 
                             {linkedHabit ? (
                               <View style={styles.linkedTaskPreview}>
@@ -1273,7 +1436,12 @@ function DaysSelector(props: {
             onPress={() => onToggle(day.key)}
             style={[styles.dayCircle, active && styles.dayCircleActive]}
           >
-            <Text style={[styles.dayCircleText, active && styles.dayCircleTextActive]}>
+            <Text
+              style={[
+                styles.dayCircleText,
+                active && styles.dayCircleTextActive,
+              ]}
+            >
               {day.short}
             </Text>
           </Pressable>
