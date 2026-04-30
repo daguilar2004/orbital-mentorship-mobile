@@ -1,14 +1,6 @@
-import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React from "react";
-import {
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 export default function RoleSelection() {
   const [step, setStep] = React.useState<1 | 2>(1);
@@ -19,30 +11,15 @@ export default function RoleSelection() {
   const [lastName, setLastName] = React.useState("");
   const [address, setAddress] = React.useState("");
   const [zip, setZip] = React.useState("");
-  const [profileImage, setProfileImage] = React.useState<string | null>(null);
 
   const handleContinue = () => {
-    if (step === 1 && selected) {
+    if (step === 1) {
       setStep(2);
-    } else if (step === 2) {
-      // finish role selection + profile; go to questionnaire with role param
-      router.push(`/onboarding2/questionnaire?role=${selected}`);
+    } else {
+      // Final step → navigate somewhere
+      router.push("/onboarding2/questionnaire"); // or wherever you want
     }
   };
-
-  const pickImage = async () => {
-    // request permission automatically handled by expo-image-picker
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.5,
-    });
-
-    if (!result.canceled) {
-      setProfileImage(result.assets[0].uri);
-    }
-  };
-
   return (
     <View style={styles.screen}>
       {step === 1 ? (
@@ -124,16 +101,6 @@ export default function RoleSelection() {
               keyboardType="numeric"
               placeholderTextColor="#999"
             />
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Profile Picture</Text>
-            <Pressable style={styles.fileButton} onPress={pickImage}>
-              <Text style={styles.fileButtonText}>Choose File</Text>
-            </Pressable>
-            {profileImage && (
-              <Image source={{ uri: profileImage }} style={styles.preview} />
-            )}
           </View>
         </>
       )}
@@ -226,5 +193,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   fileButtonText: { color: "#374151", fontWeight: "600" },
-  preview: { width: 100, height: 100, borderRadius: 50, marginTop: 12 },
 });
