@@ -1,18 +1,18 @@
-import React, { useState } from "react";
-import * as ImagePicker from "expo-image-picker";
-import * as DocumentPicker from "expo-document-picker";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  TextInput,
-  ScrollView,
-  Alert,
-} from "react-native";
-import { router } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useApp } from "../context/AppContext";
+import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
+import { useState } from "react";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useApp } from "../../context/AppContext";
 const defaultProfile = {
   firstName: "",
   lastName: "",

@@ -13,11 +13,13 @@
       "bundleIdentifier": "com.anonymous.orbital-mentorship"
     },
     "android": {
+      "package": "com.orbital.mentorship",
+
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./app/assets/logo.png",
+        "backgroundImage": "./app/assets/logo.png",
+        "monochromeImage": "./app/assets/logo.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -27,6 +29,13 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "react-native-auth0",
+        {
+          "domain": "dev-r4ni6rpttlphjtpa.us.auth0.com",
+          "customScheme": "orbitalmentorship"
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",

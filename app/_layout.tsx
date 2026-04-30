@@ -6,7 +6,9 @@ import {
 import { Drawer } from "expo-router/drawer";
 import { StyleSheet, Switch, Text, View } from "react-native";
 import "react-native-gesture-handler";
-import { AppProvider, useApp } from "./context/AppContext";
+
+import { AppProvider, useApp } from "../context/AppContext";
+import { Auth0AppProvider } from "../context/Auth0Provider";
 
 function CustomDrawerContent(props: any) {
   const { userRole, toggleRole } = useApp();
@@ -31,58 +33,78 @@ function CustomDrawerContent(props: any) {
   );
 }
 
+function AppDrawer() {
+  return (
+    <Drawer
+      drawerContent={(props) => <CustomDrawerContent {...props} />}
+      screenOptions={{
+        headerShown: true,
+        drawerActiveTintColor: "#7C3AED",
+      }}
+    >
+      {/* Login page: hide from drawer */}
+      <Drawer.Screen
+        name="index"
+        options={{
+          drawerItemStyle: { display: "none" },
+          headerShown: false,
+        }}
+      />
+
+      <Drawer.Screen
+        name="homepage"
+        options={{
+          title: "Home",
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="home" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Drawer.Screen
+        name="notes"
+        options={{
+          title: "Notes",
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="document-text" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Drawer.Screen
+        name="journey"
+        options={{
+          title: "Journey",
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="map" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Drawer.Screen
+        name="onboarding2/profile-setup"
+        options={{
+          title: "Onboarding",
+        }}
+      />
+
+      <Drawer.Screen
+        name="onboarding"
+        options={{
+          drawerItemStyle: { display: "none" },
+        }}
+      />
+    </Drawer>
+  );
+}
+
 export default function Layout() {
   return (
-    <AppProvider>
-      <Drawer
-        drawerContent={(props) => <CustomDrawerContent {...props} />}
-        screenOptions={{
-          headerShown: true,
-          drawerActiveTintColor: "#7C3AED",
-        }}
-      >
-        <Drawer.Screen
-          name="onboarding2/profile-setup"
-          options={{
-            title: "Onboarding",
-          }}
-        />
-
-        <Drawer.Screen
-          name="onboarding"
-          options={{
-            drawerItemStyle: { display: "none" },
-          }}
-        />
-        <Drawer.Screen
-          name="index"
-          options={{
-            title: "Home",
-            drawerIcon: ({ color, size }) => (
-              <Ionicons name="home" size={size} color={color} />
-            ),
-          }}
-        />
-        <Drawer.Screen
-          name="notes"
-          options={{
-            title: "Notes",
-            drawerIcon: ({ color, size }) => (
-              <Ionicons name="document-text" size={size} color={color} />
-            ),
-          }}
-        />
-        <Drawer.Screen
-          name="journey"
-          options={{
-            title: "Journey",
-            drawerIcon: ({ color, size }) => (
-              <Ionicons name="map" size={size} color={color} />
-            ),
-          }}
-        />
-      </Drawer>
-    </AppProvider>
+    <Auth0AppProvider>
+      <AppProvider>
+        <AppDrawer />
+      </AppProvider>
+    </Auth0AppProvider>
   );
 }
 
