@@ -23,6 +23,8 @@
       }
     },
     "android": {
+      "package": "com.orbital.mentorship",
+
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./app/assets/logo.png",

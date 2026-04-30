@@ -3,12 +3,12 @@ import Constants from "expo-constants";
 import * as DocumentPicker from "expo-document-picker";
 import React from "react";
 import {
-  Alert,
-  Platform,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Platform,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { styles } from "../../styles/homeStyles";
 

@@ -1,11 +1,11 @@
 import React from "react";
 import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 import { Phase, Task, UserRole } from "../../context/AppContext";
 import { styles } from "../../styles/homeStyles";
