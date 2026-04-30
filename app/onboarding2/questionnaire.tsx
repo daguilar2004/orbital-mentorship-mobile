@@ -7,8 +7,9 @@ import {
   TextInput,
   ScrollView,
 } from "react-native";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useApp } from "../context/AppContext";
 
 const INDUSTRIES = [
   "Technology",
@@ -23,26 +24,13 @@ const INDUSTRIES = [
   "Other",
 ];
 
-interface QuestionnaireAnswers {
-  mentoringComfort: number;
-  industry: string;
-  mentorIndustry: string;
-  mentorSkillset: string;
-  developmentGoal: string;
-  holdingBack: string;
-}
+const ONBOARDING_HUB_ROUTE: Href = "/onboarding2";
 
 export default function Questionnaire() {
+  const { questionnaireAnswers, setQuestionnaireAnswers } = useApp();
   const [currentQ, setCurrentQ] = React.useState(1);
   const [showDropdown, setShowDropdown] = React.useState(false);
-  const [answers, setAnswers] = React.useState<QuestionnaireAnswers>({
-    mentoringComfort: 5,
-    industry: "",
-    mentorIndustry: "",
-    mentorSkillset: "",
-    developmentGoal: "",
-    holdingBack: "",
-  });
+  const [answers, setAnswers] = React.useState(questionnaireAnswers);
 
   const totalQuestions = 6;
   const minWords = 20;
@@ -73,8 +61,8 @@ export default function Questionnaire() {
       setCurrentQ(currentQ + 1);
       setShowDropdown(false);
     } else {
-      // ✅ go back to hub after finishing
-      router.replace("/onboarding2");
+      setQuestionnaireAnswers(answers);
+      router.replace(ONBOARDING_HUB_ROUTE);
     }
   };
 

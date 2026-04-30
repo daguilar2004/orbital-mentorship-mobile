@@ -433,46 +433,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  useEffect(() => {
-    async function fetchPhases() {
-      try {
-        const mentorshipId = "69e27a39b628f49f70d766db"; // TEMP (later from login/user)
-
-        const res = await fetch(`${API_URL}/phases/mentorship/${mentorshipId}`);
-
-        const data = await res.json();
-
-        const mapped = data.map((p: any) => ({
-          id: p._id,
-          name: p.name,
-          startDate: p.startDate,
-          endDate: p.endDate,
-          status: p.status,
-          tasks: (p.tasks || []).map((t: any) => ({
-            id: t._id,
-            title: t.title,
-            description: t.description,
-            xp: t.xp,
-            dueDate: t.dueDate,
-            status: t.status,
-            submittedResponse: t.submissionText,
-            submittedAt: t.submittedAt,
-            mentorFeedback: t.mentorFeedback,
-            reviewedAt: t.reviewedAt,
-          })),
-        }));
-
-        setPhases(mapped);
-      } catch (err) {
-        console.error("Failed to load phases", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchPhases();
-  }, []);
-
   function editPhase(
     phaseId: string,
     name: string,
@@ -494,34 +454,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
   async function refreshPhases() {
     const mentorshipId = "69e27a39b628f49f70d766db";
+    try {
+      const data = await PhaseAPI.getByMentorship(mentorshipId);
 
-    const data = await PhaseAPI.getByMentorship(mentorshipId);
+      const mapped = data.map((p: any) => ({
+        id: p._id,
+        name: p.name,
+        startDate: p.startDate,
+        endDate: p.endDate,
+        status: p.status,
+        tasks: (p.tasks || []).map((t: any) => ({
+          id: t._id,
+          title: t.title,
+          description: t.description,
+          xp: t.xp,
+          dueDate: t.dueDate,
+          status: t.status,
+          submittedResponse: t.submissionText,
+          submittedAt: t.submittedAt,
+          mentorFeedback: t.mentorFeedback,
+          reviewedAt: t.reviewedAt,
+        })),
+      }));
 
-    const mapped = data.map((p: any) => ({
-      id: p._id,
-      name: p.name,
-      startDate: p.startDate,
-      endDate: p.endDate,
-      status: p.status,
-      tasks: (p.tasks || []).map((t: any) => ({
-        id: t._id,
-        title: t.title,
-        description: t.description,
-        xp: t.xp,
-        dueDate: t.dueDate,
-        status: t.status,
-        submittedResponse: t.submissionText,
-        submittedAt: t.submittedAt,
-        mentorFeedback: t.mentorFeedback,
-        reviewedAt: t.reviewedAt,
-      })),
-    }));
-
-    setPhases(mapped);
+      setPhases(mapped);
+    } catch (err) {
+      console.error("Failed to load phases", err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
-    refreshPhases();
+    void refreshPhases();
   }, []);
 
   function deletePhase(phaseId: string) {
@@ -581,9 +546,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       totalXP,
       xpGoal,
-      // phases: recomputePhaseStatuses(phases),
+      phases,
 
-      // ✅ ADD THESE
       profileData,
       setProfileData,
       questionnaireAnswers,

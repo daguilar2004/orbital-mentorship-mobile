@@ -1,8 +1,4 @@
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
-
-if (!API_URL) {
-  throw new Error("EXPO_PUBLIC_API_URL is not set");
-}
+import { buildApiUrl } from "../config/api";
 
 export type HabitPayload = {
   title: string;
@@ -27,7 +23,7 @@ async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(buildApiUrl(path), {
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {}),
@@ -56,62 +52,62 @@ async function request<T>(
 
 // Habits
 export async function getHabits() {
-  return request<any[]>("/api/habits");
+  return request<any[]>("/habits");
 }
 
 export async function createHabit(payload: HabitPayload) {
-  return request<any>("/api/habits", {
+  return request<any>("/habits", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export async function updateHabit(id: string, payload: Partial<HabitPayload>) {
-  return request<any>(`/api/habits/${id}`, {
+  return request<any>(`/habits/${id}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
 }
 
 export async function toggleHabit(id: string) {
-  return request<any>(`/api/habits/${id}/toggle`, {
+  return request<any>(`/habits/${id}/toggle`, {
     method: "PATCH",
   });
 }
 
 export async function deleteHabit(id: string) {
-  return request<any>(`/api/habits/${id}`, {
+  return request<any>(`/habits/${id}`, {
     method: "DELETE",
   });
 }
 
 // Goals
 export async function getGoals() {
-  return request<any[]>("/api/goals");
+  return request<any[]>("/goals");
 }
 
 export async function createGoal(payload: GoalPayload) {
-  return request<any>("/api/goals", {
+  return request<any>("/goals", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export async function updateGoal(id: string, payload: Partial<GoalPayload>) {
-  return request<any>(`/api/goals/${id}`, {
+  return request<any>(`/goals/${id}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
 }
 
 export async function toggleGoal(id: string) {
-  return request<any>(`/api/goals/${id}/toggle-complete`, {
+  return request<any>(`/goals/${id}/toggle-complete`, {
     method: "PATCH",
   });
 }
 
 export async function deleteGoal(id: string) {
-  return request<any>(`/api/goals/${id}`, {
+  return request<any>(`/goals/${id}`, {
     method: "DELETE",
   });
 }

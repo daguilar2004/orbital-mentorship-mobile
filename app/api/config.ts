@@ -1,2 +1,1 @@
-// api/config.ts
-export const API_URL = "http://localhost:4000/api";
+export { API_BASE_URL, API_URL, buildApiUrl } from "../config/api";

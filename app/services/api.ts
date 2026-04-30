@@ -1,42 +1,40 @@
-// API Configuration for Orbital Mentorship Backend
-// Update this URL based on your backend server location
-
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:4000/api";
+import { API_BASE_URL, buildApiUrl } from "../config/api";
 
 export const API_ENDPOINTS = {
   // Health check
-  HEALTH: `${API_BASE_URL}/health`,
+  HEALTH: buildApiUrl("/health"),
 
   // Mentorship
-  MENTORSHIPS: `${API_BASE_URL}/mentorships`,
-  MENTORSHIP_BY_ID: (id: string) => `${API_BASE_URL}/mentorships/${id}`,
+  MENTORSHIPS: buildApiUrl("/mentorships"),
+  MENTORSHIP_BY_ID: (id: string) => buildApiUrl(`/mentorships/${id}`),
 
   // Phases
-  PHASES: `${API_BASE_URL}/phases`,
-  PHASE_BY_ID: (id: string) => `${API_BASE_URL}/phases/${id}`,
+  PHASES: buildApiUrl("/phases"),
+  PHASE_BY_ID: (id: string) => buildApiUrl(`/phases/${id}`),
 
   // Tasks
-  TASKS: `${API_BASE_URL}/tasks`,
-  TASK_BY_ID: (id: string) => `${API_BASE_URL}/tasks/${id}`,
-  TASK_SUBMIT: (id: string) => `${API_BASE_URL}/tasks/${id}/submit`,
-  TASK_REVIEW: (id: string) => `${API_BASE_URL}/tasks/${id}/review`,
-  TASK_UPDATE_DESCRIPTION: (id: string) => `${API_BASE_URL}/tasks/${id}/description`,
+  TASKS: buildApiUrl("/tasks"),
+  TASK_BY_ID: (id: string) => buildApiUrl(`/tasks/${id}`),
+  TASK_SUBMIT: (id: string) => buildApiUrl(`/tasks/${id}/submit`),
+  TASK_REVIEW: (id: string) => buildApiUrl(`/tasks/${id}/review`),
+  TASK_UPDATE_DESCRIPTION: (id: string) =>
+    buildApiUrl(`/tasks/${id}/description`),
 
   // Resources
-  RESOURCES: `${API_BASE_URL}/resources`,
-  RESOURCE_BY_ID: (id: string) => `${API_BASE_URL}/resources/${id}`,
+  RESOURCES: buildApiUrl("/resources"),
+  RESOURCE_BY_ID: (id: string) => buildApiUrl(`/resources/${id}`),
 
   // Users
-  USERS: `${API_BASE_URL}/users`,
-  USER_BY_ID: (id: string) => `${API_BASE_URL}/users/${id}`,
+  USERS: buildApiUrl("/users"),
+  USER_BY_ID: (id: string) => buildApiUrl(`/users/${id}`),
 
   // Mentors
-  MENTORS: `${API_BASE_URL}/mentors`,
-  MENTOR_BY_ID: (id: string) => `${API_BASE_URL}/mentors/${id}`,
+  MENTORS: buildApiUrl("/mentors"),
+  MENTOR_BY_ID: (id: string) => buildApiUrl(`/mentors/${id}`),
 
   // Mentees
-  MENTEES: `${API_BASE_URL}/mentees`,
-  MENTEE_BY_ID: (id: string) => `${API_BASE_URL}/mentees/${id}`,
+  MENTEES: buildApiUrl("/mentees"),
+  MENTEE_BY_ID: (id: string) => buildApiUrl(`/mentees/${id}`),
 };
 
 // Generic fetch wrapper with error handling

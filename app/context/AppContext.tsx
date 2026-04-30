@@ -63,6 +63,28 @@ export type Phase = {
   tasks: Task[];
 };
 
+export type ProfileData = {
+  firstName: string;
+  lastName: string;
+  profilePicture: string | null;
+  resume: string | null;
+  headline: string;
+  bio: string;
+  goals: string;
+  industries: string[];
+  skills: string[];
+  links: string[];
+};
+
+export type QuestionnaireAnswers = {
+  mentoringComfort: number;
+  industry: string;
+  mentorIndustry: string;
+  mentorSkillset: string;
+  developmentGoal: string;
+  holdingBack: string;
+};
+
 type AppContextValue = {
   userRole: UserRole;
   toggleRole: () => void;
@@ -71,6 +93,12 @@ type AppContextValue = {
   xpGoal: number;
   phases: Phase[];
   loading: boolean;
+  profileData: ProfileData;
+  setProfileData: React.Dispatch<React.SetStateAction<ProfileData>>;
+  questionnaireAnswers: QuestionnaireAnswers;
+  setQuestionnaireAnswers: React.Dispatch<
+    React.SetStateAction<QuestionnaireAnswers>
+  >;
 
   // PHASE
   addPhase: (name: string, startDate: string, endDate: string) => Promise<void>;
@@ -178,6 +206,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [phases, setPhases] = useState<Phase[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalXP, setTotalXP] = useState(0);
+  const [profileData, setProfileData] = useState<ProfileData>({
+    firstName: "",
+    lastName: "",
+    profilePicture: null,
+    resume: null,
+    headline: "",
+    bio: "",
+    goals: "",
+    industries: [],
+    skills: [],
+    links: [],
+  });
+  const [questionnaireAnswers, setQuestionnaireAnswers] =
+    useState<QuestionnaireAnswers>({
+      mentoringComfort: 5,
+      industry: "",
+      mentorIndustry: "",
+      mentorSkillset: "",
+      developmentGoal: "",
+      holdingBack: "",
+    });
 
   const mentorshipId = "69e27a39b628f49f70d766db";
   const xpGoal = 2000;
@@ -344,6 +393,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       xpGoal,
       phases,
       loading,
+      profileData,
+      setProfileData,
+      questionnaireAnswers,
+      setQuestionnaireAnswers,
 
       addPhase,
       editPhase,
@@ -360,7 +413,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       refreshPhases,
     }),
-    [userRole, totalXP, xpGoal, phases, loading],
+    [
+      userRole,
+      totalXP,
+      xpGoal,
+      phases,
+      loading,
+      profileData,
+      questionnaireAnswers,
+    ],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

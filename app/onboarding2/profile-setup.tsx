@@ -10,10 +10,16 @@ import {
   ScrollView,
   Alert,
 } from "react-native";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useApp } from "../context/AppContext";
-const defaultProfile = {
+import {
+  type ProfileData,
+  useApp,
+} from "../context/AppContext";
+
+const ONBOARDING_HUB_ROUTE: Href = "/onboarding2";
+
+const defaultProfile: ProfileData = {
   firstName: "",
   lastName: "",
   bio: "",
@@ -25,7 +31,10 @@ const defaultProfile = {
   profilePicture: null,
   resume: null,
 };
+
 export default function ProfileSetup() {
+  const { profileData, setProfileData, questionnaireAnswers } = useApp();
+
   const pickProfileImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -40,7 +49,7 @@ export default function ProfileSetup() {
     });
 
     if (!result.canceled) {
-      setFormData((prev) => ({
+      setFormData((prev: ProfileData) => ({
         ...prev,
         profilePicture: result.assets[0].uri,
       }));
@@ -53,15 +62,13 @@ export default function ProfileSetup() {
     });
 
     if (result.canceled === false) {
-      setFormData((prev) => ({
+      setFormData((prev: ProfileData) => ({
         ...prev,
         resume: result.assets[0].uri,
       }));
     }
   };
 
-  const app = useApp();
-  const { profileData, setProfileData, questionnaireAnswers } = useApp();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(profileData || defaultProfile);
   const [tempIndustry, setTempIndustry] = useState("");
@@ -71,13 +78,13 @@ export default function ProfileSetup() {
   const hasProfile =
     profileData?.firstName || profileData?.lastName || profileData?.bio;
 
-  const handleInputChange = (field: keyof typeof formData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: keyof ProfileData, value: string) => {
+    setFormData((prev: ProfileData) => ({ ...prev, [field]: value }));
   };
 
   const addIndustry = () => {
     if (tempIndustry.trim()) {
-      setFormData((prev) => ({
+      setFormData((prev: ProfileData) => ({
         ...prev,
         industries: [...prev.industries, tempIndustry.trim()],
       }));
@@ -86,15 +93,17 @@ export default function ProfileSetup() {
   };
 
   const removeIndustry = (index: number) => {
-    setFormData((prev) => ({
+    setFormData((prev: ProfileData) => ({
       ...prev,
-      industries: prev.industries.filter((_, i) => i !== index),
+      industries: prev.industries.filter(
+        (_industry: string, i: number) => i !== index,
+      ),
     }));
   };
 
   const addSkill = () => {
     if (tempSkill.trim()) {
-      setFormData((prev) => ({
+      setFormData((prev: ProfileData) => ({
         ...prev,
         skills: [...prev.skills, tempSkill.trim()],
       }));
@@ -103,15 +112,15 @@ export default function ProfileSetup() {
   };
 
   const removeSkill = (index: number) => {
-    setFormData((prev) => ({
+    setFormData((prev: ProfileData) => ({
       ...prev,
-      skills: prev.skills.filter((_, i) => i !== index),
+      skills: prev.skills.filter((_skill: string, i: number) => i !== index),
     }));
   };
 
   const addLink = () => {
     if (tempLink.trim()) {
-      setFormData((prev) => ({
+      setFormData((prev: ProfileData) => ({
         ...prev,
         links: [...prev.links, tempLink.trim()],
       }));
@@ -120,9 +129,9 @@ export default function ProfileSetup() {
   };
 
   const removeLink = (index: number) => {
-    setFormData((prev) => ({
+    setFormData((prev: ProfileData) => ({
       ...prev,
-      links: prev.links.filter((_, i) => i !== index),
+      links: prev.links.filter((_link: string, i: number) => i !== index),
     }));
   };
 
@@ -137,7 +146,7 @@ export default function ProfileSetup() {
     Alert.alert("Success", "Profile saved successfully!");
 
     // ✅ go back to hub
-    router.replace("/onboarding2");
+    router.replace(ONBOARDING_HUB_ROUTE);
   };
 
   const handleCancel = () => {
@@ -197,7 +206,7 @@ export default function ProfileSetup() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Industry Interests</Text>
               <View style={styles.tagContainer}>
-                {profileData.industries.map((ind, i) => (
+                {profileData.industries.map((ind: string, i: number) => (
                   <View key={i} style={styles.tag}>
                     <Text style={styles.tagText}>{ind}</Text>
                   </View>
@@ -210,7 +219,7 @@ export default function ProfileSetup() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Desired Skills</Text>
               <View style={styles.tagContainer}>
-                {profileData.skills.map((skill, i) => (
+                {profileData.skills.map((skill: string, i: number) => (
                   <View key={i} style={styles.tag}>
                     <Text style={styles.tagText}>{skill}</Text>
                   </View>
@@ -222,7 +231,7 @@ export default function ProfileSetup() {
           {profileData.links.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Social Links</Text>
-              {profileData.links.map((link, i) => (
+              {profileData.links.map((link: string, i: number) => (
                 <Text key={i} style={styles.linkText}>
                   • {link}
                 </Text>
@@ -292,7 +301,7 @@ export default function ProfileSetup() {
         <View style={styles.actions}>
           <Pressable
             style={styles.button}
-            onPress={() => router.push("/onboarding2")}
+            onPress={() => router.push(ONBOARDING_HUB_ROUTE)}
           >
             <Text style={styles.buttonText}>Next: Connect</Text>
           </Pressable>
@@ -399,7 +408,7 @@ export default function ProfileSetup() {
           </Pressable>
         </View>
         <View style={styles.tagContainer}>
-          {formData.industries.map((ind, i) => (
+          {formData.industries.map((ind: string, i: number) => (
             <View key={i} style={styles.tag}>
               <Text style={styles.tagText}>{ind}</Text>
               <Pressable onPress={() => removeIndustry(i)}>
@@ -425,7 +434,7 @@ export default function ProfileSetup() {
           </Pressable>
         </View>
         <View style={styles.tagContainer}>
-          {formData.skills.map((skill, i) => (
+          {formData.skills.map((skill: string, i: number) => (
             <View key={i} style={styles.tag}>
               <Text style={styles.tagText}>{skill}</Text>
               <Pressable onPress={() => removeSkill(i)}>
@@ -451,7 +460,7 @@ export default function ProfileSetup() {
           </Pressable>
         </View>
         <View style={styles.tagContainer}>
-          {formData.links.map((link, i) => (
+          {formData.links.map((link: string, i: number) => (
             <View key={i} style={styles.linkTag}>
               <Text style={styles.linkTagText}>{link}</Text>
               <Pressable onPress={() => removeLink(i)}>
@@ -477,7 +486,7 @@ export default function ProfileSetup() {
 
         <Pressable
           style={[styles.button, styles.secondary]}
-          onPress={() => router.push("/onboarding2")}
+          onPress={() => router.push(ONBOARDING_HUB_ROUTE)}
         >
           <Text style={styles.secondaryText}>Back to Onboarding 2</Text>
         </Pressable>

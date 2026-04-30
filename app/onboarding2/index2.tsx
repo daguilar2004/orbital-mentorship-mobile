@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 
 const CircleButton = ({
   label,
@@ -10,7 +10,7 @@ const CircleButton = ({
 }: {
   label: string;
   icon: any;
-  to: string;
+  to: Href;
 }) => (
   <Pressable style={styles.circleWrap} onPress={() => router.push(to)}>
     <View style={styles.circle}>
