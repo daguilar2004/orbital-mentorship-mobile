@@ -8,7 +8,8 @@ import { StyleSheet, Switch, Text, View } from "react-native";
 import "react-native-gesture-handler";
 
 import { AppProvider, useApp } from "../context/AppContext";
-import { Auth0AppProvider } from "../context/Auth0Provider";
+// import { Auth0AppProvider } from "../context/Auth0Provider";
+import { Auth0WebProvider } from "../context/Auth0WebProvider";
 
 function CustomDrawerContent(props: any) {
   const { userRole, toggleRole } = useApp();
@@ -100,11 +101,11 @@ function AppDrawer() {
 
 export default function Layout() {
   return (
-    <Auth0AppProvider>
+    <Auth0WebProvider>
       <AppProvider>
         <AppDrawer />
       </AppProvider>
-    </Auth0AppProvider>
+    </Auth0WebProvider>
   );
 }
 
