@@ -9,7 +9,7 @@ import {
     Text,
     View,
 } from "react-native";
-import { useApp } from "../context/AppContext";
+import { useApp } from "./context/AppContext";
 
 export default function OffboardingScreen() {
   const { userRole, phases, totalXP } = useApp();
