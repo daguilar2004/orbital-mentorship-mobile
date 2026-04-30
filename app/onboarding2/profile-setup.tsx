@@ -88,11 +88,6 @@ export default function ProfileSetup() {
     Alert.alert("Success", "Profile saved successfully!");
   };
 
-  const handleCancel = () => {
-    setFormData(profileData);
-    setIsEditing(false);
-  };
-
   const handleEdit = () => {
     setFormData(profileData);
     setIsEditing(true);
@@ -244,6 +239,13 @@ export default function ProfileSetup() {
           >
             <Text style={styles.buttonText}>Next: Connect</Text>
           </Pressable>
+
+          <Pressable
+          style={[styles.button, styles.secondary]}
+          onPress={() => router.push("/onboarding2/questionnaire")}
+        >
+          <Text style={styles.secondaryText}>Back to Onboarding 2</Text>
+        </Pressable>
         </View>
       </ScrollView>
     );
@@ -418,14 +420,7 @@ export default function ProfileSetup() {
 
         <Pressable
           style={[styles.button, styles.secondary]}
-          onPress={handleCancel}
-        >
-          <Text style={styles.secondaryText}>Cancel</Text>
-        </Pressable>
-
-        <Pressable
-          style={[styles.button, styles.secondary]}
-          onPress={() => router.push("/onboarding2")}
+          onPress={() => router.push("/onboarding2/questionnaire")}
         >
           <Text style={styles.secondaryText}>Back to Onboarding 2</Text>
         </Pressable>

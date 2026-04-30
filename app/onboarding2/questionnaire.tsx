@@ -74,7 +74,7 @@ export default function Questionnaire() {
       setShowDropdown(false);
     } else {
       // ✅ go back to hub after finishing
-      router.replace("/onboarding2");
+      router.replace("/onboarding2/profile-setup");
     }
   };
 
@@ -82,6 +82,9 @@ export default function Questionnaire() {
     if (currentQ > 1) {
       setCurrentQ(currentQ - 1);
       setShowDropdown(false);
+    }
+    else {
+      router.push("/onboarding2/role-selection");
     }
   };
 
@@ -283,17 +286,16 @@ export default function Questionnaire() {
       {/* Navigation */}
       <View style={styles.footer}>
         <Pressable
-          style={[styles.navButton, currentQ === 1 && styles.navButtonDisabled]}
+          style={[styles.navButton]}
           onPress={handlePrev}
-          disabled={currentQ === 1}
         >
           <Ionicons
             name="chevron-back"
             size={20}
-            color={currentQ === 1 ? "#CCC" : "#7C3AED"}
+            color={ "#7C3AED"}
           />
           <Text
-            style={[styles.navText, currentQ === 1 && styles.navTextDisabled]}
+            style={[styles.navText]}
           >
             Previous
           </Text>

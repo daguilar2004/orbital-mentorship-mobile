@@ -13,14 +13,14 @@ export default function Connect() {
       <View style={styles.actions}>
         <Pressable
           style={styles.button}
-          onPress={() => router.replace("/onboarding2")}
+          onPress={() => router.replace("/")}
         >
           <Text style={styles.buttonText}>Finish Onboarding</Text>
         </Pressable>
 
         <Pressable
           style={[styles.button, styles.secondary]}
-          onPress={() => router.push("/onboarding2")}
+          onPress={() => router.push("/onboarding2/profile-setup")}
         >
           <Text style={styles.secondaryText}>Back to Onboarding 2</Text>
         </Pressable>
