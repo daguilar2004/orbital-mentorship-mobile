@@ -1,14 +1,14 @@
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
   Pressable,
-  TextInput,
   ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
-import { router } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 
 const INDUSTRIES = [
   "Technology",
@@ -74,7 +74,7 @@ export default function Questionnaire() {
       setShowDropdown(false);
     } else {
       // ✅ go back to hub after finishing
-      router.replace("/onboarding2");
+      router.replace("/onboarding2/profile-setup");
     }
   };
 
@@ -82,6 +82,9 @@ export default function Questionnaire() {
     if (currentQ > 1) {
       setCurrentQ(currentQ - 1);
       setShowDropdown(false);
+    }
+    else {
+      router.push("/onboarding2/role-selection");
     }
   };
 
@@ -157,7 +160,7 @@ export default function Questionnaire() {
               <Ionicons
                 name={showDropdown ? "chevron-up" : "chevron-down"}
                 size={24}
-                color="#7C3AED"
+                color="#0b0c67"
               />
             </Pressable>
 
@@ -283,17 +286,16 @@ export default function Questionnaire() {
       {/* Navigation */}
       <View style={styles.footer}>
         <Pressable
-          style={[styles.navButton, currentQ === 1 && styles.navButtonDisabled]}
+          style={[styles.navButton]}
           onPress={handlePrev}
-          disabled={currentQ === 1}
         >
           <Ionicons
             name="chevron-back"
             size={20}
-            color={currentQ === 1 ? "#CCC" : "#7C3AED"}
+            color={ "#0b0c67"}
           />
           <Text
-            style={[styles.navText, currentQ === 1 && styles.navTextDisabled]}
+            style={[styles.navText]}
           >
             Previous
           </Text>
@@ -318,7 +320,7 @@ export default function Questionnaire() {
           <Ionicons
             name="chevron-forward"
             size={20}
-            color={!isCurrentAnswerValid() ? "#CCC" : "#7C3AED"}
+            color={!isCurrentAnswerValid() ? "#CCC" : "#0b0c67"}
           />
         </Pressable>
       </View>
@@ -351,7 +353,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   scaleLabel: { fontSize: 13, color: "#6B7280", fontWeight: "500" },
-  scaleValue: { fontSize: 24, fontWeight: "700", color: "#7C3AED" },
+  scaleValue: { fontSize: 24, fontWeight: "700", color: "#0b0c67" },
   numericControl: {
     flexDirection: "row",
     alignItems: "center",
@@ -388,7 +390,7 @@ const styles = StyleSheet.create({
   },
   dropdownItem: { paddingHorizontal: 14, paddingVertical: 12 },
   dropdownItemText: { fontSize: 14, color: "#6B7280" },
-  dropdownItemSelected: { color: "#7C3AED", fontWeight: "600" },
+  dropdownItemSelected: { color: "#0b0c67", fontWeight: "600" },
   textarea: {
     borderWidth: 1,
     borderColor: "#D1D5DB",
@@ -417,10 +419,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#7C3AED",
+    borderColor: "#0b0c67",
     gap: 6,
   },
   navButtonDisabled: { borderColor: "#CCC", opacity: 0.5 },
-  navText: { fontSize: 14, fontWeight: "600", color: "#7C3AED" },
+  navText: { fontSize: 14, fontWeight: "600", color: "#0b0c67" },
   navTextDisabled: { color: "#CCC" },
 });

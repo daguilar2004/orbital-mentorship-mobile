@@ -17,6 +17,14 @@ export default function RoleSelection() {
       setStep(2);
     } else {
       // Final step → navigate somewhere
+      router.push("/onboarding2/questionnaire"); // or wherever you want
+    }
+  };
+  const handleBack = () => {
+    if (step === 2) {
+      setStep(1);
+    } else {
+      // Final step → navigate somewhere
       router.push("/onboarding2"); // or wherever you want
     }
   };
@@ -123,7 +131,7 @@ export default function RoleSelection() {
 
         <Pressable
           style={[styles.button, styles.secondary]}
-          onPress={() => router.push("/onboarding2")}
+          onPress={handleBack}
         >
           <Text style={styles.secondaryText}>Back to Onboarding 2</Text>
         </Pressable>
@@ -138,7 +146,7 @@ const styles = StyleSheet.create({
   subtitle: { color: "#6B7280", marginBottom: 24 },
   actions: { marginTop: 20 },
   button: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#0b0c67",
     padding: 14,
     borderRadius: 10,
     alignItems: "center",
@@ -161,7 +169,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   optionSelected: {
-    borderColor: "#7C3AED",
+    borderColor: "#0b0c67",
     backgroundColor: "#F3E8FF",
   },
   optionTitle: {

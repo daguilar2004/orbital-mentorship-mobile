@@ -1,12 +1,12 @@
 import axios from "axios";
-const API_URL = import.meta.env.VITE_APP_SERVER_URL;
+import { API_BASE_URL } from "./index";
 
 
 
 export const getModuleProgress = async (mentorshipId,role, token ) => {
     try{
        
-        const res = await fetch(`${API_URL}/api/mentorships/${mentorshipId}/modules/progress?role=${role}`, {
+        const res = await fetch(`${API_BASE_URL}/api/mentorships/${mentorshipId}/modules/progress?role=${role}`, {
             method: "GET",
             headers: {
                 "Authorization": token,
@@ -30,7 +30,7 @@ export const getModuleProgress = async (mentorshipId,role, token ) => {
 export const getLevelProgress = async (mentorshipId,moduleId,token) => {
     try{
         
-        const res = await fetch(`${API_URL}/api/mentorships/${mentorshipId}/modules/${moduleId}/levels/progress`, {
+        const res = await fetch(`${API_BASE_URL}/api/mentorships/${mentorshipId}/modules/${moduleId}/levels/progress`, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
@@ -54,7 +54,7 @@ export const getMentorData = async (mentorId, token) => {
     try {
         const id = mentorId.userId || mentorId; // Check if mentorId is an object or a string
         
-        const res = await fetch(`${API_URL}/api/mentors/${id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/mentors/${id}`, {
             method: "GET",
             headers: {
                 "Authorization": `Bearer ${token}`,
@@ -82,7 +82,7 @@ export const getMenteeData = async (menteeId, token) => {
         const id = menteeId.userId || menteeId; // Check if menteeId is an object or a string
         
         
-        const res = await fetch(`${API_URL}/api/mentees/${id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/mentees/${id}`, {
             method: "GET",
             headers: {
                 "Authorization": `Bearer ${token}`,
@@ -107,7 +107,7 @@ export const getMenteeData = async (menteeId, token) => {
 export const getUserXP = async (mentorshipId, role, token) => {
     try{
         const id = mentorshipId;
-        const res = await fetch(`${API_URL}/api/mentorships/${id}/${role}/xp`, {
+        const res = await fetch(`${API_BASE_URL}/api/mentorships/${id}/${role}/xp`, {
             method: "GET",
             headers: {
                 "Authorization": `Bearer ${token}`,
@@ -131,7 +131,7 @@ export const getUserXP = async (mentorshipId, role, token) => {
 
 export const submitLevel = async (mentorshipId, moduleId, levelOrder, responses, token) => {
   try {
-    const res = await fetch(`${API_URL}/api/mentorships/${mentorshipId}/modules/${moduleId}/levels/${levelOrder}`, {
+    const res = await fetch(`${API_BASE_URL}/api/mentorships/${mentorshipId}/modules/${moduleId}/levels/${levelOrder}`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,   // ✅ Fixed casing
@@ -152,7 +152,7 @@ export const submitLevel = async (mentorshipId, moduleId, levelOrder, responses,
 
 export const submitModule = async (mentorshipId, moduleId, token) => {
   try {
-    const res = await fetch(`${API_URL}/api/mentorships/${mentorshipId}/modules/${moduleId}`, {
+    const res = await fetch(`${API_BASE_URL}/api/mentorships/${mentorshipId}/modules/${moduleId}`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,   // ✅ Fixed casing
@@ -172,7 +172,7 @@ export const submitModule = async (mentorshipId, moduleId, token) => {
 
 export const createMentorship = async (mentorId, menteeId, token ) => {
     try{
-        const res = await fetch(`${API_URL}/api/mentorships`, {
+        const res = await fetch(`${API_BASE_URL}/api/mentorships`, {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${token}`,
@@ -202,7 +202,7 @@ export const mentorshipRequest = async (mentorId, token) => {
             throw new Error("mentorId not given ")
         }
 
-        const res = await fetch(`${API_URL}/api/mentorship-requests/`, {
+        const res = await fetch(`${API_BASE_URL}/api/mentorship-requests/`, {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${token}`,
