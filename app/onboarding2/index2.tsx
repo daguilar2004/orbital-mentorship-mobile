@@ -1,6 +1,7 @@
+import React from "react";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, type Href } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
 
 const CircleButton = ({
   label,
@@ -70,7 +71,7 @@ const styles = StyleSheet.create({
     width: 110,
     height: 110,
     borderRadius: 55,
-    backgroundColor: "#0b0c67",
+    backgroundColor: "#7C3AED",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 10,

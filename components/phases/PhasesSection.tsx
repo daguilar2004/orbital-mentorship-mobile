@@ -12,8 +12,9 @@ type PhasesSectionProps = {
   togglePhase: (phase: Phase) => void;
   setAddingPhase: React.Dispatch<React.SetStateAction<boolean>>;
   openTask: (phase: Phase, task: Task) => void;
-  deleteTask: (phaseId: string, taskId: string) => void;
-  setAddingTaskToPhaseId: React.Dispatch<React.SetStateAction<string | null>>;
+  deleteTask: (taskId: string) => void;
+  onEditTask: (phase: Phase, task: Task) => void;
+  openTaskFormForPhase: (phaseId: string) => void;
   setEditingPhaseId: React.Dispatch<React.SetStateAction<string | null>>;
   setNewPhaseName: React.Dispatch<React.SetStateAction<string>>;
   setNewPhaseDescription: React.Dispatch<React.SetStateAction<string>>;
@@ -35,17 +36,12 @@ export default function PhasesSection({
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionTitle}>Phases</Text>
 
-        {userRole === "mentee" && (
-          <Pressable
-            onPress={() => setAddingPhase(true)}
-            style={({ pressed }) => [
-              styles.addButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Ionicons name="add-circle" size={24} color="#FF3B89" />
-          </Pressable>
-        )}
+        <Pressable
+          onPress={() => setAddingPhase(true)}
+          style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
+        >
+          <Ionicons name="add-circle" size={24} color="#FF3B89" />
+        </Pressable>
       </View>
 
       <View style={{ gap: 12 }}>

@@ -19,17 +19,13 @@ type TaskDetailsCardProps = {
   userRole: UserRole;
   draftDesc: string;
   setDraftDesc: React.Dispatch<React.SetStateAction<string>>;
-  updateTaskDescription: (
-    phaseId: string,
-    taskId: string,
-    description: string,
-  ) => void;
+  updateTaskDescription: (taskId: string, description: string) => void;
 };
 
 export default function TaskDetailsCard({
   activeTask,
   activePhase,
-  userRole,
+  userRole: _userRole,
   draftDesc,
   setDraftDesc,
   updateTaskDescription,
@@ -38,35 +34,23 @@ export default function TaskDetailsCard({
     <View style={styles.modalCard}>
       <Text style={styles.cardHeading}>Task Description</Text>
 
-      {userRole === "mentor" ? (
-        <>
-          <TextInput
-            value={draftDesc}
-            onChangeText={setDraftDesc}
-            multiline
-            style={styles.textArea}
-            placeholder="Write the task description…"
-            placeholderTextColor="#6B7280"
-          />
-          <Pressable
-            style={styles.primaryBtn}
-            onPress={() => {
-              if (!activePhase || !activeTask) return;
-              updateTaskDescription(
-                activePhase.id,
-                activeTask.id,
-                draftDesc.trim(),
-              );
-            }}
-          >
-            <Text style={styles.primaryBtnText}>Save Description</Text>
-          </Pressable>
-        </>
-      ) : (
-        <Text style={styles.bodyText}>
-          {activeTask?.description || "No description."}
-        </Text>
-      )}
+      <TextInput
+        value={draftDesc}
+        onChangeText={setDraftDesc}
+        multiline
+        style={styles.textArea}
+        placeholder="Write the task description..."
+        placeholderTextColor="#6B7280"
+      />
+      <Pressable
+        style={styles.primaryBtn}
+        onPress={() => {
+          if (!activePhase || !activeTask) return;
+          updateTaskDescription(activeTask.id, draftDesc.trim());
+        }}
+      >
+        <Text style={styles.primaryBtnText}>Save Description</Text>
+      </Pressable>
 
       {activeTask?.skills && activeTask.skills.length > 0 && (
         <View style={{ marginTop: 16 }}>
@@ -149,7 +133,7 @@ export default function TaskDetailsCard({
 
       <View style={styles.metaRow}>
         <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-        <Text style={styles.metaText}>Due: {activeTask?.dueDate}</Text>
+        <Text style={styles.metaText}>Due: {activeTask?.dueDateFormatted}</Text>
 
         <Ionicons name="ribbon-outline" size={16} color="#6B7280" />
         <Text

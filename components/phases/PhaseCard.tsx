@@ -14,8 +14,9 @@ type PhaseCardProps = {
   togglePhase: (phase: Phase) => void;
   setAddingPhase: React.Dispatch<React.SetStateAction<boolean>>;
   openTask: (phase: Phase, task: Task) => void;
-  deleteTask: (phaseId: string, taskId: string) => void;
-  setAddingTaskToPhaseId: React.Dispatch<React.SetStateAction<string | null>>;
+  deleteTask: (taskId: string) => void;
+  onEditTask: (phase: Phase, task: Task) => void;
+  openTaskFormForPhase: (phaseId: string) => void;
   setEditingPhaseId: React.Dispatch<React.SetStateAction<string | null>>;
   setNewPhaseName: React.Dispatch<React.SetStateAction<string>>;
   setNewPhaseDescription: React.Dispatch<React.SetStateAction<string>>;

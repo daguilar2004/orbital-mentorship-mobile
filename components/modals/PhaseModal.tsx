@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -16,18 +16,28 @@ import PhaseModalActions from "./PhaseModalActions";
 type PhaseModalProps = {
   addingPhase: boolean;
   editingPhaseId: string | null;
+
   newPhaseName: string;
   setNewPhaseName: React.Dispatch<React.SetStateAction<string>>;
+
   newPhaseDescription: string;
   setNewPhaseDescription: React.Dispatch<React.SetStateAction<string>>;
+
   newPhaseStart: string;
   setNewPhaseStart: React.Dispatch<React.SetStateAction<string>>;
+
   newPhaseEnd: string;
   setNewPhaseEnd: React.Dispatch<React.SetStateAction<string>>;
+
   setAddingPhase: React.Dispatch<React.SetStateAction<boolean>>;
   setEditingPhaseId: React.Dispatch<React.SetStateAction<string | null>>;
-  addPhase: (name: string, startDate: string, endDate: string) => void;
-  editPhase: (
+
+  addPhase?: (
+    name: string,
+    startDate: string,
+    endDate: string,
+  ) => Promise<void>;
+  editPhase?: (
     id: string,
     name: string,
     startDate: string,
@@ -38,19 +48,27 @@ type PhaseModalProps = {
 export default function PhaseModal({
   addingPhase,
   editingPhaseId,
+
   newPhaseName,
   setNewPhaseName,
+
   newPhaseDescription,
   setNewPhaseDescription,
+
   newPhaseStart,
   setNewPhaseStart,
+
   newPhaseEnd,
   setNewPhaseEnd,
+
   setAddingPhase,
   setEditingPhaseId,
+
   addPhase,
   editPhase,
 }: PhaseModalProps) {
+  const [saving, setSaving] = useState(false);
+
   const resetPhaseForm = () => {
     setAddingPhase(false);
     setEditingPhaseId(null);
@@ -60,16 +78,26 @@ export default function PhaseModal({
     setNewPhaseEnd("");
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!newPhaseName.trim()) return;
 
-    if (editingPhaseId) {
-      editPhase(editingPhaseId, newPhaseName, newPhaseStart, newPhaseEnd);
-    } else {
-      addPhase(newPhaseName, newPhaseStart, newPhaseEnd);
-    }
+    try {
+      setSaving(true);
 
-    resetPhaseForm();
+      if (editingPhaseId && editPhase) {
+        editPhase(editingPhaseId, newPhaseName, newPhaseStart, newPhaseEnd);
+      } else if (addPhase) {
+        await addPhase(newPhaseName, newPhaseStart, newPhaseEnd);
+      } else {
+        console.error("addPhase is not defined");
+      }
+
+      resetPhaseForm();
+    } catch (err) {
+      console.error("Error saving phase:", err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

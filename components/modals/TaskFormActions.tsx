@@ -14,7 +14,12 @@ export default function TaskFormActions({
 }: TaskFormActionsProps) {
   return (
     <View style={styles.rowGap}>
-      <Pressable style={styles.primaryBtn} onPress={onSave}>
+      <Pressable
+        style={styles.primaryBtn}
+        onPress={() => {
+          void onSave();
+        }}
+      >
         <Text style={styles.primaryBtnText}>
           {editingTaskId ? "Update Task" : "Add Task"}
         </Text>

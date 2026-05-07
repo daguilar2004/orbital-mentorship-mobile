@@ -9,8 +9,9 @@ type PhaseTaskListProps = {
   phase: Phase;
   userRole: UserRole;
   openTask: (phase: Phase, task: Task) => void;
-  deleteTask: (phaseId: string, taskId: string) => void;
-  setAddingTaskToPhaseId: React.Dispatch<React.SetStateAction<string | null>>;
+  deleteTask: (taskId: string) => void;
+  onEditTask: (phase: Phase, task: Task) => void;
+  openTaskFormForPhase: (phaseId: string) => void;
 };
 
 export default function PhaseTaskList({
@@ -18,7 +19,8 @@ export default function PhaseTaskList({
   userRole,
   openTask,
   deleteTask,
-  setAddingTaskToPhaseId,
+  onEditTask,
+  openTaskFormForPhase,
 }: PhaseTaskListProps) {
   return (
     <View style={styles.phaseBody}>
@@ -29,22 +31,18 @@ export default function PhaseTaskList({
           phase={phase}
           userRole={userRole}
           openTask={openTask}
-          deleteTask={deleteTask}
+          deleteTask={(taskId) => deleteTask(taskId)}
+          onEditTask={onEditTask}
         />
       ))}
 
-      {userRole === "mentee" && (
-        <Pressable
-          onPress={() => setAddingTaskToPhaseId(phase.id)}
-          style={({ pressed }) => [
-            styles.addTaskButton,
-            pressed && styles.pressed,
-          ]}
-        >
-          <Ionicons name="add" size={18} color="white" />
-          <Text style={styles.addTaskButtonText}>Add Task</Text>
-        </Pressable>
-      )}
+      <Pressable
+        onPress={() => openTaskFormForPhase(phase.id)}
+        style={({ pressed }) => [styles.addTaskButton, pressed && styles.pressed]}
+      >
+        <Ionicons name="add" size={18} color="white" />
+        <Text style={styles.addTaskButtonText}>Add Task</Text>
+      </Pressable>
     </View>
   );
 }
