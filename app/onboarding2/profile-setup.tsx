@@ -1,90 +1,35 @@
-import React, { useState } from "react";
-import * as ImagePicker from "expo-image-picker";
-import * as DocumentPicker from "expo-document-picker";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  TextInput,
-  ScrollView,
-  Alert,
-} from "react-native";
-import { router, type Href } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { useState } from "react";
 import {
-  type ProfileData,
-  useApp,
-} from "../context/AppContext";
-
-const ONBOARDING_HUB_ROUTE: Href = "/onboarding2";
-
-const defaultProfile: ProfileData = {
-  firstName: "",
-  lastName: "",
-  bio: "",
-  headline: "",
-  goals: "",
-  industries: [],
-  skills: [],
-  links: [],
-  profilePicture: null,
-  resume: null,
-};
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useApp } from "../context/AppContext";
 
 export default function ProfileSetup() {
   const { profileData, setProfileData, questionnaireAnswers } = useApp();
-
-  const pickProfileImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert("Permission required", "Allow access to photos");
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setFormData((prev: ProfileData) => ({
-        ...prev,
-        profilePicture: result.assets[0].uri,
-      }));
-    }
-  };
-
-  const pickResume = async () => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: "*/*",
-    });
-
-    if (result.canceled === false) {
-      setFormData((prev: ProfileData) => ({
-        ...prev,
-        resume: result.assets[0].uri,
-      }));
-    }
-  };
-
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState(profileData || defaultProfile);
+  const [formData, setFormData] = useState(profileData);
   const [tempIndustry, setTempIndustry] = useState("");
   const [tempSkill, setTempSkill] = useState("");
   const [tempLink, setTempLink] = useState("");
 
   const hasProfile =
-    profileData?.firstName || profileData?.lastName || profileData?.bio;
+    profileData.firstName || profileData.lastName || profileData.bio;
 
-  const handleInputChange = (field: keyof ProfileData, value: string) => {
-    setFormData((prev: ProfileData) => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: keyof typeof formData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const addIndustry = () => {
     if (tempIndustry.trim()) {
-      setFormData((prev: ProfileData) => ({
+      setFormData((prev) => ({
         ...prev,
         industries: [...prev.industries, tempIndustry.trim()],
       }));
@@ -93,17 +38,15 @@ export default function ProfileSetup() {
   };
 
   const removeIndustry = (index: number) => {
-    setFormData((prev: ProfileData) => ({
+    setFormData((prev) => ({
       ...prev,
-      industries: prev.industries.filter(
-        (_industry: string, i: number) => i !== index,
-      ),
+      industries: prev.industries.filter((_, i) => i !== index),
     }));
   };
 
   const addSkill = () => {
     if (tempSkill.trim()) {
-      setFormData((prev: ProfileData) => ({
+      setFormData((prev) => ({
         ...prev,
         skills: [...prev.skills, tempSkill.trim()],
       }));
@@ -112,15 +55,15 @@ export default function ProfileSetup() {
   };
 
   const removeSkill = (index: number) => {
-    setFormData((prev: ProfileData) => ({
+    setFormData((prev) => ({
       ...prev,
-      skills: prev.skills.filter((_skill: string, i: number) => i !== index),
+      skills: prev.skills.filter((_, i) => i !== index),
     }));
   };
 
   const addLink = () => {
     if (tempLink.trim()) {
-      setFormData((prev: ProfileData) => ({
+      setFormData((prev) => ({
         ...prev,
         links: [...prev.links, tempLink.trim()],
       }));
@@ -129,9 +72,9 @@ export default function ProfileSetup() {
   };
 
   const removeLink = (index: number) => {
-    setFormData((prev: ProfileData) => ({
+    setFormData((prev) => ({
       ...prev,
-      links: prev.links.filter((_link: string, i: number) => i !== index),
+      links: prev.links.filter((_, i) => i !== index),
     }));
   };
 
@@ -142,16 +85,7 @@ export default function ProfileSetup() {
     }
     setProfileData(formData);
     setIsEditing(false);
-
     Alert.alert("Success", "Profile saved successfully!");
-
-    // ✅ go back to hub
-    router.replace(ONBOARDING_HUB_ROUTE);
-  };
-
-  const handleCancel = () => {
-    setFormData(profileData);
-    setIsEditing(false);
   };
 
   const handleEdit = () => {
@@ -166,7 +100,7 @@ export default function ProfileSetup() {
         <View style={styles.header}>
           <Text style={styles.title}>Your Profile</Text>
           <Pressable style={styles.editButton} onPress={handleEdit}>
-            <MaterialIcons name="edit" size={16} color="#7C3AED" />
+            <MaterialIcons name="edit" size={16} color="#0b0c67" />
             <Text style={styles.editButtonText}>Edit Profile</Text>
           </Pressable>
         </View>
@@ -206,7 +140,7 @@ export default function ProfileSetup() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Industry Interests</Text>
               <View style={styles.tagContainer}>
-                {profileData.industries.map((ind: string, i: number) => (
+                {profileData.industries.map((ind, i) => (
                   <View key={i} style={styles.tag}>
                     <Text style={styles.tagText}>{ind}</Text>
                   </View>
@@ -219,7 +153,7 @@ export default function ProfileSetup() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Desired Skills</Text>
               <View style={styles.tagContainer}>
-                {profileData.skills.map((skill: string, i: number) => (
+                {profileData.skills.map((skill, i) => (
                   <View key={i} style={styles.tag}>
                     <Text style={styles.tagText}>{skill}</Text>
                   </View>
@@ -231,7 +165,7 @@ export default function ProfileSetup() {
           {profileData.links.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Social Links</Text>
-              {profileData.links.map((link: string, i: number) => (
+              {profileData.links.map((link, i) => (
                 <Text key={i} style={styles.linkText}>
                   • {link}
                 </Text>
@@ -289,7 +223,7 @@ export default function ProfileSetup() {
 
           {questionnaireAnswers.holdingBack && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>What's Holding You Back</Text>
+              <Text style={styles.sectionTitle}>What&apos;s Holding You Back</Text>
               <Text style={styles.sectionText}>
                 {questionnaireAnswers.holdingBack}
               </Text>
@@ -301,10 +235,17 @@ export default function ProfileSetup() {
         <View style={styles.actions}>
           <Pressable
             style={styles.button}
-            onPress={() => router.push(ONBOARDING_HUB_ROUTE)}
+            onPress={() => router.push("/onboarding2/connect")}
           >
             <Text style={styles.buttonText}>Next: Connect</Text>
           </Pressable>
+
+          <Pressable
+          style={[styles.button, styles.secondary]}
+          onPress={() => router.push("/onboarding2/questionnaire")}
+        >
+          <Text style={styles.secondaryText}>Back to Onboarding 2</Text>
+        </Pressable>
         </View>
       </ScrollView>
     );
@@ -341,7 +282,7 @@ export default function ProfileSetup() {
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>Profile Picture</Text>
-        <Pressable style={styles.fileInput} onPress={pickProfileImage}>
+        <Pressable style={styles.fileInput}>
           <MaterialIcons name="image" size={24} color="#9CA3AF" />
           <Text style={styles.fileInputText}>
             {formData.profilePicture ? "File chosen" : "No file chosen"}
@@ -351,7 +292,7 @@ export default function ProfileSetup() {
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>Resume</Text>
-        <Pressable style={styles.fileInput} onPress={pickResume}>
+        <Pressable style={styles.fileInput}>
           <MaterialIcons name="description" size={24} color="#9CA3AF" />
           <Text style={styles.fileInputText}>
             {formData.resume ? "File chosen" : "No file chosen"}
@@ -408,11 +349,11 @@ export default function ProfileSetup() {
           </Pressable>
         </View>
         <View style={styles.tagContainer}>
-          {formData.industries.map((ind: string, i: number) => (
+          {formData.industries.map((ind, i) => (
             <View key={i} style={styles.tag}>
               <Text style={styles.tagText}>{ind}</Text>
               <Pressable onPress={() => removeIndustry(i)}>
-                <MaterialIcons name="close" size={16} color="#7C3AED" />
+                <MaterialIcons name="close" size={16} color="#0b0c67" />
               </Pressable>
             </View>
           ))}
@@ -434,11 +375,11 @@ export default function ProfileSetup() {
           </Pressable>
         </View>
         <View style={styles.tagContainer}>
-          {formData.skills.map((skill: string, i: number) => (
+          {formData.skills.map((skill, i) => (
             <View key={i} style={styles.tag}>
               <Text style={styles.tagText}>{skill}</Text>
               <Pressable onPress={() => removeSkill(i)}>
-                <MaterialIcons name="close" size={16} color="#7C3AED" />
+                <MaterialIcons name="close" size={16} color="#0b0c67" />
               </Pressable>
             </View>
           ))}
@@ -460,11 +401,11 @@ export default function ProfileSetup() {
           </Pressable>
         </View>
         <View style={styles.tagContainer}>
-          {formData.links.map((link: string, i: number) => (
+          {formData.links.map((link, i) => (
             <View key={i} style={styles.linkTag}>
               <Text style={styles.linkTagText}>{link}</Text>
               <Pressable onPress={() => removeLink(i)}>
-                <MaterialIcons name="close" size={16} color="#7C3AED" />
+                <MaterialIcons name="close" size={16} color="#0b0c67" />
               </Pressable>
             </View>
           ))}
@@ -479,14 +420,7 @@ export default function ProfileSetup() {
 
         <Pressable
           style={[styles.button, styles.secondary]}
-          onPress={handleCancel}
-        >
-          <Text style={styles.secondaryText}>Cancel</Text>
-        </Pressable>
-
-        <Pressable
-          style={[styles.button, styles.secondary]}
-          onPress={() => router.push(ONBOARDING_HUB_ROUTE)}
+          onPress={() => router.push("/onboarding2/questionnaire")}
         >
           <Text style={styles.secondaryText}>Back to Onboarding 2</Text>
         </Pressable>
@@ -516,7 +450,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     gap: 4,
   },
-  editButtonText: { color: "#7C3AED", fontWeight: "600", fontSize: 12 },
+  editButtonText: { color: "#0b0c67", fontWeight: "600", fontSize: 12 },
 
   // Card Styles
   card: {
@@ -539,7 +473,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#0b0c67",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -570,7 +504,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     gap: 6,
   },
-  tagText: { fontSize: 12, color: "#6B3EDA", fontWeight: "500" },
+  tagText: { fontSize: 12, color: "#0b0c67", fontWeight: "500" },
   linkTag: {
     flexDirection: "row",
     alignItems: "center",
@@ -581,7 +515,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     justifyContent: "space-between",
   },
-  linkTagText: { fontSize: 12, color: "#1e40af", fontWeight: "500" },
+  linkTagText: { fontSize: 12, color: "#0b0c67", fontWeight: "500" },
 
   // Form Styles
   formGroup: { marginBottom: 20 },
@@ -627,7 +561,7 @@ const styles = StyleSheet.create({
     color: "#111",
   },
   addButton: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#0b0c67",
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
@@ -638,7 +572,7 @@ const styles = StyleSheet.create({
   // Action Buttons
   actions: { marginTop: 20, marginBottom: 32 },
   button: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#0b0c67",
     padding: 14,
     borderRadius: 10,
     alignItems: "center",
