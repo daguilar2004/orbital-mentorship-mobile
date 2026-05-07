@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Alert } from "react-native";
-import { API_BASE_URL } from "@/app/api/index";
-import { MOCK_AUTH_TOKEN } from "@/app/config/mockAuth";
+import { API_URL } from "@/app/api/config";
+import { MOCK_AUTH_TOKEN } from "@/app/api/mockAuth";
 import { defaultFormatting } from "../constants";
 import { Note } from "../types";
 import { getLabels, getNoteId } from "../utils";
@@ -28,7 +28,7 @@ export function useNotes(userId: string, userRole: string) {
       const headers = await getHeadersWithAuth();
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8000);
-      const response = await fetch(`${API_BASE_URL}/notes/${userId}`, {
+      const response = await fetch(`${API_URL}/notes/${userId}`, {
         method: "GET",
         headers,
         signal: controller.signal,
@@ -68,14 +68,14 @@ export function useNotes(userId: string, userRole: string) {
 
       let response;
       if (action === "create") {
-        response = await fetch(`${API_BASE_URL}/notes/${userId}`, {
+        response = await fetch(`${API_URL}/notes/${userId}`, {
           method: "POST",
           headers,
           body: JSON.stringify(payload),
         });
       } else {
         const noteId = getNoteId(noteData);
-        response = await fetch(`${API_BASE_URL}/notes/${noteId}`, {
+        response = await fetch(`${API_URL}/notes/${noteId}`, {
           method: "PATCH",
           headers,
           body: JSON.stringify(payload),
@@ -107,7 +107,7 @@ export function useNotes(userId: string, userRole: string) {
     setLoading(true);
     try {
       const headers = await getHeadersWithAuth();
-      const response = await fetch(`${API_BASE_URL}/notes/${id}`, {
+      const response = await fetch(`${API_URL}/notes/${id}`, {
         method: "DELETE",
         headers,
       });
@@ -135,7 +135,7 @@ export function useNotes(userId: string, userRole: string) {
       const headers = await getHeadersWithAuth();
       await Promise.all(
         Array.from(selectedIds).map((id) =>
-          fetch(`${API_BASE_URL}/notes/${id}`, { method: "DELETE", headers })
+          fetch(`${API_URL}/notes/${id}`, { method: "DELETE", headers })
         )
       );
       setNotes((prev) => prev.filter((n) => !selectedIds.has(getNoteId(n))));
@@ -158,7 +158,7 @@ export function useNotes(userId: string, userRole: string) {
 
     try {
       const headers = await getHeadersWithAuth();
-      const response = await fetch(`${API_BASE_URL}/notes/${id}`, {
+      const response = await fetch(`${API_URL}/notes/${id}`, {
         method: "PATCH",
         headers,
         body: JSON.stringify({ favorite: newFavorite }),

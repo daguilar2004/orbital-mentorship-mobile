@@ -1,4 +1,4 @@
-import { buildApiUrl } from "../config/api";
+import { buildApiUrl } from "../api/config";
 
 export type HabitPayload = {
   title: string;

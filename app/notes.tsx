@@ -25,7 +25,7 @@ import { categoryColors, defaultFormatting, displayLabels, options } from "@/com
 import { useNotes } from "@/components/notes/hooks/useNotes";
 import { Formatting, Note, SortMode, ViewMode } from "@/components/notes/types";
 import { escapeHtml, formatDateKey, getLabels, getNoteId } from "@/components/notes/utils";
-import { MOCK_USER_ID } from "./config/mockAuth";
+import { MOCK_USER_ID } from "./api/mockAuth";
 import { useApp } from "./context/AppContext";
 
 export default function Notes() {

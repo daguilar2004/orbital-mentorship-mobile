@@ -1,4 +1,4 @@
-import { API_BASE_URL, buildApiUrl } from "../config/api";
+import { API_BASE_URL, buildApiUrl } from "../api/config";
 
 export const API_ENDPOINTS = {
   // Health check
