@@ -1,7 +1,7 @@
 import React from "react";
 import { View } from "react-native";
-import { Phase, Task, UserRole } from "../../context/AppContext";
-import { styles } from "../../styles/homeStyles";
+import { Phase, Task, UserRole } from "../../app/context/AppContext";
+import { styles } from "../../app/styles/homeStyles";
 import PhaseHeader from "./PhaseHeader";
 import PhaseProgress from "./PhaseProgress";
 import PhaseTaskList from "./PhaseTaskList";

@@ -1,7 +1,7 @@
 import React from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
-import { Phase, Task } from "../../context/AppContext";
-import { styles } from "../../styles/homeStyles";
+import { Phase, Task } from "../../app/context/AppContext";
+import { styles } from "../../app/styles/homeStyles";
 
 type TaskReviewCardProps = {
   activeTask: Task | null;

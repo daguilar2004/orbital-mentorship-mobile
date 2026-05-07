@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Alert, Pressable, Text, TouchableOpacity, View } from "react-native";
-import { Phase, UserRole } from "../../context/AppContext";
-import { styles } from "../../styles/homeStyles";
+import { Phase, UserRole } from "../../app/context/AppContext";
+import { styles } from "../../app/styles/homeStyles";
 
 type PhaseHeaderProps = {
   phase: Phase;

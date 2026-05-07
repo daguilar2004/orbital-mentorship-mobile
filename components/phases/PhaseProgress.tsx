@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
-import { Phase } from "../../context/AppContext";
-import { styles } from "../../styles/homeStyles";
+import { Phase } from "../../app/context/AppContext";
+import { styles } from "../../app/styles/homeStyles";
 
 type PhaseProgressProps = {
   approvedCount: number;

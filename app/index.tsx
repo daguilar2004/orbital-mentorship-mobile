@@ -4,10 +4,10 @@ import { ScrollView, Text, View } from "react-native";
 import { Phase, Task, useApp } from "./context/AppContext";
 import { styles } from "./styles/homeStyles";
 
-import PhaseModal from "./components/modals/PhaseModal";
-import TaskFormModal from "./components/modals/TaskFormModal";
-import PhasesSection from "./components/phases/PhasesSection";
-import TaskModal from "./components/tasks/TaskModal";
+import PhaseModal from "../components/modals/PhaseModal";
+import TaskFormModal from "../components/modals/TaskFormModal";
+import PhasesSection from "../components/phases/PhasesSection";
+import TaskModal from "../components/tasks/TaskModal";
 
 type TaskResource = {
   type: "link" | "file";

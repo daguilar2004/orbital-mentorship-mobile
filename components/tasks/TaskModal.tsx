@@ -7,8 +7,8 @@ import {
   Text,
   View,
 } from "react-native";
-import { Phase, Task, UserRole } from "../../context/AppContext";
-import { styles } from "../../styles/homeStyles";
+import { Phase, Task, UserRole } from "../../app/context/AppContext";
+import { styles } from "../../app/styles/homeStyles";
 import AttachedFilesCard from "./AttachedFilesCard";
 import MentorFeedbackCard from "./MentorFeedbackCard";
 import SubmittedResponseCard from "./SubmittedResponseCard";

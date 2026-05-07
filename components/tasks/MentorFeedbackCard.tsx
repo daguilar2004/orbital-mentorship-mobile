@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
-import { Task } from "../../context/AppContext";
-import { styles } from "../../styles/homeStyles";
+import { Task } from "../../app/context/AppContext";
+import { styles } from "../../app/styles/homeStyles";
 
 type MentorFeedbackCardProps = {
   activeTask: Task;

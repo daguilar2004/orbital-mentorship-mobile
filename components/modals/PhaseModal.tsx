@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { styles } from "../../styles/homeStyles";
+import { styles } from "../../app/styles/homeStyles";
 import PhaseFormFields from "./PhaseFormFields";
 import PhaseModalActions from "./PhaseModalActions";
 

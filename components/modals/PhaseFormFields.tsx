@@ -1,6 +1,6 @@
 import React from "react";
 import { Text, TextInput } from "react-native";
-import { styles } from "../../styles/homeStyles";
+import { styles } from "../../app/styles/homeStyles";
 
 type PhaseFormFieldsProps = {
   newPhaseName: string;

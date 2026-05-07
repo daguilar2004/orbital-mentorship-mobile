@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, Text, View } from "react-native";
-import { Task } from "../../context/AppContext";
-import { styles } from "../../styles/homeStyles";
+import { Task } from "../../app/context/AppContext";
+import { styles } from "../../app/styles/homeStyles";
 
 type AttachedFilesCardProps = {
   activeTask: Task | null;

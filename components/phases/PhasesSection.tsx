@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Pressable, Text, View } from "react-native";
-import { Phase, Task, UserRole } from "../../context/AppContext";
-import { styles } from "../../styles/homeStyles";
+import { Phase, Task, UserRole } from "../../app/context/AppContext";
+import { styles } from "../../app/styles/homeStyles";
 import PhaseCard from "./PhaseCard";
 
 type PhasesSectionProps = {

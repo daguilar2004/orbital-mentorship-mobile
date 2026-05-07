@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from "react-native";
-import { styles } from "../../styles/homeStyles";
+import { styles } from "../../app/styles/homeStyles";
 
 type TaskFormActionsProps = {
   editingTaskId: string | null;

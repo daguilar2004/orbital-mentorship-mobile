@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { styles } from "../../styles/homeStyles";
+import { styles } from "../../app/styles/homeStyles";
 
 type TaskResource = {
   type: "link" | "file";

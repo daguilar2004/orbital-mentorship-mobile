@@ -1,6 +1,6 @@
 import React from "react";
 import { Modal, Pressable, Text, TextInput, View } from "react-native";
-import { styles } from "../../styles/homeStyles";
+import { styles } from "../../app/styles/homeStyles";
 
 type TaskFormFieldsProps = {
   newTaskTitle: string;
