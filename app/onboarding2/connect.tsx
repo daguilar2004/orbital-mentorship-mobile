@@ -1,6 +1,5 @@
-import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
 import { router } from "expo-router";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function Connect() {
   return (
@@ -13,14 +12,14 @@ export default function Connect() {
       <View style={styles.actions}>
         <Pressable
           style={styles.button}
-          onPress={() => router.replace("/onboarding2")}
+          onPress={() => router.replace("/")}
         >
           <Text style={styles.buttonText}>Finish Onboarding</Text>
         </Pressable>
 
         <Pressable
           style={[styles.button, styles.secondary]}
-          onPress={() => router.push("/onboarding2")}
+          onPress={() => router.push("/onboarding2/profile-setup")}
         >
           <Text style={styles.secondaryText}>Back to Onboarding 2</Text>
         </Pressable>
@@ -35,7 +34,7 @@ const styles = StyleSheet.create({
   subtitle: { color: "#6B7280", marginBottom: 24 },
   actions: { marginTop: 20 },
   button: {
-    backgroundColor: "#10B981",
+    backgroundColor: "#0b0c67",
     padding: 14,
     borderRadius: 10,
     alignItems: "center",

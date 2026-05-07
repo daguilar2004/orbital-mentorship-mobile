@@ -2,72 +2,26 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { useApp } from "../context/AppContext";
-const defaultProfile = {
-  firstName: "",
-  lastName: "",
-  bio: "",
-  headline: "",
-  goals: "",
-  industries: [],
-  skills: [],
-  links: [],
-  profilePicture: null,
-  resume: null,
-};
+
 export default function ProfileSetup() {
-  const pickProfileImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert("Permission required", "Allow access to photos");
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setFormData((prev) => ({
-        ...prev,
-        profilePicture: result.assets[0].uri,
-      }));
-    }
-  };
-
-  const pickResume = async () => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: "*/*",
-    });
-
-    if (result.canceled === false) {
-      setFormData((prev) => ({
-        ...prev,
-        resume: result.assets[0].uri,
-      }));
-    }
-  };
-
-  const app = useApp();
   const { profileData, setProfileData, questionnaireAnswers } = useApp();
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState(profileData || defaultProfile);
+  const [formData, setFormData] = useState(profileData);
   const [tempIndustry, setTempIndustry] = useState("");
   const [tempSkill, setTempSkill] = useState("");
   const [tempLink, setTempLink] = useState("");
 
   const hasProfile =
-    profileData?.firstName || profileData?.lastName || profileData?.bio;
+    profileData.firstName || profileData.lastName || profileData.bio;
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -131,16 +85,7 @@ export default function ProfileSetup() {
     }
     setProfileData(formData);
     setIsEditing(false);
-
     Alert.alert("Success", "Profile saved successfully!");
-
-    // ✅ go back to hub
-    router.replace("/onboarding2");
-  };
-
-  const handleCancel = () => {
-    setFormData(profileData);
-    setIsEditing(false);
   };
 
   const handleEdit = () => {
@@ -155,7 +100,7 @@ export default function ProfileSetup() {
         <View style={styles.header}>
           <Text style={styles.title}>Your Profile</Text>
           <Pressable style={styles.editButton} onPress={handleEdit}>
-            <MaterialIcons name="edit" size={16} color="#7C3AED" />
+            <MaterialIcons name="edit" size={16} color="#0b0c67" />
             <Text style={styles.editButtonText}>Edit Profile</Text>
           </Pressable>
         </View>
@@ -290,10 +235,17 @@ export default function ProfileSetup() {
         <View style={styles.actions}>
           <Pressable
             style={styles.button}
-            onPress={() => router.push("/onboarding2")}
+            onPress={() => router.push("/onboarding2/connect")}
           >
             <Text style={styles.buttonText}>Next: Connect</Text>
           </Pressable>
+
+          <Pressable
+          style={[styles.button, styles.secondary]}
+          onPress={() => router.push("/onboarding2/questionnaire")}
+        >
+          <Text style={styles.secondaryText}>Back to Onboarding 2</Text>
+        </Pressable>
         </View>
       </ScrollView>
     );
@@ -330,7 +282,7 @@ export default function ProfileSetup() {
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>Profile Picture</Text>
-        <Pressable style={styles.fileInput} onPress={pickProfileImage}>
+        <Pressable style={styles.fileInput}>
           <MaterialIcons name="image" size={24} color="#9CA3AF" />
           <Text style={styles.fileInputText}>
             {formData.profilePicture ? "File chosen" : "No file chosen"}
@@ -340,7 +292,7 @@ export default function ProfileSetup() {
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>Resume</Text>
-        <Pressable style={styles.fileInput} onPress={pickResume}>
+        <Pressable style={styles.fileInput}>
           <MaterialIcons name="description" size={24} color="#9CA3AF" />
           <Text style={styles.fileInputText}>
             {formData.resume ? "File chosen" : "No file chosen"}
@@ -401,7 +353,7 @@ export default function ProfileSetup() {
             <View key={i} style={styles.tag}>
               <Text style={styles.tagText}>{ind}</Text>
               <Pressable onPress={() => removeIndustry(i)}>
-                <MaterialIcons name="close" size={16} color="#7C3AED" />
+                <MaterialIcons name="close" size={16} color="#0b0c67" />
               </Pressable>
             </View>
           ))}
@@ -427,7 +379,7 @@ export default function ProfileSetup() {
             <View key={i} style={styles.tag}>
               <Text style={styles.tagText}>{skill}</Text>
               <Pressable onPress={() => removeSkill(i)}>
-                <MaterialIcons name="close" size={16} color="#7C3AED" />
+                <MaterialIcons name="close" size={16} color="#0b0c67" />
               </Pressable>
             </View>
           ))}
@@ -453,7 +405,7 @@ export default function ProfileSetup() {
             <View key={i} style={styles.linkTag}>
               <Text style={styles.linkTagText}>{link}</Text>
               <Pressable onPress={() => removeLink(i)}>
-                <MaterialIcons name="close" size={16} color="#7C3AED" />
+                <MaterialIcons name="close" size={16} color="#0b0c67" />
               </Pressable>
             </View>
           ))}
@@ -468,14 +420,7 @@ export default function ProfileSetup() {
 
         <Pressable
           style={[styles.button, styles.secondary]}
-          onPress={handleCancel}
-        >
-          <Text style={styles.secondaryText}>Cancel</Text>
-        </Pressable>
-
-        <Pressable
-          style={[styles.button, styles.secondary]}
-          onPress={() => router.push("/onboarding2")}
+          onPress={() => router.push("/onboarding2/questionnaire")}
         >
           <Text style={styles.secondaryText}>Back to Onboarding 2</Text>
         </Pressable>
@@ -505,7 +450,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     gap: 4,
   },
-  editButtonText: { color: "#7C3AED", fontWeight: "600", fontSize: 12 },
+  editButtonText: { color: "#0b0c67", fontWeight: "600", fontSize: 12 },
 
   // Card Styles
   card: {
@@ -528,7 +473,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#0b0c67",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -559,7 +504,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     gap: 6,
   },
-  tagText: { fontSize: 12, color: "#6B3EDA", fontWeight: "500" },
+  tagText: { fontSize: 12, color: "#0b0c67", fontWeight: "500" },
   linkTag: {
     flexDirection: "row",
     alignItems: "center",
@@ -570,7 +515,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     justifyContent: "space-between",
   },
-  linkTagText: { fontSize: 12, color: "#1e40af", fontWeight: "500" },
+  linkTagText: { fontSize: 12, color: "#0b0c67", fontWeight: "500" },
 
   // Form Styles
   formGroup: { marginBottom: 20 },
@@ -616,7 +561,7 @@ const styles = StyleSheet.create({
     color: "#111",
   },
   addButton: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#0b0c67",
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
@@ -627,7 +572,7 @@ const styles = StyleSheet.create({
   // Action Buttons
   actions: { marginTop: 20, marginBottom: 32 },
   button: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#0b0c67",
     padding: 14,
     borderRadius: 10,
     alignItems: "center",

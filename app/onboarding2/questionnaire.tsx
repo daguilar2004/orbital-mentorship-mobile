@@ -1,426 +1,584 @@
-import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  TextInput,
-  ScrollView,
-} from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { useState } from "react";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useApp } from "../context/AppContext";
 
-const INDUSTRIES = [
-  "Technology",
-  "Finance",
-  "Healthcare",
-  "Education",
-  "Manufacturing",
-  "Retail",
-  "Energy",
-  "Real Estate",
-  "Transportation",
-  "Other",
-];
+export default function ProfileSetup() {
+  const { profileData, setProfileData, questionnaireAnswers } = useApp();
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState(profileData);
+  const [tempIndustry, setTempIndustry] = useState("");
+  const [tempSkill, setTempSkill] = useState("");
+  const [tempLink, setTempLink] = useState("");
 
-interface QuestionnaireAnswers {
-  mentoringComfort: number;
-  industry: string;
-  mentorIndustry: string;
-  mentorSkillset: string;
-  developmentGoal: string;
-  holdingBack: string;
-}
+  const hasProfile =
+    profileData.firstName || profileData.lastName || profileData.bio;
 
-export default function Questionnaire() {
-  const [currentQ, setCurrentQ] = React.useState(1);
-  const [showDropdown, setShowDropdown] = React.useState(false);
-  const [answers, setAnswers] = React.useState<QuestionnaireAnswers>({
-    mentoringComfort: 5,
-    industry: "",
-    mentorIndustry: "",
-    mentorSkillset: "",
-    developmentGoal: "",
-    holdingBack: "",
-  });
+  const handleInputChange = (field: keyof typeof formData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
 
-  const totalQuestions = 6;
-  const minWords = 20;
-
-  const countWords = (text: string) => text.trim().split(/\s+/).length;
-
-  const isCurrentAnswerValid = () => {
-    switch (currentQ) {
-      case 1:
-        return answers.mentoringComfort !== null;
-      case 2:
-        return answers.industry !== "";
-      case 3:
-        return countWords(answers.mentorIndustry) >= minWords;
-      case 4:
-        return countWords(answers.mentorSkillset) >= minWords;
-      case 5:
-        return countWords(answers.developmentGoal) >= minWords;
-      case 6:
-        return countWords(answers.holdingBack) >= minWords;
-      default:
-        return false;
+  const addIndustry = () => {
+    if (tempIndustry.trim()) {
+      setFormData((prev) => ({
+        ...prev,
+        industries: [...prev.industries, tempIndustry.trim()],
+      }));
+      setTempIndustry("");
     }
   };
 
-  const handleNext = () => {
-    if (currentQ < totalQuestions) {
-      setCurrentQ(currentQ + 1);
-      setShowDropdown(false);
-    } else {
-      // ✅ go back to hub after finishing
-      router.replace("/onboarding2");
+  const removeIndustry = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      industries: prev.industries.filter((_, i) => i !== index),
+    }));
+  };
+
+  const addSkill = () => {
+    if (tempSkill.trim()) {
+      setFormData((prev) => ({
+        ...prev,
+        skills: [...prev.skills, tempSkill.trim()],
+      }));
+      setTempSkill("");
     }
   };
 
-  const handlePrev = () => {
-    if (currentQ > 1) {
-      setCurrentQ(currentQ - 1);
-      setShowDropdown(false);
+  const removeSkill = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      skills: prev.skills.filter((_, i) => i !== index),
+    }));
+  };
+
+  const addLink = () => {
+    if (tempLink.trim()) {
+      setFormData((prev) => ({
+        ...prev,
+        links: [...prev.links, tempLink.trim()],
+      }));
+      setTempLink("");
     }
   };
 
-  return (
-    <View style={styles.screen}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Questionnaire</Text>
-        <Text style={styles.stepIndicator}>
-          Question {currentQ} of {totalQuestions}
-        </Text>
-      </View>
+  const removeLink = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      links: prev.links.filter((_, i) => i !== index),
+    }));
+  };
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Q1: Mentoring Comfort */}
-        {currentQ === 1 && (
-          <View style={styles.questionContainer}>
-            <Text style={styles.questionTitle}>
-              How close of a mentoring relationship are you comfortable with?
-            </Text>
+  const handleSave = () => {
+    if (!formData.firstName.trim() || !formData.lastName.trim()) {
+      Alert.alert("Error", "Please fill in first and last name");
+      return;
+    }
+    setProfileData(formData);
+    setIsEditing(false);
+    Alert.alert("Success", "Profile saved successfully!");
+  };
 
-            <View style={styles.scaleContainer}>
-              {/* simple numeric picker instead of slider */}
-              <View style={styles.numericControl}>
-                <Pressable
-                  onPress={() =>
-                    setAnswers((a) => ({
-                      ...a,
-                      mentoringComfort: Math.max(1, a.mentoringComfort - 1),
-                    }))
-                  }
-                  style={styles.stepBtn}
-                >
-                  <Text style={styles.stepBtnText}>-</Text>
-                </Pressable>
-                <Text style={styles.scaleValue}>
-                  {" "}
-                  {answers.mentoringComfort}{" "}
-                </Text>
-                <Pressable
-                  onPress={() =>
-                    setAnswers((a) => ({
-                      ...a,
-                      mentoringComfort: Math.min(10, a.mentoringComfort + 1),
-                    }))
-                  }
-                  style={styles.stepBtn}
-                >
-                  <Text style={styles.stepBtnText}>+</Text>
-                </Pressable>
-              </View>
-              <View style={styles.scaleLabels}>
-                <Text style={styles.scaleLabel}>Formal</Text>
-                <Text style={styles.scaleLabel}>Personal</Text>
-              </View>
+  const handleEdit = () => {
+    setFormData(profileData);
+    setIsEditing(true);
+  };
+
+  // Display Mode (when profile is saved)
+  if (!isEditing && hasProfile) {
+    return (
+      <ScrollView style={styles.screen}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Your Profile</Text>
+          <Pressable style={styles.editButton} onPress={handleEdit}>
+            <MaterialIcons name="edit" size={16} color="#0b0c67" />
+            <Text style={styles.editButtonText}>Edit Profile</Text>
+          </Pressable>
+        </View>
+
+        {/* Profile Information */}
+        <View style={styles.card}>
+          <View style={styles.profileRow}>
+            <View style={styles.profileAvatar}>
+              <Text style={styles.avatarText}>
+                {profileData.firstName[0]}
+                {profileData.lastName[0]}
+              </Text>
+            </View>
+            <View style={styles.profileInfo}>
+              <Text style={styles.displayName}>
+                {profileData.firstName} {profileData.lastName}
+              </Text>
+              <Text style={styles.headline}>{profileData.headline}</Text>
             </View>
           </View>
-        )}
 
-        {/* Q2: Industry Dropdown */}
-        {currentQ === 2 && (
-          <View style={styles.questionContainer}>
-            <Text style={styles.questionTitle}>
-              What industry or domain are you studying?
-            </Text>
+          {profileData.bio && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Bio</Text>
+              <Text style={styles.sectionText}>{profileData.bio}</Text>
+            </View>
+          )}
 
-            <Pressable
-              style={styles.dropdown}
-              onPress={() => setShowDropdown(!showDropdown)}
-            >
-              <Text style={styles.dropdownText}>
-                {answers.industry || "Select industry"}
-              </Text>
-              <Ionicons
-                name={showDropdown ? "chevron-up" : "chevron-down"}
-                size={24}
-                color="#7C3AED"
-              />
-            </Pressable>
+          {profileData.goals && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Goals for Mentorship</Text>
+              <Text style={styles.sectionText}>{profileData.goals}</Text>
+            </View>
+          )}
 
-            {showDropdown && (
-              <View style={styles.dropdownMenu}>
-                {INDUSTRIES.map((ind) => (
-                  <Pressable
-                    key={ind}
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setAnswers({ ...answers, industry: ind });
-                      setShowDropdown(false);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownItemText,
-                        answers.industry === ind && styles.dropdownItemSelected,
-                      ]}
-                    >
-                      {ind}
-                    </Text>
-                  </Pressable>
+          {profileData.industries.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Industry Interests</Text>
+              <View style={styles.tagContainer}>
+                {profileData.industries.map((ind, i) => (
+                  <View key={i} style={styles.tag}>
+                    <Text style={styles.tagText}>{ind}</Text>
+                  </View>
                 ))}
               </View>
-            )}
-          </View>
-        )}
+            </View>
+          )}
 
-        {/* Q3: Mentor Industry */}
-        {currentQ === 3 && (
-          <View style={styles.questionContainer}>
-            <Text style={styles.questionTitle}>
-              What industry should your mentor be in?
-            </Text>
-            <TextInput
-              style={styles.textarea}
-              placeholder="Type your answer (minimum 20 words)..."
-              multiline
-              numberOfLines={5}
-              value={answers.mentorIndustry}
-              onChangeText={(text) =>
-                setAnswers({ ...answers, mentorIndustry: text })
-              }
-              placeholderTextColor="#999"
-            />
-            <Text style={styles.wordCount}>
-              {countWords(answers.mentorIndustry)}/20 words
-            </Text>
-          </View>
-        )}
+          {profileData.skills.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Desired Skills</Text>
+              <View style={styles.tagContainer}>
+                {profileData.skills.map((skill, i) => (
+                  <View key={i} style={styles.tag}>
+                    <Text style={styles.tagText}>{skill}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
 
-        {/* Q4: Mentor Skillset */}
-        {currentQ === 4 && (
-          <View style={styles.questionContainer}>
-            <Text style={styles.questionTitle}>
-              What kind of skillset should your mentor have?
-            </Text>
-            <TextInput
-              style={styles.textarea}
-              placeholder="Type your answer (minimum 20 words)..."
-              multiline
-              numberOfLines={5}
-              value={answers.mentorSkillset}
-              onChangeText={(text) =>
-                setAnswers({ ...answers, mentorSkillset: text })
-              }
-              placeholderTextColor="#999"
-            />
-            <Text style={styles.wordCount}>
-              {countWords(answers.mentorSkillset)}/20 words
+          {profileData.links.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Social Links</Text>
+              {profileData.links.map((link, i) => (
+                <Text key={i} style={styles.linkText}>
+                  • {link}
+                </Text>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Questionnaire Answers */}
+        <View style={styles.card}>
+          <Text style={styles.title}>Questionnaire Answers</Text>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Mentoring Comfort Level</Text>
+            <Text style={styles.sectionText}>
+              {questionnaireAnswers.mentoringComfort}/10
             </Text>
           </View>
-        )}
 
-        {/* Q5: Development Goal */}
-        {currentQ === 5 && (
-          <View style={styles.questionContainer}>
-            <Text style={styles.questionTitle}>
-              What is your most urgent professional development goal right now?
-            </Text>
-            <TextInput
-              style={styles.textarea}
-              placeholder="Type your answer (minimum 20 words)..."
-              multiline
-              numberOfLines={5}
-              value={answers.developmentGoal}
-              onChangeText={(text) =>
-                setAnswers({ ...answers, developmentGoal: text })
-              }
-              placeholderTextColor="#999"
-            />
-            <Text style={styles.wordCount}>
-              {countWords(answers.developmentGoal)}/20 words
-            </Text>
-          </View>
-        )}
+          {questionnaireAnswers.industry && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Your Industry</Text>
+              <Text style={styles.sectionText}>
+                {questionnaireAnswers.industry}
+              </Text>
+            </View>
+          )}
 
-        {/* Q6: Holding Back */}
-        {currentQ === 6 && (
-          <View style={styles.questionContainer}>
-            <Text style={styles.questionTitle}>
-              What is holding you back from overcoming that goal?
-            </Text>
-            <TextInput
-              style={styles.textarea}
-              placeholder="Type your answer (minimum 20 words)..."
-              multiline
-              numberOfLines={5}
-              value={answers.holdingBack}
-              onChangeText={(text) =>
-                setAnswers({ ...answers, holdingBack: text })
-              }
-              placeholderTextColor="#999"
-            />
-            <Text style={styles.wordCount}>
-              {countWords(answers.holdingBack)}/20 words
-            </Text>
-          </View>
-        )}
-      </ScrollView>
+          {questionnaireAnswers.mentorIndustry && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Mentor Industry</Text>
+              <Text style={styles.sectionText}>
+                {questionnaireAnswers.mentorIndustry}
+              </Text>
+            </View>
+          )}
 
-      {/* Navigation */}
-      <View style={styles.footer}>
-        <Pressable
-          style={[styles.navButton, currentQ === 1 && styles.navButtonDisabled]}
-          onPress={handlePrev}
-          disabled={currentQ === 1}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={20}
-            color={currentQ === 1 ? "#CCC" : "#7C3AED"}
-          />
-          <Text
-            style={[styles.navText, currentQ === 1 && styles.navTextDisabled]}
+          {questionnaireAnswers.mentorSkillset && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Mentor Skillset to Learn</Text>
+              <Text style={styles.sectionText}>
+                {questionnaireAnswers.mentorSkillset}
+              </Text>
+            </View>
+          )}
+
+          {questionnaireAnswers.developmentGoal && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Development Goals</Text>
+              <Text style={styles.sectionText}>
+                {questionnaireAnswers.developmentGoal}
+              </Text>
+            </View>
+          )}
+
+          {questionnaireAnswers.holdingBack && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>What&apos;s Holding You Back</Text>
+              <Text style={styles.sectionText}>
+                {questionnaireAnswers.holdingBack}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Next Button */}
+        <View style={styles.actions}>
+          <Pressable
+            style={styles.button}
+            onPress={() => router.push("/onboarding2/connect")}
           >
-            Previous
-          </Text>
+            <Text style={styles.buttonText}>Next: Connect</Text>
+          </Pressable>
+
+          <Pressable
+          style={[styles.button, styles.secondary]}
+          onPress={() => router.push("/onboarding2/questionnaire")}
+        >
+          <Text style={styles.secondaryText}>Back to Onboarding 2</Text>
         </Pressable>
+        </View>
+      </ScrollView>
+    );
+  }
 
-        <Pressable
-          style={[
-            styles.navButton,
-            !isCurrentAnswerValid() && styles.navButtonDisabled,
-          ]}
-          onPress={handleNext}
-          disabled={!isCurrentAnswerValid()}
-        >
-          <Text
-            style={[
-              styles.navText,
-              !isCurrentAnswerValid() && styles.navTextDisabled,
-            ]}
-          >
-            {currentQ === totalQuestions ? "Finish" : "Next"}
+  // Edit/Form Mode
+  return (
+    <ScrollView style={styles.screen}>
+      <Text style={styles.title}>Profile Setup</Text>
+      <Text style={styles.subtitle}>
+        Add your name, picture and a short bio.
+      </Text>
+
+      {/* Form Inputs */}
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>First Name</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter first name"
+          value={formData.firstName}
+          onChangeText={(text) => handleInputChange("firstName", text)}
+        />
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Last Name</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter last name"
+          value={formData.lastName}
+          onChangeText={(text) => handleInputChange("lastName", text)}
+        />
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Profile Picture</Text>
+        <Pressable style={styles.fileInput}>
+          <MaterialIcons name="image" size={24} color="#9CA3AF" />
+          <Text style={styles.fileInputText}>
+            {formData.profilePicture ? "File chosen" : "No file chosen"}
           </Text>
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color={!isCurrentAnswerValid() ? "#CCC" : "#7C3AED"}
-          />
         </Pressable>
       </View>
-    </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Resume</Text>
+        <Pressable style={styles.fileInput}>
+          <MaterialIcons name="description" size={24} color="#9CA3AF" />
+          <Text style={styles.fileInputText}>
+            {formData.resume ? "File chosen" : "No file chosen"}
+          </Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Headline</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Please input answer"
+          value={formData.headline}
+          onChangeText={(text) => handleInputChange("headline", text)}
+        />
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Bio</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="Please input answer"
+          value={formData.bio}
+          onChangeText={(text) => handleInputChange("bio", text)}
+          multiline
+          numberOfLines={4}
+        />
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Goals for Mentorship</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="Please input answer"
+          value={formData.goals}
+          onChangeText={(text) => handleInputChange("goals", text)}
+          multiline
+          numberOfLines={4}
+        />
+      </View>
+
+      {/* Industry Interests */}
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Industry Interests</Text>
+        <View style={styles.addItemRow}>
+          <TextInput
+            style={styles.addItemInput}
+            placeholder="Add an industry"
+            value={tempIndustry}
+            onChangeText={setTempIndustry}
+          />
+          <Pressable style={styles.addButton} onPress={addIndustry}>
+            <Text style={styles.addButtonText}>Add</Text>
+          </Pressable>
+        </View>
+        <View style={styles.tagContainer}>
+          {formData.industries.map((ind, i) => (
+            <View key={i} style={styles.tag}>
+              <Text style={styles.tagText}>{ind}</Text>
+              <Pressable onPress={() => removeIndustry(i)}>
+                <MaterialIcons name="close" size={16} color="#0b0c67" />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Desired Skills */}
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Desired Skills</Text>
+        <View style={styles.addItemRow}>
+          <TextInput
+            style={styles.addItemInput}
+            placeholder="Add a skill"
+            value={tempSkill}
+            onChangeText={setTempSkill}
+          />
+          <Pressable style={styles.addButton} onPress={addSkill}>
+            <Text style={styles.addButtonText}>Add</Text>
+          </Pressable>
+        </View>
+        <View style={styles.tagContainer}>
+          {formData.skills.map((skill, i) => (
+            <View key={i} style={styles.tag}>
+              <Text style={styles.tagText}>{skill}</Text>
+              <Pressable onPress={() => removeSkill(i)}>
+                <MaterialIcons name="close" size={16} color="#0b0c67" />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Links */}
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Social Links</Text>
+        <View style={styles.addItemRow}>
+          <TextInput
+            style={styles.addItemInput}
+            placeholder="Add a link to your Social Profile"
+            value={tempLink}
+            onChangeText={setTempLink}
+          />
+          <Pressable style={styles.addButton} onPress={addLink}>
+            <Text style={styles.addButtonText}>Add</Text>
+          </Pressable>
+        </View>
+        <View style={styles.tagContainer}>
+          {formData.links.map((link, i) => (
+            <View key={i} style={styles.linkTag}>
+              <Text style={styles.linkTagText}>{link}</Text>
+              <Pressable onPress={() => removeLink(i)}>
+                <MaterialIcons name="close" size={16} color="#0b0c67" />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Action Buttons */}
+      <View style={styles.actions}>
+        <Pressable style={styles.button} onPress={handleSave}>
+          <Text style={styles.buttonText}>Save</Text>
+        </Pressable>
+
+        <Pressable
+          style={[styles.button, styles.secondary]}
+          onPress={() => router.push("/onboarding2/questionnaire")}
+        >
+          <Text style={styles.secondaryText}>Back to Onboarding 2</Text>
+        </Pressable>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F9FAFB" },
+  screen: { flex: 1, padding: 16, backgroundColor: "#f9fafb" },
+  title: { fontSize: 24, fontWeight: "700", marginBottom: 8, color: "#111" },
+  subtitle: { color: "#6B7280", marginBottom: 24, fontSize: 14 },
+
+  // Header Styles
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "#fff",
-  },
-  title: { fontSize: 20, fontWeight: "700", color: "#111827" },
-  stepIndicator: { fontSize: 13, color: "#999", marginTop: 4 },
-  content: { flex: 1, paddingHorizontal: 16, paddingVertical: 20 },
-  questionContainer: { marginBottom: 24 },
-  questionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#111827",
-    marginBottom: 20,
-  },
-  scaleContainer: { paddingVertical: 20 },
-  scaleLabels: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 16,
+    marginBottom: 24,
   },
-  scaleLabel: { fontSize: 13, color: "#6B7280", fontWeight: "500" },
-  scaleValue: { fontSize: 24, fontWeight: "700", color: "#7C3AED" },
-  numericControl: {
+  editButton: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 16,
-  },
-  stepBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#E5E7EB",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepBtnText: { fontSize: 18, fontWeight: "700", color: "#111827" },
-  dropdown: {
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#fff",
-  },
-  dropdownText: { fontSize: 15, color: "#111827" },
-  dropdownMenu: {
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 10,
-    marginTop: 8,
-    backgroundColor: "#fff",
-  },
-  dropdownItem: { paddingHorizontal: 14, paddingVertical: 12 },
-  dropdownItemText: { fontSize: 14, color: "#6B7280" },
-  dropdownItemSelected: { color: "#7C3AED", fontWeight: "600" },
-  textarea: {
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 10,
+    backgroundColor: "#f3f4f6",
     paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: "#111827",
-    textAlignVertical: "top",
+    paddingVertical: 8,
+    borderRadius: 6,
+    gap: 4,
   },
-  wordCount: { fontSize: 12, color: "#999", marginTop: 6 },
-  footer: {
-    flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+  editButtonText: { color: "#0b0c67", fontWeight: "600", fontSize: 12 },
+
+  // Card Styles
+  card: {
     backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
   },
-  navButton: {
-    flex: 1,
+
+  // Profile Display Styles
+  profileRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 20,
+    gap: 12,
+  },
+  profileAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#0b0c67",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarText: { color: "#fff", fontWeight: "700", fontSize: 20 },
+  profileInfo: { flex: 1 },
+  displayName: { fontSize: 18, fontWeight: "700", marginBottom: 4 },
+  headline: { fontSize: 14, color: "#6B7280" },
+
+  // Section Styles
+  section: { marginBottom: 16 },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 8,
+  },
+  sectionText: { fontSize: 14, color: "#4B5563", lineHeight: 20 },
+  linkText: { fontSize: 14, color: "#4B5563", marginBottom: 4 },
+
+  // Tag Styles
+  tagContainer: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  tag: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#7C3AED",
+    backgroundColor: "#ede9fe",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     gap: 6,
   },
-  navButtonDisabled: { borderColor: "#CCC", opacity: 0.5 },
-  navText: { fontSize: 14, fontWeight: "600", color: "#7C3AED" },
-  navTextDisabled: { color: "#CCC" },
+  tagText: { fontSize: 12, color: "#0b0c67", fontWeight: "500" },
+  linkTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#dbeafe",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginBottom: 8,
+    justifyContent: "space-between",
+  },
+  linkTagText: { fontSize: 12, color: "#0b0c67", fontWeight: "500" },
+
+  // Form Styles
+  formGroup: { marginBottom: 20 },
+  label: { fontSize: 14, fontWeight: "600", marginBottom: 8, color: "#374151" },
+  input: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#111",
+  },
+  textArea: {
+    paddingTop: 10,
+    textAlignVertical: "top",
+  },
+  fileInput: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  fileInputText: { fontSize: 14, color: "#9CA3AF" },
+
+  // Add Item Styles
+  addItemRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+  addItemInput: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#111",
+  },
+  addButton: {
+    backgroundColor: "#0b0c67",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    justifyContent: "center",
+  },
+  addButtonText: { color: "#fff", fontWeight: "600", fontSize: 12 },
+
+  // Action Buttons
+  actions: { marginTop: 20, marginBottom: 32 },
+  button: {
+    backgroundColor: "#0b0c67",
+    padding: 14,
+    borderRadius: 10,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  buttonText: { color: "#fff", fontWeight: "600" },
+  secondary: { backgroundColor: "#F3F4F6" },
+  secondaryText: { color: "#374151", fontWeight: "600" },
 });
