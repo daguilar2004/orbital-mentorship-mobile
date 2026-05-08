@@ -79,13 +79,13 @@ export default function OffboardingScreen() {
         <View
           style={[
             styles.icon,
-            { backgroundColor: allTasksCompleted ? "#F3E8FF" : "#FEF3C7" },
+            { backgroundColor: allTasksCompleted ? "#F3E8FF" : "#F3E8FF" },
           ]}
         >
           <Ionicons
             name={allTasksCompleted ? "trophy" : "alert-circle"}
             size={40}
-            color={allTasksCompleted ? "#7C3AED" : "#EA580C"}
+            color={allTasksCompleted ? "#0b0c67" : "#0b0c67"}
           />
         </View>
       </View>
@@ -128,10 +128,10 @@ export default function OffboardingScreen() {
         <View
           style={[
             styles.statusBox,
-            { backgroundColor: "#DCFCE7", borderColor: "#86EFAC" },
+            { backgroundColor: "#cfc2eb", borderColor: "#0b0c67" },
           ]}
         >
-          <Ionicons name="checkmark-circle" size={24} color="#16A34A" />
+          <Ionicons name="checkmark-circle" size={24} color="#0b0c67" />
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.statusTitle}>All Tasks Completed Early!</Text>
             <Text style={styles.statusText}>
@@ -160,10 +160,10 @@ export default function OffboardingScreen() {
         <View
           style={[
             styles.statusBox,
-            { backgroundColor: "#DCFCE7", borderColor: "#86EFAC" },
+            { backgroundColor: "#DCFCE7", borderColor: "#0b0c67" },
           ]}
         >
-          <Ionicons name="trophy" size={24} color="#16A34A" />
+          <Ionicons name="trophy" size={24} color="#0b0c67" />
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.statusTitle}>Mentorship Completed!</Text>
             <Text style={styles.statusText}>
@@ -176,10 +176,10 @@ export default function OffboardingScreen() {
         <View
           style={[
             styles.statusBox,
-            { backgroundColor: "#DBEAFE", borderColor: "#93C5FD" },
+            { backgroundColor: "#F3E8FF", borderColor: "#cfc2eb" },
           ]}
         >
-          <Ionicons name="trending-up" size={24} color="#2563EB" />
+          <Ionicons name="trending-up" size={24} color="#e373bd" />
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.statusTitle}>In Progress</Text>
             <Text style={styles.statusText}>
@@ -196,7 +196,7 @@ export default function OffboardingScreen() {
     <View style={styles.stepContainer}>
       <View style={styles.iconContainer}>
         <View style={[styles.icon, { backgroundColor: "#F3E8FF" }]}>
-          <Ionicons name="calendar" size={40} color="#7C3AED" />
+          <Ionicons name="calendar" size={40} color="#0b0c67" />
         </View>
       </View>
 
@@ -232,7 +232,7 @@ export default function OffboardingScreen() {
               </Text>
             </View>
             {selectedOption === "addPhases" && (
-              <Ionicons name="checkmark-circle" size={24} color="#7C3AED" />
+              <Ionicons name="checkmark-circle" size={24} color="#0b0c67" />
             )}
           </Pressable>
         )}
@@ -265,7 +265,7 @@ export default function OffboardingScreen() {
               </Text>
             </View>
             {selectedOption === "extend" && (
-              <Ionicons name="checkmark-circle" size={24} color="#7C3AED" />
+              <Ionicons name="checkmark-circle" size={24} color="#0b0c67" />
             )}
           </Pressable>
         )}
@@ -276,7 +276,7 @@ export default function OffboardingScreen() {
             styles.optionButton,
             selectedOption === "complete" && [
               styles.optionButtonSelected,
-              { borderColor: "#10B981" },
+              { borderColor: "#0b0c67" },
             ],
           ]}
         >
@@ -284,7 +284,7 @@ export default function OffboardingScreen() {
             <Text
               style={[
                 styles.optionText,
-                selectedOption === "complete" && { color: "#10B981" },
+                selectedOption === "complete" && { color: "#0b0c67" },
               ]}
             >
               Complete Mentorship
@@ -292,14 +292,14 @@ export default function OffboardingScreen() {
             <Text
               style={[
                 styles.optionDescription,
-                selectedOption === "complete" && { color: "#10B981" },
+                selectedOption === "complete" && { color: "#0b0c67" },
               ]}
             >
               End your mentorship journey and graduate
             </Text>
           </View>
           {selectedOption === "complete" && (
-            <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+            <Ionicons name="checkmark-circle" size={24} color="#0b0c67" />
           )}
         </Pressable>
       </View>
@@ -310,7 +310,7 @@ export default function OffboardingScreen() {
     <View style={styles.stepContainer}>
       <View style={styles.iconContainer}>
         <View style={[styles.icon, { backgroundColor: "#DBEAFE" }]}>
-          <Ionicons name="trophy" size={40} color="#2563EB" />
+          <Ionicons name="trophy" size={40} color="#0b0c67" />
         </View>
       </View>
 
@@ -323,12 +323,12 @@ export default function OffboardingScreen() {
       <View
         style={[
           styles.progressBox,
-          { backgroundColor: "#F0F9FF", borderColor: "#93C5FD" },
+          { backgroundColor: "#F0F9FF", borderColor: "#ff3b89" },
         ]}
       >
         <View style={styles.rowBetween}>
           <Text style={styles.progressLabel}>Program Progress</Text>
-          <Text style={[styles.progressValue, { color: "#2563EB" }]}>
+          <Text style={[styles.progressValue, { color: "#ff3b89" }]}>
             {completedPhases}/{totalPhases} Phases
           </Text>
         </View>
@@ -339,7 +339,7 @@ export default function OffboardingScreen() {
               styles.progressFill,
               {
                 width: `${(completedPhases / totalPhases) * 100}%`,
-                backgroundColor: "#2563EB",
+                backgroundColor: "#ff3b89",
               },
             ]}
           />
@@ -347,7 +347,7 @@ export default function OffboardingScreen() {
 
         <View style={[styles.rowBetween, { marginTop: 12 }]}>
           <Text style={styles.progressLabel}>Total XP Distributed</Text>
-          <Text style={[styles.progressValue, { color: "#2563EB" }]}>
+          <Text style={[styles.progressValue, { color: "#ff3b89" }]}>
             {totalXP} XP
           </Text>
         </View>
@@ -356,10 +356,10 @@ export default function OffboardingScreen() {
       <View
         style={[
           styles.statusBox,
-          { backgroundColor: "#DBEAFE", borderColor: "#93C5FD" },
+          { backgroundColor: "#DBEAFE", borderColor: "#ff3b89" },
         ]}
       >
-        <Ionicons name="trending-up" size={24} color="#2563EB" />
+        <Ionicons name="trending-up" size={24} color="#ff3b89" />
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={styles.statusTitle}>Great Work!</Text>
           <Text style={styles.statusText}>
@@ -375,7 +375,7 @@ export default function OffboardingScreen() {
     <View style={styles.stepContainer}>
       <View style={styles.iconContainer}>
         <View style={[styles.icon, { backgroundColor: "#DBEAFE" }]}>
-          <Ionicons name="calendar" size={40} color="#2563EB" />
+          <Ionicons name="calendar" size={40} color="#0b0c67" />
         </View>
       </View>
 
@@ -390,7 +390,7 @@ export default function OffboardingScreen() {
               styles.optionButton,
               selectedOption === "addPhases" && [
                 styles.optionButtonSelected,
-                { borderColor: "#2563EB" },
+                { borderColor: "#0b0c67" },
               ],
             ]}
           >
@@ -398,7 +398,7 @@ export default function OffboardingScreen() {
               <Text
                 style={[
                   styles.optionText,
-                  selectedOption === "addPhases" && { color: "#2563EB" },
+                  selectedOption === "addPhases" && { color: "#0b0c67" },
                 ]}
               >
                 Add More Phases
@@ -406,14 +406,14 @@ export default function OffboardingScreen() {
               <Text
                 style={[
                   styles.optionDescription,
-                  selectedOption === "addPhases" && { color: "#2563EB" },
+                  selectedOption === "addPhases" && { color: "#0b0c67" },
                 ]}
               >
                 Extend the program with additional learning phases
               </Text>
             </View>
             {selectedOption === "addPhases" && (
-              <Ionicons name="checkmark-circle" size={24} color="#2563EB" />
+              <Ionicons name="checkmark-circle" size={24} color="#0b0c67" />
             )}
           </Pressable>
         )}
@@ -424,7 +424,7 @@ export default function OffboardingScreen() {
             styles.optionButton,
             selectedOption === "extend" && [
               styles.optionButtonSelected,
-              { borderColor: "#2563EB" },
+              { borderColor: "#e373bd" },
             ],
           ]}
         >
@@ -432,7 +432,7 @@ export default function OffboardingScreen() {
             <Text
               style={[
                 styles.optionText,
-                selectedOption === "extend" && { color: "#2563EB" },
+                selectedOption === "extend" && { color: "#e373bd" },
               ]}
             >
               Extend Timeline
@@ -440,14 +440,14 @@ export default function OffboardingScreen() {
             <Text
               style={[
                 styles.optionDescription,
-                selectedOption === "extend" && { color: "#2563EB" },
+                selectedOption === "extend" && { color: "#e373bd" },
               ]}
             >
               Give mentees more time to complete their goals
             </Text>
           </View>
           {selectedOption === "extend" && (
-            <Ionicons name="checkmark-circle" size={24} color="#2563EB" />
+            <Ionicons name="checkmark-circle" size={24} color="#e373bd" />
           )}
         </Pressable>
 
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: "100%",
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#0b0c67",
   },
   content: {
     flex: 1,
@@ -652,7 +652,7 @@ const styles = StyleSheet.create({
   progressValue: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#7C3AED",
+    color: "#0b0c67",
   },
   statusBox: {
     width: "100%",
@@ -688,7 +688,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   optionButtonSelected: {
-    borderColor: "#7C3AED",
+    borderColor: "#0b0c67",
     backgroundColor: "#F3E8FF",
   },
   optionText: {
@@ -697,7 +697,7 @@ const styles = StyleSheet.create({
     color: "#111827",
   },
   optionTextSelected: {
-    color: "#7C3AED",
+    color: "#0b0c67",
   },
   optionDescription: {
     fontSize: 14,
@@ -705,7 +705,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   optionDescriptionSelected: {
-    color: "#7C3AED",
+    color: "#0b0c67",
   },
   footer: {
     paddingHorizontal: 16,
@@ -727,7 +727,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     flex: 1,
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#0b0c67",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 12,
@@ -749,7 +749,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   completeButton: {
-    backgroundColor: "#10B981",
+    backgroundColor: "#0b0c67",
   },
   completeButtonText: {
     color: "#FFFFFF",
