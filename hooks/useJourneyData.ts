@@ -2,17 +2,17 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert } from "react-native";
 
 import {
-    createGoal,
-    createHabit,
-    deleteGoal as deleteGoalApi,
-    deleteHabit,
-    getGoals,
-    getHabits,
-    toggleGoal as toggleGoalApi,
-    toggleHabit,
-    updateGoal,
-    updateHabit,
-} from "../app/Services/journey";
+  createGoal,
+  createHabit,
+  deleteGoal as deleteGoalApi,
+  deleteHabit,
+  getGoals,
+  getHabits,
+  toggleGoal as toggleGoalApi,
+  toggleHabit,
+  updateGoal,
+  updateHabit,
+} from "../app/services/journey";
 import { DailyHabit, DayKey, SmartGoal } from "../types/accountability";
 
 type ApiHabit = {
